@@ -106,7 +106,39 @@ class TestTenantsIntegration:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 409
-        assert "already taken" in resp.text.lower()
+
+    async def test_create_tenant_duplicate_name(self, client: AsyncClient):
+        """Duplicate name returns 409 (regression: linea 31 en tenants.py)."""
+        holder = await _register_holder(client)
+        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        await client.post(
+            "/api/tenants",
+            json={"name": "Colegio Duplicado", "subdomain": "primero"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp = await client.post(
+            "/api/tenants",
+            json={"name": "Colegio Duplicado", "subdomain": "segundo"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 409
+        assert "registration failed" in resp.text.lower()
+
+    async def test_create_tenant_duplicate_name_and_subdomain(self, client: AsyncClient):
+        """Same name AND same subdomain returns 409 (redundant but valid)."""
+        holder = await _register_holder(client)
+        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        await client.post(
+            "/api/tenants",
+            json={"name": "Full Dupe", "subdomain": "full-dupe"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        resp = await client.post(
+            "/api/tenants",
+            json={"name": "Full Dupe", "subdomain": "full-dupe"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 409
 
     async def test_list_tenants(self, client: AsyncClient):
         """List tenants returns all created tenants."""

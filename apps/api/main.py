@@ -10,6 +10,22 @@ from database import engine, Base
 from routers import auth, evaluations, results, dashboard, courses, students, tenants, users
 
 
+# ─── Security Headers Middleware ────────────────────────────────────
+# SECURITY: Adds hardening headers to all HTTP responses to prevent
+# clickjacking, MIME-type sniffing, and other common attacks.
+
+
+async def security_headers_middleware(request: Request, call_next):
+    """Add security hardening headers to every response."""
+    response = await call_next(request)
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+
 # ─── Rate Limiter (in-memory) ──────────────────────────────────────
 # SECURITY: Prevents brute-force attacks on auth endpoints.
 # In production, replace with Redis-backed rate limiter for persistence
@@ -134,6 +150,9 @@ app.add_middleware(
         "X-Tenant-Id",
     ],
 )
+
+# SECURITY: Security hardening headers for all responses
+app.middleware("http")(security_headers_middleware)
 
 # SECURITY: Rate limiting for all endpoints (brute-force protection)
 # Auth endpoints are more restrictive (10 req/min) than general ones (60 req/min)
