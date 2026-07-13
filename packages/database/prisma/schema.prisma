@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id          String       @id @default(cuid()) @db.VarChar
+  subdomain   String       @unique @db.VarChar
+  name        String       @db.VarChar
+  brand       String?      @db.VarChar
+  settings    Json?        @db.Json
+  createdAt   DateTime?    @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime?    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  courses     Course[]
+  evaluations Evaluation[]
+  users       User[]
+  members     TenantMember[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String    @id @default(cuid()) @db.VarChar
+  email     String    @unique @db.VarChar
+  name      String    @db.VarChar
+  password  String    @db.VarChar
+  role      String?   @db.VarChar
+  tenantId  String    @map("tenant_id") @db.VarChar
+  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  tenantMemberships TenantMember[]
+
+  @@index([email], map: "ix_users_email")
+  @@index([tenantId], map: "ix_users_tenant_id")
+  @@index([tenantId, role], map: "ix_users_tenant_role")
+  @@map("users")
+}
+
+model Evaluation {
+  id        String    @id @default(cuid()) @db.VarChar
+  tenantId  String    @map("tenant_id") @db.VarChar
+  title     String    @db.VarChar
+  subject   String    @db.VarChar
+  grade     String    @db.VarChar
+  rubric    Json      @db.Json
+  pdfUrl    String?   @map("pdf_url") @db.VarChar
+  status    String?   @db.VarChar
+  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  results   Result[]
+
+  @@index([status], map: "ix_evaluations_status")
+  @@index([tenantId], map: "ix_evaluations_tenant_id")
+  @@map("evaluations")
+}
+
+model Result {
+  id             String     @id @default(cuid()) @db.VarChar
+  evaluationId   String     @map("evaluation_id") @db.VarChar
+  studentCode    String     @map("student_code") @db.VarChar
+  answers        Json?      @db.Json
+  confidence     Float?
+  requiresReview Boolean?   @map("requires_review")
+  finalGrade     Float?     @map("final_grade")
+  status         String?    @db.VarChar
+  feedbackPdfUrl String?    @map("feedback_pdf_url") @db.VarChar
+  createdAt      DateTime?  @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime?  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  evaluation     Evaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([evaluationId], map: "ix_results_evaluation_id")
+  @@index([status], map: "ix_results_status")
+  @@map("results")
+}
+
+model AuditLog {
+  id         String    @id @default(cuid()) @db.VarChar
+  tenantId   String    @map("tenant_id") @db.VarChar
+  userId     String    @map("user_id") @db.VarChar
+  action     String    @db.VarChar
+  resource   String    @db.VarChar
+  resourceId String    @map("resource_id") @db.VarChar
+  details    Json?     @db.Json
+  ipAddress  String?   @map("ip_address") @db.VarChar
+  createdAt  DateTime? @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt], map: "ix_audit_created_at")
+  @@index([tenantId], map: "ix_audit_tenant_id")
+  @@index([userId], map: "ix_audit_user_id")
+  @@map("audit_logs")
+}
+
+model Course {
+  id        String    @id @default(cuid()) @db.VarChar
+  tenantId  String    @map("tenant_id") @db.VarChar
+  name      String    @db.VarChar
+  grade     String    @db.VarChar
+  subject   String    @db.VarChar
+  teacherId String    @map("teacher_id") @db.VarChar
+  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  students  Student[]
+
+  @@index([teacherId], map: "ix_courses_teacher_id")
+  @@index([tenantId], map: "ix_courses_tenant_id")
+  @@map("courses")
+}
+
+model Student {
+  id          String    @id @default(cuid()) @db.VarChar
+  courseId    String    @map("course_id") @db.VarChar
+  fullName    String    @map("full_name") @db.VarChar
+  studentCode String    @map("student_code") @db.VarChar
+  rut         String?   @db.VarChar
+  email       String?   @db.VarChar
+  createdAt   DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([courseId, studentCode], map: "uq_student_course")
+  @@index([courseId], map: "ix_students_course_id")
+  @@map("students")
+}
+
+model TenantMember {
+  id        String   @id @default(cuid()) @db.VarChar
+  tenantId  String   @map("tenant_id") @db.VarChar
+  userId    String   @map("user_id") @db.VarChar
+  role      String   @default("member") @db.VarChar
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([tenantId, userId], map: "uq_tenant_member")
+  @@index([tenantId], map: "ix_tenant_members_tenant_id")
+  @@index([userId], map: "ix_tenant_members_user_id")
+  @@map("tenant_members")
+}

@@ -1,0 +1,28 @@
+{
+  "name": "relevo-tiza",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:all": "bash dev.sh",
+    "stop": "bash scripts/stop-dev.sh",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "format": "prettier --write .",
+    "db:migrate": "turbo db:migrate",
+    "db:generate": "turbo db:generate"
+  },
+  "devDependencies": {
+    "playwright": "^1.61.1",
+    "prettier": "^3.3.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.5.0"
+  },
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "node-fetch": "^3.3.2"
+  }
+}
