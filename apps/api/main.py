@@ -69,12 +69,18 @@ async def lifespan(app: FastAPI):
 
         # Migration v1: add join_code column to existing tenants table if missing
         # (legacy migration that added the column without NOT NULL)
+        # NOTE: We check information_schema first to avoid PostgreSQL aborting
+        # the entire transaction on a "column already exists" error.
         from sqlalchemy import text
 
-        try:
+        col_exists = await conn.execute(
+            text(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'tenants' AND column_name = 'join_code'"
+            )
+        )
+        if not col_exists.scalar():
             await conn.execute(text("ALTER TABLE tenants ADD COLUMN join_code VARCHAR(10) UNIQUE"))
-        except Exception:
-            pass  # Column already exists — safe to ignore
 
         # Migration v2: backfill NULL join_codes for existing tenants that
         # were created before the join_code column was added
