@@ -69,7 +69,7 @@ async def get_current_user(
     token = credentials.credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Invalid authentication credentials",
+        detail="Credenciales de autenticación inválidas",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
@@ -113,7 +113,7 @@ async def get_current_user(
 def require_role(role: str):
     async def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role != role and current_user.role != "ADMIN":
-            raise HTTPException(status_code=403, detail=f"Requires {role} role")
+            raise HTTPException(status_code=403, detail=f"Se requiere rol {role}")
         return current_user
 
     return role_checker
@@ -125,6 +125,20 @@ async def require_super_admin(current_user: User = Depends(get_current_user)) ->
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requieren privilegios de administrador para esta operación.",
+        )
+    return current_user
+
+
+async def require_admin_or_holder(current_user: User = Depends(get_current_user)) -> User:
+    """Allows ADMIN or HOLDER roles. Used for tenant-scoped approval endpoints.
+    
+    ADMIN can approve/reject users across all tenants.
+    HOLDER can only approve/reject TEACHERs within their own tenant.
+    """
+    if current_user.role not in ("ADMIN", "HOLDER"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requieren privilegios de administrador o director para esta operación.",
         )
     return current_user
 
@@ -153,7 +167,7 @@ def get_tenant_id(request: Request, current_user: User = None) -> str:
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail="No tenant context. Provide a valid subdomain.",
+        detail="No hay contexto de colegio. Proporciona un subdominio válido.",
     )
 
 
@@ -196,7 +210,7 @@ async def verify_tenant_access(
     if not membership.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to this tenant",
+            detail="Acceso denegado a este colegio",
         )
 
     return current_user

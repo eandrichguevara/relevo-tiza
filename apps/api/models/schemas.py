@@ -1,8 +1,21 @@
 """Pydantic schemas for API request/response validation."""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Annotated
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator, EmailStr
+import re
+from pydantic import BaseModel, Field, field_validator, BeforeValidator
+
+# Basic email regex — same as frontend. Allows .local / .test domains for dev.
+_EMAIL_RE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+
+
+def _validate_email_field(v: str) -> str:
+    v = v.strip()
+    if not _EMAIL_RE.match(v):
+        raise ValueError('El valor no es un email válido')
+    return v
+
+EmailStr = Annotated[str, BeforeValidator(_validate_email_field)]
 
 
 class BrandEnum(str, Enum):
@@ -111,13 +124,35 @@ class ApprovalActionResponse(BaseModel):
 
 class CreateTenantRequest(BaseModel):
     name: str = Field(..., min_length=1)
-    subdomain: str
+    subdomain: str = Field(
+        ...,
+        min_length=3,
+        max_length=63,
+        pattern=r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?$',
+    )
 
     @field_validator("name")
     @classmethod
     def name_must_not_be_blank(cls, v: str) -> str:
         if not v.strip():
-            raise ValueError("Name must not be empty or whitespace only")
+            raise ValueError("El nombre no debe estar vacío o ser solo espacios")
+        return v
+
+    @field_validator("subdomain")
+    @classmethod
+    def subdomain_must_be_valid(cls, v: str) -> str:
+        """Validate subdomain format: lowercase, numbers and hyphens only."""
+        if not v or not v.strip():
+            raise ValueError("El subdominio no debe estar vacío")
+        v = v.strip().lower()
+        import re
+        if not re.match(r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?$', v):
+            raise ValueError(
+                "El subdominio solo puede contener letras minúsculas, números y guiones. "
+                "No puede comenzar ni terminar con un guión."
+            )
+        if len(v) < 3 or len(v) > 63:
+            raise ValueError("El subdominio debe tener entre 3 y 63 caracteres")
         return v
 
 
@@ -141,6 +176,12 @@ class TenantLookupResponse(BaseModel):
     name: str
 
 
+class DeleteTenantResponse(BaseModel):
+    success: bool
+    message: str
+    tenant_id: str
+
+
 # ─── Users (multi-tenant admin) ───────────
 
 
@@ -150,6 +191,12 @@ class CreateUserRequest(BaseModel):
     name: str
     role: str  # only "teacher" allowed via this endpoint
     tenant_id: str
+
+
+class ResetPasswordResponse(BaseModel):
+    success: bool
+    message: str
+    temporary_password: str
 
 
 # ─── Rubric ───────────────────────────────

@@ -323,7 +323,7 @@ class TestTenantsIntegration:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 409
-        assert "registration failed" in resp.text.lower()
+        assert "colegio con este nombre" in resp.text.lower()
 
     async def test_create_tenant_duplicate_name_and_subdomain(self, client: AsyncClient, fastapi_app):
         """Same name AND same subdomain returns 409 (redundant but valid)."""
@@ -492,7 +492,7 @@ class TestUsersIntegration:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 409
-        assert "already registered" in resp.text.lower()
+        assert "registrado" in resp.text.lower()
 
     async def test_create_user_invalid_tenant_returns_404(self, client: AsyncClient, fastapi_app):
         """Non-existent tenant_id returns 404."""
@@ -543,6 +543,186 @@ class TestUsersIntegration:
         """GET /api/users without auth returns 401."""
         resp = await client.get("/api/users")
         assert resp.status_code == 401
+
+    # ─────────────────────────────────────────────
+    #  RESET PASSWORD  (HOLDER action)
+    # ─────────────────────────────────────────────
+
+    RESET_TEACHER_EMAIL = "reset-teacher@integro.com"
+    RESET_TEACHER_PASS = "OldPass123!"
+    RESET_TEACHER_NAME = "Profe Reset"
+
+    async def _create_teacher_for_reset(self, _app, tenant_id: str) -> dict:
+        """Create a TEACHER directly in DB and return their data."""
+        from database import get_db
+        from models.db_models import User
+        from utils.security import hash_password
+
+        override = _app.dependency_overrides.get(get_db)
+        session_generator = override() if override else get_db()
+        async for session in session_generator:
+            teacher = User(
+                email=self.RESET_TEACHER_EMAIL,
+                name=self.RESET_TEACHER_NAME,
+                password=hash_password(self.RESET_TEACHER_PASS),
+                status="active",
+                role="TEACHER",
+                tenant_id=tenant_id,
+            )
+            session.add(teacher)
+            await session.flush()
+            teacher_id = teacher.id
+
+        return {"id": teacher_id, "email": self.RESET_TEACHER_EMAIL}
+
+    async def test_reset_password_success(self, client: AsyncClient, fastapi_app):
+        """HOLDER can reset a teacher's password and gets a temporary password back."""
+        holder = await _setup_holder(fastapi_app)
+        teacher = await self._create_teacher_for_reset(fastapi_app, holder["tenant_id"])
+
+        resp = await client.post(
+            f"/api/users/{teacher['id']}/reset-password",
+            headers={"Authorization": f"Bearer {holder['token']}"},
+        )
+        assert resp.status_code == 200, f"Reset password failed: {resp.text}"
+        data = resp.json()
+        assert data["success"] is True
+        assert data["message"] == "Contraseña restaurada exitosamente."
+        assert "temporary_password" in data
+        assert len(data["temporary_password"]) >= 12
+
+        # Verify the old password no longer works
+        old_login = await client.post("/api/auth/login", json={
+            "email": teacher["email"],
+            "password": self.RESET_TEACHER_PASS,
+        })
+        assert old_login.status_code == 401, (
+            f"Old password should be invalid, got {old_login.status_code}"
+        )
+
+        # Verify the new temporary password works
+        new_login = await client.post("/api/auth/login", json={
+            "email": teacher["email"],
+            "password": data["temporary_password"],
+        })
+        assert new_login.status_code == 200, (
+            f"New temp password should work, got {new_login.status_code}: {new_login.text}"
+        )
+
+    async def test_reset_password_user_not_found(self, client: AsyncClient, fastapi_app):
+        """Reset password on non-existent user returns 404."""
+        holder = await _setup_holder(fastapi_app)
+
+        resp = await client.post(
+            "/api/users/00000000-0000-0000-0000-000000000000/reset-password",
+            headers={"Authorization": f"Bearer {holder['token']}"},
+        )
+        assert resp.status_code == 404
+
+    async def test_reset_password_requires_holder(self, client: AsyncClient, fastapi_app):
+        """A TEACHER (not HOLDER) cannot reset passwords — returns 403."""
+        holder = await _setup_holder(fastapi_app)
+        teacher_data = await self._create_teacher_for_reset(fastapi_app, holder["tenant_id"])
+
+        # Login as teacher to get teacher token
+        teacher_token = await _login(fastapi_app, teacher_data["email"], self.RESET_TEACHER_PASS)
+
+        resp = await client.post(
+            f"/api/users/{teacher_data['id']}/reset-password",
+            headers={"Authorization": f"Bearer {teacher_token}"},
+        )
+        assert resp.status_code == 403, f"Expected 403, got {resp.status_code}: {resp.text}"
+
+    async def test_reset_password_requires_auth(self, client: AsyncClient, fastapi_app):
+        """Reset password without auth returns 401."""
+        resp = await client.post("/api/users/some-id/reset-password")
+        assert resp.status_code == 401
+
+    async def test_reset_password_tenant_isolation(self, client: AsyncClient, fastapi_app):
+        """HOLDER from tenant A cannot reset password for a user in tenant B."""
+        from database import get_db
+        from models.db_models import Tenant, User, TenantMember
+        from utils.security import hash_password
+        from models.db_models import generate_join_code
+        from httpx import AsyncClient, ASGITransport
+
+        # Create holder_a with tenant_a
+        holder_a = await _setup_holder(fastapi_app)
+
+        # Create a second holder (holder_b) with their own tenant
+        override = fastapi_app.dependency_overrides.get(get_db)
+        session_generator = override() if override else get_db()
+        async for session in session_generator:
+            import time, random
+            ts = f"{time.time()}-{random.randint(1000,9999)}"
+            tenant_b = Tenant(
+                subdomain=f"iso-reset-{ts}",
+                name=f"Iso Reset School {ts}",
+                brand="relevo",
+                status="active",
+                join_code=generate_join_code(),
+            )
+            session.add(tenant_b)
+            await session.flush()
+
+            holder_b = User(
+                email="holder-iso-reset@test.com",
+                name="Holder Iso Reset",
+                password=hash_password("HolderIso999!"),
+                status="active",
+                role="HOLDER",
+                tenant_id=tenant_b.id,
+            )
+            session.add(holder_b)
+            await session.flush()
+
+            member_b = TenantMember(
+                tenant_id=tenant_b.id,
+                user_id=holder_b.id,
+                role="owner",
+            )
+            session.add(member_b)
+            tenant_b_id = tenant_b.id
+
+        # Login as holder_b
+        transport = ASGITransport(app=fastapi_app)
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            login_resp = await c.post("/api/auth/login", json={
+                "email": "holder-iso-reset@test.com",
+                "password": "HolderIso999!",
+            })
+            assert login_resp.status_code == 200
+            holder_b_token = login_resp.json()["access_token"]
+
+        # Create a teacher in holder_a's tenant
+        teacher = await self._create_teacher_for_reset(fastapi_app, holder_a["tenant_id"])
+
+        # Holder_b tries to reset password for a teacher in holder_a's tenant → 403
+        resp = await client.post(
+            f"/api/users/{teacher['id']}/reset-password",
+            headers={"Authorization": f"Bearer {holder_b_token}"},
+        )
+        assert resp.status_code == 403, (
+            f"Expected 403 (tenant isolation), got {resp.status_code}: {resp.text}"
+        )
+
+    async def test_reset_password_returns_valid_response_shape(self, client: AsyncClient, fastapi_app):
+        """ResetPasswordResponse schema is respected."""
+        holder = await _setup_holder(fastapi_app)
+        teacher = await self._create_teacher_for_reset(fastapi_app, holder["tenant_id"])
+
+        resp = await client.post(
+            f"/api/users/{teacher['id']}/reset-password",
+            headers={"Authorization": f"Bearer {holder['token']}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Must match ResetPasswordResponse schema
+        assert isinstance(data["success"], bool)
+        assert isinstance(data["message"], str)
+        assert isinstance(data["temporary_password"], str)
+        # No extra fields
+        assert set(data.keys()) == {"success", "message", "temporary_password"}
 
 
 # ═════════════════════════════════════════════

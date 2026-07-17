@@ -133,7 +133,7 @@ class TestAuthRegister:
         })
         assert response.status_code == 409
         data = response.json()
-        assert "already registered" in data["detail"].lower()
+        assert "registrado" in data["detail"].lower()
 
     async def test_register_admin_role_downgraded_to_teacher(self, client: AsyncClient):
         """Register with role 'admin' should be rejected or downgraded.
@@ -184,7 +184,7 @@ class TestAuthLogin:
         })
         assert response.status_code == 401
         data = response.json()
-        assert "invalid" in data["detail"].lower()
+        assert "inválidos" in data["detail"].lower()
 
     async def test_login_nonexistent_user_returns_401(self, client: AsyncClient):
         """Login with an email that doesn't exist should return 401."""

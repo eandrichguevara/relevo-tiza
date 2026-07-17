@@ -26,7 +26,7 @@ async def bulk_create_students(
     )
     course = result.scalar_one_or_none()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     # Get existing students count for this course to avoid code collisions
     count_result = await db.execute(
@@ -63,7 +63,7 @@ async def bulk_create_students(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Some students could not be created. Check for duplicate student codes or names.",
+            detail="No se pudieron crear algunos estudiantes. Revisa si hay códigos de estudiante o nombres duplicados.",
         )
 
     return BulkCreateStudentsResponse(
@@ -83,7 +83,7 @@ async def list_students(
         select(Course).where(Course.id == course_id)
     )
     if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     students_result = await db.execute(
         select(Student).where(Student.course_id == course_id).order_by(Student.full_name)
@@ -103,7 +103,7 @@ async def delete_student(
     )
     student = result.scalar_one_or_none()
     if not student:
-        raise HTTPException(status_code=404, detail="Student not found")
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
     await db.delete(student)
     await db.flush()
-    return {"message": "Student deleted"}
+    return {"message": "Estudiante eliminado"}

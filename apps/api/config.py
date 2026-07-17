@@ -44,8 +44,8 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = ["http://localhost:3001", "http://localhost:3002"]
 
     # ─── Rate Limiting ─────────────────────────────────────────────
-    RATE_LIMIT_AUTH_MAX_REQUESTS: int = 10
-    RATE_LIMIT_GENERAL_MAX_REQUESTS: int = 60
+    RATE_LIMIT_AUTH_MAX_REQUESTS: int = 30
+    RATE_LIMIT_GENERAL_MAX_REQUESTS: int = 120
     RATE_LIMIT_WINDOW_SECONDS: int = 60
 
     # ─── Storage (S3/MinIO) ────────────────────────────────────────

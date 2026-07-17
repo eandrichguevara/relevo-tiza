@@ -70,7 +70,7 @@ async def get_evaluation(
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
     return evaluation
 
 
@@ -86,7 +86,7 @@ async def generate_pdf(
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     pdf_buffer = generate_evaluation_pdf(evaluation)
     evaluation.pdf_url = f"/api/evaluations/{evaluation_id}/pdf"
@@ -117,7 +117,7 @@ async def process_scanned(
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     # Process with Gemini
     contents = await file.read()
@@ -146,7 +146,7 @@ async def process_scanned(
     evaluation.status = "completed"
     await db.flush()
 
-    return {"message": "Processing complete", "results_count": len(processing_results)}
+    return {"message": "Procesamiento completado", "results_count": len(processing_results)}
 
 
 @router.delete("/{evaluation_id}")
@@ -161,11 +161,11 @@ async def delete_evaluation(
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     await db.delete(evaluation)
     await db.flush()
-    return {"message": "Evaluation deleted"}
+    return {"message": "Evaluación eliminada"}
 
 
 @router.get("/{evaluation_id}/answer-sheet/{course_id}")
@@ -183,14 +183,14 @@ async def generate_answer_sheet(
     )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     course_result = await db.execute(
         select(Course).where(Course.id == course_id)
     )
     course = course_result.scalar_one_or_none()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     students_result = await db.execute(
         select(Student).where(Student.course_id == course_id).order_by(Student.full_name)
@@ -198,7 +198,7 @@ async def generate_answer_sheet(
     students = students_result.scalars().all()
 
     if not students:
-        raise HTTPException(status_code=400, detail="No students in this course. Add students first.")
+        raise HTTPException(status_code=400, detail="No hay estudiantes en este curso. Agrega estudiantes primero.")
 
     pdf_buffer = generate_answer_sheet_pdf(course.name, evaluation.title, students)
 
@@ -226,13 +226,13 @@ async def simulate_answers(
     )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     course_result = await db.execute(
         select(Course).where(Course.id == course_id)
     )
     if not course_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     students_result = await db.execute(
         select(Student).where(Student.course_id == course_id)
@@ -240,7 +240,7 @@ async def simulate_answers(
     students = students_result.scalars().all()
 
     if not students:
-        raise HTTPException(status_code=400, detail="No students in course")
+        raise HTTPException(status_code=400, detail="No hay estudiantes en el curso")
 
     rubric = evaluation.rubric if isinstance(evaluation.rubric, list) else []
     results_created = []
@@ -294,7 +294,7 @@ async def simulate_answers(
     await db.commit()
 
     return {
-        "message": f"Simulated answers for {len(students)} students",
+        "message": f"Respuestas simuladas para {len(students)} estudiantes",
         "evaluation_id": evaluation.id,
         "course_id": course_id,
         "generated": len(results_created),
@@ -323,7 +323,7 @@ async def process_scanned_async(
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     contents = await file.read()
 
@@ -341,7 +341,7 @@ async def process_scanned_async(
     return {
         "job_id": job_id,
         "status": "processing",
-        "message": "Evaluation queued for AI processing",
+        "message": "Evaluación encolada para procesamiento con IA",
         "poll_url": f"/api/evaluations/{evaluation_id}/status",
     }
 
@@ -362,7 +362,7 @@ async def get_processing_status(
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     # Count results
     from models.db_models import Result

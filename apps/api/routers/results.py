@@ -25,7 +25,7 @@ async def list_results(
     )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
-        raise HTTPException(status_code=404, detail="Evaluation not found")
+        raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     results = await db.execute(
         select(Result).where(Result.evaluation_id == evaluation_id)
@@ -65,7 +65,7 @@ async def get_result(
     )
     result = res.scalar_one_or_none()
     if not result:
-        raise HTTPException(status_code=404, detail="Result not found")
+        raise HTTPException(status_code=404, detail="Resultado no encontrado")
     return result
 
 
@@ -82,7 +82,7 @@ async def review_result(
     )
     result = res.scalar_one_or_none()
     if not result:
-        raise HTTPException(status_code=404, detail="Result not found")
+        raise HTTPException(status_code=404, detail="Resultado no encontrado")
 
     # Apply corrections
     answers = result.answers if isinstance(result.answers, list) else []
@@ -126,7 +126,7 @@ async def generate_report(
     )
     result = res.scalar_one_or_none()
     if not result:
-        raise HTTPException(status_code=404, detail="Result not found")
+        raise HTTPException(status_code=404, detail="Resultado no encontrado")
 
     pdf_buffer = generate_result_report_pdf(result)
 

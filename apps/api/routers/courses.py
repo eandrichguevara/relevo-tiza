@@ -66,7 +66,7 @@ async def get_course(
     )
     course = result.scalar_one_or_none()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     count_result = await db.execute(
         select(func.count(Student.id)).where(Student.course_id == course.id)
@@ -89,7 +89,7 @@ async def delete_course(
     )
     course = result.scalar_one_or_none()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
     await db.delete(course)
     await db.flush()
-    return {"message": "Course deleted"}
+    return {"message": "Curso eliminado"}

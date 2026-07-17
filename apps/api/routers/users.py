@@ -1,12 +1,17 @@
 """Users router — multi-tenant user management for HOLDERs."""
+import secrets
+import string
+import uuid
+from datetime import datetime, timezone
 from typing import Optional
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database import get_db
-from models.db_models import User, Tenant, TenantMember
-from models.schemas import CreateUserRequest, UserResponse
+from models.db_models import User, Tenant, TenantMember, AuditLog
+from models.schemas import CreateUserRequest, UserResponse, ResetPasswordResponse
 from utils.security import hash_password, require_role, get_tenant_id
 
 router = APIRouter()
@@ -29,7 +34,7 @@ async def create_user(
     if not resolved_role:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Only 'teacher' role can be created via this endpoint",
+            detail="Solo el rol 'teacher' puede ser creado a través de este endpoint",
         )
 
     # Verify tenant exists
@@ -40,7 +45,7 @@ async def create_user(
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found",
+            detail="Colegio no encontrado",
         )
 
     # SEC-2: Verify HOLDER is a member of this tenant (tenant isolation)
@@ -54,7 +59,7 @@ async def create_user(
         if not member_result.scalar_one_or_none():
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Not a member of this tenant",
+                detail="No eres miembro de este colegio",
             )
 
     # Check email uniqueness
@@ -62,7 +67,7 @@ async def create_user(
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+            detail="El email ya está registrado",
         )
 
     user = User(
@@ -107,7 +112,7 @@ async def list_users(
         if not membership.scalar_one_or_none() and current_user.role != "ADMIN":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You are not a member of this tenant",
+                detail="No eres miembro de este colegio",
             )
         stmt = stmt.where(User.tenant_id == tenant_id)
     else:
@@ -129,3 +134,96 @@ async def list_users(
     result = await db.execute(stmt)
     users = result.scalars().all()
     return users
+
+
+def _generate_temp_password(length: int = 12) -> str:
+    """Generate a secure random temporary password."""
+    alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
+@router.post("/{user_id}/reset-password", response_model=ResetPasswordResponse)
+async def reset_password(
+    user_id: UUID,
+    current_user: User = Depends(require_role("HOLDER")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset a user's password to a secure temporary password.
+    
+    Only HOLDERs can reset passwords. The HOLDER must belong to the same
+    tenant as the target user (tenant isolation). The temporary password
+    is returned in the response and is not stored in plaintext.
+    """
+    # Fetch the target user
+    user_id_str = str(user_id)
+    user_result = await db.execute(select(User).where(User.id == user_id_str))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuario no encontrado",
+        )
+
+    # SECURITY: Prevent HOLDER from resetting their own password
+    if user_id_str == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No puedes restaurar tu propia contraseña desde este panel.",
+        )
+
+    # SECURITY: Tenant isolation — HOLDER must be a member of the user's tenant
+    if current_user.role != "ADMIN":
+        member_result = await db.execute(
+            select(TenantMember).where(
+                TenantMember.tenant_id == user.tenant_id,
+                TenantMember.user_id == current_user.id,
+            )
+        )
+        if not member_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No eres miembro del colegio de este usuario",
+            )
+
+    # SECURITY: Only allow password reset for active TEACHERs
+    if user.role != "TEACHER":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo se puede restaurar la contraseña de profesores.",
+        )
+
+    if user.status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"No se puede restaurar la contraseña de un usuario con estado '{user.status}'.",
+        )
+
+    # Generate secure random password and hash it
+    temp_password = _generate_temp_password()
+    user.password = hash_password(temp_password)
+
+    await db.flush()
+    await db.commit()
+
+    # ── Audit log ────────────────────────────────────────────────
+    audit = AuditLog(
+        id=str(uuid.uuid4()),
+        tenant_id=user.tenant_id,
+        user_id=current_user.id,
+        action="password_reset",
+        resource="user",
+        resource_id=user.id,
+        details={
+            "target_email": user.email,
+            "target_role": user.role,
+        },
+        ip_address="0.0.0.0",
+    )
+    db.add(audit)
+    await db.commit()
+
+    return ResetPasswordResponse(
+        success=True,
+        message="Contraseña restaurada exitosamente.",
+        temporary_password=temp_password,
+    )

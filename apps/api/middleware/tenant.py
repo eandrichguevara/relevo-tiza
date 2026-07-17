@@ -193,7 +193,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
             if auth.startswith("Bearer "):
                 return JSONResponse(
                     status_code=400,
-                    content={"detail": "No tenant context resolved"},
+                    content={"detail": "No se pudo resolver el contexto del colegio"},
                 )
             # No auth → let the endpoint handle 401
             return await call_next(request)

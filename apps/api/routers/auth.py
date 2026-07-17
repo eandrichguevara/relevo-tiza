@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
-from database import get_db
+from database import get_db, create_tenant_schema
 from models.db_models import User, Tenant, TenantMember, generate_join_code as _raw_join_code
 from models.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
 from utils.security import verify_password, hash_password, create_access_token, get_current_user
@@ -14,7 +14,7 @@ MAX_JOIN_CODE_ATTEMPTS = 10
 
 
 async def _generate_unique_join_code(db: AsyncSession) -> str:
-    """Generate a unique join_code with collision retry."""
+    """Generar un join_code único con reintento en caso de colisión."""
     for _ in range(MAX_JOIN_CODE_ATTEMPTS):
         code = _raw_join_code()
         existing = await db.execute(select(Tenant).where(Tenant.join_code == code))
@@ -22,7 +22,7 @@ async def _generate_unique_join_code(db: AsyncSession) -> str:
             return code
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Failed to generate a unique join_code. Please try again.",
+        detail="No se pudo generar un código de acceso único. Intenta nuevamente.",
     )
 
 router = APIRouter()
@@ -71,7 +71,7 @@ async def register(
     if result.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Email already registered",
+            detail="El email ya está registrado",
         )
 
     # Resolve role and brand
@@ -91,7 +91,7 @@ async def register(
         if not tenant:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Invalid join code",
+                detail="Código de acceso inválido",
             )
         tenant_id = tenant.id
 
@@ -103,12 +103,12 @@ async def register(
             if not tenant:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Tenant not found",
+                    detail="Colegio no encontrado",
                 )
     elif resolved_role == "TEACHER":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Teachers must be assigned to an existing tenant. Provide a tenant_id, a join_code, or ask your school director to create an account.",
+            detail="Los profesores deben estar asignados a un colegio existente. Proporciona un tenant_id, un código de acceso, o pide a tu director(a) que cree una cuenta.",
         )
     else:
         # HOLDER / ADMIN → create a default tenant
@@ -130,6 +130,8 @@ async def register(
             db.add(tenant)
             try:
                 await db.flush()
+                # Create tenant schema for data isolation
+                await create_tenant_schema(tenant.id)
             except IntegrityError:
                 await db.rollback()
                 # Race condition: another request concurrently created the same tenant.
@@ -141,7 +143,7 @@ async def register(
                 if not tenant:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Failed to create tenant due to a concurrent registration. Please try again.",
+                        detail="No se pudo crear el colegio debido a un registro concurrente. Intenta nuevamente.",
                     )
         tenant_id = tenant.id
 
@@ -179,7 +181,7 @@ async def login(
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(body.password, user.password):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        raise HTTPException(status_code=401, detail="Email o contraseña inválidos")
 
     # Block non-active users from logging in
     if user.status != "active":

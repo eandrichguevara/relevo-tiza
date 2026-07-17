@@ -58,10 +58,18 @@ async def rate_limit_middleware(request: Request, call_next):
 
     # Determine limit for this endpoint
     is_auth = request.url.path in AUTH_PATHS
-    max_requests = (
-        settings.RATE_LIMIT_AUTH_MAX_REQUESTS if is_auth
-        else settings.RATE_LIMIT_GENERAL_MAX_REQUESTS
-    )
+
+    # Development mode: more permissive limits
+    if settings.ENVIRONMENT == "development":
+        max_requests = (
+            settings.RATE_LIMIT_AUTH_MAX_REQUESTS * 3 if is_auth
+            else settings.RATE_LIMIT_GENERAL_MAX_REQUESTS * 3
+        )
+    else:
+        max_requests = (
+            settings.RATE_LIMIT_AUTH_MAX_REQUESTS if is_auth
+            else settings.RATE_LIMIT_GENERAL_MAX_REQUESTS
+        )
 
     if len(rate_limit_store[client_ip]) >= max_requests:
         # Return 429 JSON directly instead of raising HTTPException,
@@ -69,7 +77,7 @@ async def rate_limit_middleware(request: Request, call_next):
         # by FastAPI's exception handler, causing a 500 error.
         return JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={"detail": "Too many requests. Please try again later."},
+            content={"detail": "Demasiadas solicitudes. Intenta nuevamente más tarde."},
         )
 
     rate_limit_store[client_ip].append(now)

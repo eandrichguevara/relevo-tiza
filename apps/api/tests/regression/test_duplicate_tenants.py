@@ -60,7 +60,8 @@ class TestDuplicateTenantsRegression:
         )
         data = resp.json()
         assert resp.status_code == 409
-        assert data["detail"] == "Registration failed"
+        assert "colegio" in data["detail"].lower()
+        assert "nombre" in data["detail"].lower()
 
     async def test_unique_names_allowed(self, client: AsyncClient, pre_approved_holder: dict):
         """Different names with different subdomains are all accepted."""

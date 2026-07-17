@@ -5,10 +5,10 @@ from sqlalchemy import select
 
 from sqlalchemy.exc import IntegrityError
 
-from database import get_db
+from database import get_db, create_tenant_schema
 from models.db_models import Tenant, TenantMember, User, generate_join_code
-from models.schemas import CreateTenantRequest, TenantResponse, TenantLookupResponse
-from utils.security import require_role
+from models.schemas import CreateTenantRequest, TenantResponse, TenantLookupResponse, DeleteTenantResponse
+from utils.security import require_role, require_super_admin
 
 router = APIRouter()
 
@@ -16,7 +16,7 @@ MAX_JOIN_CODE_ATTEMPTS = 10
 
 
 async def _generate_unique_join_code(db: AsyncSession) -> str:
-    """Generate a unique join_code with collision retry."""
+    """Generar un join_code único con reintento en caso de colisión."""
     for _ in range(MAX_JOIN_CODE_ATTEMPTS):
         code = generate_join_code()
         existing = await db.execute(
@@ -26,7 +26,7 @@ async def _generate_unique_join_code(db: AsyncSession) -> str:
             return code
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        detail="Failed to generate a unique join_code. Please try again.",
+        detail="No se pudo generar un código de acceso único. Intenta nuevamente.",
     )
 
 
@@ -47,7 +47,7 @@ async def create_tenant(
     if existing_name.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Registration failed",
+            detail="Ya existe un colegio con este nombre",
         )
 
     # Check subdomain uniqueness
@@ -57,7 +57,7 @@ async def create_tenant(
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Registration failed",
+            detail="Ya existe un colegio con este subdominio",
         )
 
     join_code = await _generate_unique_join_code(db)
@@ -73,11 +73,13 @@ async def create_tenant(
     try:
         await db.flush()
         await db.refresh(tenant)
+        # Create tenant schema for data isolation
+        await create_tenant_schema(tenant.id)
     except IntegrityError:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A tenant with this name or subdomain already exists",
+            detail="Ya existe un colegio con este nombre o subdominio",
         )
 
     # Automatically add the creating HOLDER as an owner member (tenant isolation)
@@ -95,7 +97,7 @@ async def create_tenant(
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="A tenant with this name or subdomain already exists",
+            detail="Ya existe un colegio con este nombre o subdominio",
         )
     return tenant
 
@@ -106,12 +108,20 @@ async def list_tenants(
     current_user: User = Depends(require_role("HOLDER")),
     db: AsyncSession = Depends(get_db),
 ):
-    """List tenants accessible to the current HOLDER.
-    
-    SECURITY: Only returns tenants where the HOLDER (or ADMIN) is
-    a member of, enforcing tenant isolation.
+    """List tenants.
+
+    - ADMIN: sees ALL tenants across the system.
+    - HOLDER: only sees tenants where they are a member (tenant isolation).
     """
-    # Get IDs of all tenants where the current user is a member
+    # ADMIN can see all tenants
+    if current_user.role == "ADMIN":
+        result = await db.execute(
+            select(Tenant).order_by(Tenant.created_at.desc())
+        )
+        tenants = result.scalars().all()
+        return tenants
+
+    # HOLDER: get IDs of all tenants where they are a member
     member_result = await db.execute(
         select(TenantMember.tenant_id).where(TenantMember.user_id == current_user.id)
     )
@@ -143,6 +153,53 @@ async def list_tenants(
     return tenants
 
 
+@router.delete("/{tenant_id}", response_model=DeleteTenantResponse)
+async def delete_tenant(
+    tenant_id: str,
+    current_user: User = Depends(require_role("HOLDER")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Eliminar un colegio (tenant). Solo el dueño o un ADMIN puede eliminarlo.
+
+    Realiza un soft delete: cambia el estado a "inactive" en lugar de
+    eliminar físicamente el registro.
+    """
+    # Verify tenant exists
+    result = await db.execute(select(Tenant).where(Tenant.id == tenant_id))
+    tenant = result.scalar_one_or_none()
+    if not tenant:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Colegio no encontrado",
+        )
+
+    # Verify ownership: ADMIN can delete any tenant, HOLDER must be owner
+    if current_user.role != "ADMIN":
+        membership = await db.execute(
+            select(TenantMember).where(
+                TenantMember.tenant_id == tenant_id,
+                TenantMember.user_id == current_user.id,
+                TenantMember.role == "owner",
+            )
+        )
+        if not membership.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Solo el dueño del colegio puede eliminarlo. Contacta a un administrador.",
+            )
+
+    # Soft delete: change status to inactive
+    tenant.status = "inactive"
+    await db.flush()
+    await db.commit()
+
+    return DeleteTenantResponse(
+        success=True,
+        message="Colegio desactivado exitosamente.",
+        tenant_id=tenant_id,
+    )
+
+
 @router.get("/lookup", response_model=TenantLookupResponse)
 async def lookup_tenant(
     code: str,
@@ -156,7 +213,7 @@ async def lookup_tenant(
     if not code or not code.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="join_code is required",
+            detail="El código de acceso es obligatorio",
         )
 
     result = await db.execute(
@@ -167,7 +224,7 @@ async def lookup_tenant(
     if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Invalid join code",
+            detail="Código de acceso inválido",
         )
 
     return TenantLookupResponse(tenant_id=tenant.id, name=tenant.name)

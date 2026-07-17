@@ -202,7 +202,7 @@ async def course_stats(
     )
     course = course_result.scalar_one_or_none()
     if not course:
-        raise HTTPException(status_code=404, detail="Course not found")
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     # Count students
     student_count = await db.execute(

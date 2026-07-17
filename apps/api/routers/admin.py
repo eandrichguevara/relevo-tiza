@@ -16,9 +16,32 @@ from models.schemas import (
     ApprovalActionResponse,
     UserStatusEnum,
 )
-from utils.security import require_super_admin
+from utils.security import require_admin_or_holder
 
 router = APIRouter()
+
+
+def _build_tenant_scoped_query(current_user: User):
+    """Build the base pending-users query, scoped by tenant for HOLDERs.
+    
+    - ADMIN: sees all pending users across all tenants.
+    - HOLDER: sees only TEACHERs pending within their own tenant.
+    """
+    query = select(User).where(User.status == "pending")
+    count_query = select(func.count(User.id)).where(User.status == "pending")
+
+    if current_user.role == "HOLDER":
+        # HOLDER can only see TEACHERs in their own tenant
+        query = query.where(
+            User.tenant_id == current_user.tenant_id,
+            User.role == "TEACHER",
+        )
+        count_query = count_query.where(
+            User.tenant_id == current_user.tenant_id,
+            User.role == "TEACHER",
+        )
+
+    return query, count_query
 
 
 @router.get("/api/admin/pending-registrations", response_model=PendingListResponse)
@@ -26,12 +49,15 @@ async def list_pending_registrations(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
     role: str = Query(None, description="Filter by role (TEACHER, HOLDER, ADMIN)"),
-    current_user: User = Depends(require_super_admin),
+    current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all pending user registrations with pagination and optional role filter."""
-    query = select(User).where(User.status == "pending")
-    count_query = select(func.count(User.id)).where(User.status == "pending")
+    """List pending user registrations with pagination and optional role filter.
+    
+    - ADMIN: sees all pending users across all tenants.
+    - HOLDER: sees only TEACHERs pending within their own tenant.
+    """
+    query, count_query = _build_tenant_scoped_query(current_user)
 
     if role:
         role_upper = role.upper().strip()
@@ -83,15 +109,16 @@ async def list_pending_registrations(
 async def approve_registration(
     user_id: UUID,
     body: ApproveRejectRequest,
-    current_user: User = Depends(require_super_admin),
+    current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve a pending user registration.
 
-    If the user is a HOLDER or ADMIN, also approves their tenant.
+    - ADMIN: can approve any user. Also approves their tenant if HOLDER/ADMIN.
+    - HOLDER: can only approve TEACHERs within their own tenant.
+      Cannot approve other HOLDERs or ADMINs (privilege escalation prevention).
     """
     user_id_str = str(user_id)
-    previous_status = "pending"
 
     result = await db.execute(
         select(User)
@@ -106,11 +133,31 @@ async def approve_registration(
             detail="Usuario no encontrado.",
         )
 
-    if user.status != "pending":
+    if user.status not in ("pending", "rejected"):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"El usuario no está pendiente. Estado actual: {user.status}",
+            detail=f"El usuario debe estar pendiente o rechazado para ser aprobado. Estado actual: {user.status}",
         )
+
+    previous_status = user.status
+
+    # If re-approving a rejected user, clear rejection data
+    if user.status == "rejected":
+        user.rejection_reason = None
+        user.rejected_at = None
+
+    # ── HOLDER tenant scoping ──────────────────────────────────
+    if current_user.role == "HOLDER":
+        if user.tenant_id != current_user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No puedes aprobar usuarios de otro colegio.",
+            )
+        if user.role != "TEACHER":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Como director solo puedes aprobar profesores. Contacta a un administrador para aprobar otros roles.",
+            )
 
     now = datetime.now(timezone.utc)
     user.status = "active"
@@ -120,10 +167,13 @@ async def approve_registration(
     # If HOLDER or ADMIN, also approve the tenant
     if user.role in ("HOLDER", "ADMIN") and user.tenant:
         tenant = user.tenant
-        if tenant.status == "pending":
+        if tenant.status in ("pending", "rejected"):
             tenant.status = "active"
             tenant.approved_at = now
             tenant.approved_by = current_user.email
+            # Clear rejection data if previously rejected
+            tenant.rejection_reason = None
+            tenant.rejected_at = None
 
     await db.flush()
 
@@ -160,13 +210,16 @@ async def approve_registration(
 async def reject_registration(
     user_id: UUID,
     body: ApproveRejectRequest,
-    current_user: User = Depends(require_super_admin),
+    current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
 ):
     """Reject a pending user registration.
 
-    A rejection reason is required. If the user is a HOLDER or ADMIN,
-    also rejects their tenant.
+    - ADMIN: can reject any user. Also rejects their tenant if HOLDER/ADMIN.
+    - HOLDER: can only reject TEACHERs within their own tenant.
+      Cannot reject other HOLDERs or ADMINs (privilege escalation prevention).
+
+    A rejection reason is required.
     """
     if not body.reason or not body.reason.strip():
         raise HTTPException(
@@ -195,6 +248,19 @@ async def reject_registration(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"El usuario no está pendiente. Estado actual: {user.status}",
         )
+
+    # ── HOLDER tenant scoping ──────────────────────────────────
+    if current_user.role == "HOLDER":
+        if user.tenant_id != current_user.tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No puedes rechazar usuarios de otro colegio.",
+            )
+        if user.role != "TEACHER":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Como director solo puedes rechazar profesores. Contacta a un administrador para rechazar otros roles.",
+            )
 
     now = datetime.now(timezone.utc)
     user.status = "rejected"
