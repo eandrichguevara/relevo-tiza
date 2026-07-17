@@ -35,6 +35,63 @@ export function useCreateTenant() {
   });
 }
 
+// ─── Courses ──────────────────────────────────────────────
+
+export interface Course {
+  id: string;
+  name: string;
+  grade: string;
+  subject: string;
+  student_count: number;
+  created_at: string;
+}
+
+export function useCourses(tenantId: string | null) {
+  const { accessToken, isAuthenticated } = useAuth();
+
+  return useQuery<Course[]>({
+    queryKey: ['courses', tenantId],
+    queryFn: () => {
+      const params = tenantId ? `?tenant_id=${tenantId}` : '';
+      return apiFetch<Course[]>(`/api/courses${params}`, { token: accessToken });
+    },
+    enabled: isAuthenticated && !!tenantId,
+  });
+}
+
+export function useCreateCourse() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { name: string; grade: string; subject: string; tenant_id: string }) =>
+      apiFetch<Course>('/api/courses', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['courses', variables.tenant_id] });
+    },
+  });
+}
+
+export function useDeleteCourse() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/courses/${id}`, {
+        method: 'DELETE',
+        token: accessToken,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    },
+  });
+}
+
 // ─── Users ────────────────────────────────────────────────
 
 export function useUsers(tenantId: string | null) {
@@ -73,6 +130,25 @@ export function useCreateUser() {
   });
 }
 
+export function useResetPassword() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (userId: string) =>
+      apiFetch<{ success: boolean; message: string; temporary_password: string }>(
+        `/api/users/${userId}/reset-password`,
+        {
+          method: 'POST',
+          token: accessToken,
+        }
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
 // ─── Dashboard stats (existing) ───────────────────────────
 
 export function useExecutiveStats() {
@@ -90,7 +166,7 @@ export function useExecutiveStats() {
 
 export function usePendingRegistrations() {
   const { accessToken, user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdminOrHolder = user?.role === 'ADMIN' || user?.role === 'HOLDER';
 
   return useQuery<PendingListResponse>({
     queryKey: ['pending-registrations'],
@@ -98,7 +174,7 @@ export function usePendingRegistrations() {
       apiFetch<PendingListResponse>('/api/admin/pending-registrations', {
         token: accessToken,
       }),
-    enabled: isAdmin && !!accessToken,
+    enabled: isAdminOrHolder && !!accessToken,
     refetchInterval: 30000, // poll every 30s
   });
 }
@@ -112,9 +188,11 @@ export function useApproveUser() {
       apiFetch<ApprovalActionResponse>(`/api/admin/approve/${userId}`, {
         method: 'POST',
         token: accessToken,
+        body: JSON.stringify({}),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });
 }

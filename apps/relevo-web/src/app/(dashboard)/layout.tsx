@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeatures } from '@/hooks/useFeatures';
+import { ActiveTenantProvider, useActiveTenant } from '@/hooks/ActiveTenantContext';
 import {
   LayoutDashboard,
   School,
+  BookOpen,
   BarChart3,
   Users,
   CreditCard,
@@ -16,19 +18,21 @@ import {
   X,
   ChevronDown,
   Clock,
+  Loader2,
 } from 'lucide-react';
 
 function getNavItems(userRole?: string) {
   const items = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { href: '/dashboard/colegios', label: 'Colegios', icon: School },
+    { href: '/dashboard/cursos', label: 'Cursos', icon: BookOpen },
     { href: '/dashboard/analitica', label: 'Analítica', icon: BarChart3 },
     { href: '/dashboard/usuarios', label: 'Usuarios', icon: Users },
     { href: '/dashboard/facturacion', label: 'Facturación', icon: CreditCard },
   ];
 
-  // Admin-only nav items
-  if (userRole === 'ADMIN') {
+  // Admin/Holder nav items — both can manage pending approvals
+  if (userRole === 'ADMIN' || userRole === 'HOLDER') {
     items.splice(1, 0, {
       href: '/dashboard/admin/pendientes',
       label: 'Pendientes',
@@ -39,48 +43,30 @@ function getNavItems(userRole?: string) {
   return items;
 }
 
-// ─── Simulated tenants for the selector ───────────────────
-
-const SIMULATED_TENANTS = [
-  { id: 't1', name: 'Colegio San Miguel', subdomain: 'san-miguel' },
-  { id: 't2', name: 'Liceo Gabriela Mistral', subdomain: 'gabriela-mistral' },
-  { id: 't3', name: 'Instituto Nacional', subdomain: 'instituto-nacional' },
-  { id: 't4', name: 'Colegio Los Olivos', subdomain: 'los-olivos' },
-  { id: 't5', name: 'Colegio Santa María', subdomain: 'santa-maria' },
-];
-
-const STORAGE_KEY = 'relevo-active-tenant';
-
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <ActiveTenantProvider>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </ActiveTenantProvider>
+  );
+}
+
+/** Inner layout component — has access to ActiveTenantContext */
+function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { features, isLoaded } = useFeatures();
+  const {
+    activeTenantId,
+    activeTenant,
+    tenants: tenantList,
+    setActiveTenantId,
+    isLoading: tenantsLoading,
+    isError: tenantsError,
+  } = useActiveTenant();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  // ─── Tenant state ───────────────────────────────────
-  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && SIMULATED_TENANTS.some((t) => t.id === stored)) {
-      setActiveTenantId(stored);
-    } else if (SIMULATED_TENANTS.length > 0) {
-      // Default to first tenant
-      setActiveTenantId(SIMULATED_TENANTS[0].id);
-      localStorage.setItem(STORAGE_KEY, SIMULATED_TENANTS[0].id);
-    }
-  }, []);
-
-  const handleTenantChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    const tenantId = e.target.value;
-    setActiveTenantId(tenantId);
-    localStorage.setItem(STORAGE_KEY, tenantId);
-    // Optionally: update a global context/store here
-  }, []);
-
-  const activeTenant = SIMULATED_TENANTS.find((t) => t.id === activeTenantId);
-
   const toggleSidebar = () => setSidebarOpen((prev) => !prev);
 
   useEffect(() => {
@@ -126,6 +112,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
+
+  const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setActiveTenantId(e.target.value);
+  };
+
+  // Build tenant options: real API data + loading/error states
+  const showSelector = isLoaded && features.multiSchool;
+  const hasTenants = tenantList.length > 0;
 
   return (
     <div className="min-h-screen flex bg-brand-light">
@@ -192,7 +186,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* ─── Sidebar footer: tenant + user ───────────── */}
         <div className="p-4 border-t border-gray-100 space-y-3">
           {/* Tenant selector — solo si multiSchool feature flag está activo */}
-          {isLoaded && features.multiSchool && (
+          {showSelector && (
             <div>
               <label
                 htmlFor="tenant-select-sidebar"
@@ -200,29 +194,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 Colegio activo
               </label>
-              <div className="relative">
-                <select
-                  id="tenant-select-sidebar"
-                  value={activeTenantId || ''}
-                  onChange={handleTenantChange}
-                  className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 pl-3 pr-8 py-2 text-sm text-gray-900 font-medium
-                    focus:outline-none focus:ring-2 focus:ring-[#1A3A5C] focus:border-[#1A3A5C]
-                    hover:border-gray-300 transition-colors cursor-pointer"
-                  aria-label="Seleccionar colegio activo"
-                >
-                  {SIMULATED_TENANTS.map((tenant) => (
-                    <option key={tenant.id} value={tenant.id}>
-                      {tenant.name}
-                    </option>
-                  ))}
-                </select>
-                <div
-                  className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400"
-                  aria-hidden="true"
-                >
-                  <ChevronDown size={14} />
+
+              {/* Loading state */}
+              {tenantsLoading && (
+                <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+                  <Loader2 size={12} className="animate-spin" />
+                  Cargando colegios...
                 </div>
-              </div>
+              )}
+
+              {/* Error state */}
+              {!tenantsLoading && tenantsError && (
+                <p className="text-xs text-red-500 py-1">Error al cargar colegios</p>
+              )}
+
+              {/* Empty state */}
+              {!tenantsLoading && !tenantsError && !hasTenants && (
+                <p className="text-xs text-gray-400 py-1">No hay colegios disponibles</p>
+              )}
+
+              {/* Selector with data */}
+              {!tenantsLoading && hasTenants && (
+                <div className="relative">
+                  <select
+                    id="tenant-select-sidebar"
+                    value={activeTenantId || ''}
+                    onChange={handleTenantChange}
+                    className="w-full appearance-none rounded-lg border border-gray-200 bg-gray-50 pl-3 pr-8 py-2 text-sm text-gray-900 font-medium
+                      focus:outline-none focus:ring-2 focus:ring-[#1A3A5C] focus:border-[#1A3A5C]
+                      hover:border-gray-300 transition-colors cursor-pointer"
+                    aria-label="Seleccionar colegio activo"
+                  >
+                    {tenantList.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                  <div
+                    className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400"
+                    aria-hidden="true"
+                  >
+                    <ChevronDown size={14} />
+                  </div>
+                </div>
+              )}
+
+              {/* Active tenant subdomain display */}
               {activeTenant && (
                 <p className="text-[10px] text-gray-400 mt-1 truncate">
                   {activeTenant.subdomain}.relevo.cl

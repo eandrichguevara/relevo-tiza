@@ -2,55 +2,22 @@
 
 import Link from 'next/link';
 import { Card, Button, Badge, Spinner, EmptyState } from '@tiza/ui';
-import { Plus, Users, BookOpen, Trash2, BarChart3, ChevronRight, AlertCircle } from 'lucide-react';
+import {
+  Users,
+  BookOpen,
+  Trash2,
+  BarChart3,
+  ChevronRight,
+  AlertCircle,
+  School,
+} from 'lucide-react';
 import { useState } from 'react';
-import { useCourses, useCreateCourse, useDeleteCourse, type Course } from '@/hooks/useApi';
+import { useCourses, useDeleteCourse, type Course } from '@/hooks/useApi';
 
 export default function CursosPage() {
   const { data: courses, isLoading, error: coursesError } = useCourses();
-  const createCourse = useCreateCourse();
   const deleteCourse = useDeleteCourse();
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState('');
-  const [grade, setGrade] = useState('1° básico');
-  const [subjects, setSubjects] = useState<string[]>(['Lenguaje', 'Matemáticas']);
   const [error, setError] = useState<string | null>(null);
-
-  const GRADES = [
-    '1° básico',
-    '2° básico',
-    '3° básico',
-    '4° básico',
-    '5° básico',
-    '6° básico',
-    '7° básico',
-    '8° básico',
-    'I medio',
-    'II medio',
-    'III medio',
-    'IV medio',
-  ];
-  const SUBJECTS = ['Lenguaje', 'Matemáticas'];
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    try {
-      await createCourse.mutateAsync({
-        name,
-        grade,
-        subject: subjects.join(', '),
-      });
-      setShowForm(false);
-      setName('');
-      setGrade('1° básico');
-      setSubjects(['Lenguaje', 'Matemáticas']);
-    } catch (err: any) {
-      setError(
-        err?.translatedMessage || err?.detail || 'Error al crear el curso. Intenta de nuevo.'
-      );
-    }
-  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este curso y todos sus alumnos?')) return;
@@ -74,15 +41,9 @@ export default function CursosPage() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-brand-secondary">Mis Cursos</h1>
-          <p className="text-gray-500">Gestiona tus cursos y alumnos</p>
-        </div>
-        <Button brand="tiza" onClick={() => setShowForm(!showForm)}>
-          <Plus size={16} className="mr-1" />
-          Nuevo curso
-        </Button>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-brand-secondary">Mis Cursos</h1>
+        <p className="text-gray-500">Gestiona tus cursos y alumnos</p>
       </div>
 
       {/* Error banner */}
@@ -108,81 +69,11 @@ export default function CursosPage() {
         </div>
       )}
 
-      {showForm && (
-        <Card className="mb-6">
-          <form onSubmit={handleCreate} className="space-y-4">
-            <h3 className="font-semibold">Crear nuevo curso</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="course-name" className="block text-sm font-medium mb-1">
-                  Nombre del curso
-                </label>
-                <input
-                  id="course-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2"
-                  placeholder="Ej: Matemáticas"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="course-grade" className="block text-sm font-medium mb-1">
-                  Nivel
-                </label>
-                <select
-                  id="course-grade"
-                  value={grade}
-                  onChange={(e) => setGrade(e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2"
-                >
-                  {GRADES.map((g) => (
-                    <option key={g}>{g}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <span className="block text-sm font-medium mb-2">Asignaturas</span>
-                <div className="space-y-2" role="group" aria-label="Seleccionar asignaturas">
-                  {SUBJECTS.map((s) => (
-                    <label
-                      key={s}
-                      className="flex items-center gap-2 cursor-pointer rounded-lg border px-3 py-2 transition-colors has-[:checked]:border-brand-primary has-[:checked]:bg-brand-light/50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={subjects.includes(s)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSubjects([...subjects, s]);
-                          } else {
-                            setSubjects(subjects.filter((sub) => sub !== s));
-                          }
-                        }}
-                        className="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
-                      />
-                      <span className="text-sm">{s}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" brand="tiza" loading={createCourse.isPending}>
-                Crear curso
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
-                Cancelar
-              </Button>
-            </div>
-          </form>
-        </Card>
-      )}
-
       {!courses || courses.length === 0 ? (
         <EmptyState
-          title="No tienes cursos"
-          description="Usa el botón 'Nuevo curso' para crear tu primer curso"
+          title="No tienes cursos aún"
+          description="Solicita a tu sostenedor que cree los cursos en el panel de RELEVO. Una vez creados, aparecerán aquí."
+          icon={<School size={48} />}
         />
       ) : (
         <div className="space-y-3">
