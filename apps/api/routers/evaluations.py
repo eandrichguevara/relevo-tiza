@@ -1,6 +1,6 @@
 """Evaluations router - CRUD, upload, processing."""
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -24,7 +24,25 @@ async def create_evaluation(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new evaluation with rubric."""
+    """Create a new evaluation with rubric.
+    
+    The user must be a member of the course (teacher of the course, admin, or holder).
+    """
+    # N-07: Verify user is a member of the course
+    course_result = await db.execute(
+        select(Course).where(Course.id == body.course_id, Course.deleted_at.is_(None))
+    )
+    course = course_result.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
+
+    # TEACHERs can only create evaluations for courses they teach
+    if current_user.role == "TEACHER" and str(course.teacher_id) != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No puedes crear evaluaciones para un curso que no te pertenece",
+        )
+
     evaluation = Evaluation(
         title=body.title,
         subject=body.subject,

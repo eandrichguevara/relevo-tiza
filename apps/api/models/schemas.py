@@ -224,6 +224,7 @@ class CreateEvaluationRequest(BaseModel):
     subject: SubjectEnum
     grade: str
     rubric: List[RubricItem]
+    course_id: str  # evaluation must belong to a course where user is a member
 
 
 class EvaluationResponse(BaseModel):
