@@ -13,7 +13,7 @@ export default function CursosPage() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [grade, setGrade] = useState('1° básico');
-  const [subject, setSubject] = useState('Lenguaje');
+  const [subjects, setSubjects] = useState<string[]>(['Lenguaje', 'Matemáticas']);
   const [error, setError] = useState<string | null>(null);
 
   const GRADES = [
@@ -30,17 +30,21 @@ export default function CursosPage() {
     'III medio',
     'IV medio',
   ];
-  const SUBJECTS = ['Lenguaje', 'Matemáticas', 'Ciencias', 'Historia', 'Inglés'];
+  const SUBJECTS = ['Lenguaje', 'Matemáticas'];
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     try {
-      await createCourse.mutateAsync({ name, grade, subject });
+      await createCourse.mutateAsync({
+        name,
+        grade,
+        subject: subjects.join(', '),
+      });
       setShowForm(false);
       setName('');
       setGrade('1° básico');
-      setSubject('Lenguaje');
+      setSubjects(['Lenguaje', 'Matemáticas']);
     } catch (err: any) {
       setError(
         err?.translatedMessage || err?.detail || 'Error al crear el curso. Intenta de nuevo.'
@@ -118,7 +122,7 @@ export default function CursosPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-lg border px-3 py-2"
-                  placeholder="5° Básico A"
+                  placeholder="Ej: Matemáticas"
                   required
                 />
               </div>
@@ -138,19 +142,29 @@ export default function CursosPage() {
                 </select>
               </div>
               <div>
-                <label htmlFor="course-subject" className="block text-sm font-medium mb-1">
-                  Asignatura
-                </label>
-                <select
-                  id="course-subject"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  className="w-full rounded-lg border px-3 py-2"
-                >
+                <span className="block text-sm font-medium mb-2">Asignaturas</span>
+                <div className="space-y-2" role="group" aria-label="Seleccionar asignaturas">
                   {SUBJECTS.map((s) => (
-                    <option key={s}>{s}</option>
+                    <label
+                      key={s}
+                      className="flex items-center gap-2 cursor-pointer rounded-lg border px-3 py-2 transition-colors has-[:checked]:border-brand-primary has-[:checked]:bg-brand-light/50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={subjects.includes(s)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSubjects([...subjects, s]);
+                          } else {
+                            setSubjects(subjects.filter((sub) => sub !== s));
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-gray-300 text-brand-primary focus:ring-brand-primary"
+                      />
+                      <span className="text-sm">{s}</span>
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
             </div>
             <div className="flex gap-2">
@@ -168,13 +182,7 @@ export default function CursosPage() {
       {!courses || courses.length === 0 ? (
         <EmptyState
           title="No tienes cursos"
-          description="Crea tu primer curso para empezar a organizar tus evaluaciones"
-          action={
-            <Button brand="tiza" onClick={() => setShowForm(true)}>
-              <Plus size={16} className="mr-1" />
-              Crear curso
-            </Button>
-          }
+          description="Usa el botón 'Nuevo curso' para crear tu primer curso"
         />
       ) : (
         <div className="space-y-3">
