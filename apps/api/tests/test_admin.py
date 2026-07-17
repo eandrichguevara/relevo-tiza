@@ -146,8 +146,8 @@ class TestListPendingRegistrations:
             assert "role" in item
             assert "tenant_id" in item
 
-    async def test_list_pending_requires_admin(self, client: AsyncClient):
-        """Non-admin users should get 403."""
+    async def test_list_pending_holder_can_access_scoped_to_tenant(self, client: AsyncClient):
+        """HOLDER users can access pending registrations scoped to their tenant."""
         import database as db_module
         from models.db_models import Tenant, User, TenantMember
         from utils.security import hash_password, create_access_token
@@ -155,8 +155,8 @@ class TestListPendingRegistrations:
 
         async with db_module.async_session() as session:
             tenant = Tenant(
-                subdomain="holder-no-access",
-                name="Holder No Access",
+                subdomain="holder-has-access",
+                name="Holder Has Access",
                 brand="relevo",
                 status="active",
                 join_code=generate_join_code(),
@@ -165,8 +165,8 @@ class TestListPendingRegistrations:
             await session.flush()
 
             holder = User(
-                email="holder-no-admin@test.com",
-                name="Holder Not Admin",
+                email="holder-has-access@test.com",
+                name="Holder Has Access",
                 password=hash_password("Pass1234!"),
                 status="active",
                 role="HOLDER",
@@ -183,7 +183,12 @@ class TestListPendingRegistrations:
             "/api/admin/pending-registrations",
             headers={"Authorization": f"Bearer {holder_token}"},
         )
-        assert response.status_code == 403
+        # HOLDER has access via require_admin_or_holder, scoped to their tenant
+        assert response.status_code == 200
+        data = response.json()
+        # No pending users exist in this tenant, so results should be empty
+        assert data["total"] == 0
+        assert data["items"] == []
 
     async def test_list_pending_without_auth_returns_401(self, client: AsyncClient):
         """No auth token should return 401."""
@@ -358,7 +363,7 @@ class TestApproveRegistration:
         )
         assert response.status_code == 409
         data = response.json()
-        assert "no está pendiente" in data["detail"].lower()
+        assert "pendiente o rechazado" in data["detail"].lower()
 
     async def test_approve_pending_holder_also_approves_tenant(self, client: AsyncClient):
         """Approve a HOLDER should also approve their pending tenant."""
@@ -410,8 +415,8 @@ class TestApproveRegistration:
             assert tenant.status == "active", f"Expected active, got {tenant.status}"
             assert tenant.approved_by == "superadmin@example.com"
 
-    async def test_approve_requires_admin(self, client: AsyncClient):
-        """Non-admin user trying to approve gets 403."""
+    async def test_approve_holder_can_approve_in_own_tenant(self, client: AsyncClient):
+        """HOLDER user can approve pending users in their own tenant."""
         import database as db_module
         from models.db_models import Tenant, User
         from utils.security import hash_password, create_access_token
@@ -419,8 +424,8 @@ class TestApproveRegistration:
 
         async with db_module.async_session() as session:
             tenant = Tenant(
-                subdomain="approve-403-tenant",
-                name="Approve 403 School",
+                subdomain="approve-holder-tenant",
+                name="Approve Holder School",
                 brand="tiza",
                 status="active",
                 join_code=generate_join_code(),
@@ -429,14 +434,27 @@ class TestApproveRegistration:
             await session.flush()
 
             holder = User(
-                email="holder-approve-403@test.com",
-                name="Holder 403",
+                email="holder-approve-own@test.com",
+                name="Holder Approve Own",
                 password=hash_password("Pass1234!"),
                 status="active",
                 role="HOLDER",
                 tenant_id=tenant.id,
             )
             session.add(holder)
+
+            # Create a pending user in the same tenant for the HOLDER to approve
+            pending_user = User(
+                email="pending-in-holder-tenant@test.com",
+                name="Pending In Holder Tenant",
+                password=hash_password("Pass1234!"),
+                status="pending",
+                role="TEACHER",
+                tenant_id=tenant.id,
+            )
+            session.add(pending_user)
+            await session.flush()
+            pending_user_id = pending_user.id
             await session.commit()
 
             token = create_access_token(
@@ -444,11 +462,15 @@ class TestApproveRegistration:
             )
 
         response = await client.post(
-            "/api/admin/approve/00000000-0000-0000-0000-000000000000",
+            f"/api/admin/approve/{pending_user_id}",
             json={"reason": "OK"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 403
+        # HOLDER has access via require_admin_or_holder, scoped to their tenant
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["status"] == "active"
 
 
 # ─────────────────────────────────────────────
@@ -611,8 +633,8 @@ class TestRejectRegistration:
             assert tenant.status == "rejected", f"Expected rejected, got {tenant.status}"
             assert tenant.rejection_reason == "No cumple requisitos"
 
-    async def test_reject_requires_admin(self, client: AsyncClient):
-        """Non-admin user trying to reject gets 403."""
+    async def test_reject_holder_can_reject_in_own_tenant(self, client: AsyncClient):
+        """HOLDER user can reject pending users in their own tenant."""
         import database as db_module
         from models.db_models import Tenant, User
         from utils.security import hash_password, create_access_token
@@ -620,8 +642,8 @@ class TestRejectRegistration:
 
         async with db_module.async_session() as session:
             tenant = Tenant(
-                subdomain="reject-403-tenant",
-                name="Reject 403 School",
+                subdomain="reject-holder-tenant",
+                name="Reject Holder School",
                 brand="tiza",
                 status="active",
                 join_code=generate_join_code(),
@@ -630,14 +652,27 @@ class TestRejectRegistration:
             await session.flush()
 
             holder = User(
-                email="holder-reject-403@test.com",
-                name="Holder 403 Reject",
+                email="holder-reject-own@test.com",
+                name="Holder Reject Own",
                 password=hash_password("Pass1234!"),
                 status="active",
                 role="HOLDER",
                 tenant_id=tenant.id,
             )
             session.add(holder)
+
+            # Create a pending user in the same tenant for the HOLDER to reject
+            pending_user = User(
+                email="pending-reject-in-holder-tenant@test.com",
+                name="Pending Reject In Holder Tenant",
+                password=hash_password("Pass1234!"),
+                status="pending",
+                role="TEACHER",
+                tenant_id=tenant.id,
+            )
+            session.add(pending_user)
+            await session.flush()
+            pending_user_id = pending_user.id
             await session.commit()
 
             token = create_access_token(
@@ -645,11 +680,15 @@ class TestRejectRegistration:
             )
 
         response = await client.post(
-            "/api/admin/reject/00000000-0000-0000-0000-000000000000",
-            json={"reason": "X"},
+            f"/api/admin/reject/{pending_user_id}",
+            json={"reason": "Documentación incompleta"},
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 403
+        # HOLDER has access via require_admin_or_holder, scoped to their tenant
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["status"] == "rejected"
 
 
 # ─────────────────────────────────────────────
@@ -670,8 +709,8 @@ class TestRequireSuperAdmin:
         )
         assert response.status_code == 200
 
-    async def test_require_super_admin_with_holder_fails(self, client: AsyncClient):
-        """HOLDER user fails require_super_admin (403)."""
+    async def test_require_super_admin_with_holder_passes(self, client: AsyncClient):
+        """HOLDER user passes require_admin_or_holder (200) scoped to their tenant."""
         import database as db_module
         from models.db_models import Tenant, User
         from utils.security import hash_password, create_access_token
@@ -679,8 +718,8 @@ class TestRequireSuperAdmin:
 
         async with db_module.async_session() as session:
             tenant = Tenant(
-                subdomain="superadmin-test-tenant",
-                name="SuperAdmin Test",
+                subdomain="superadmin-holder-tenant",
+                name="SuperAdmin Holder Tenant",
                 brand="tiza",
                 status="active",
                 join_code=generate_join_code(),
@@ -689,8 +728,8 @@ class TestRequireSuperAdmin:
             await session.flush()
 
             holder = User(
-                email="holder-superadmin-test@test.com",
-                name="Holder SuperAdmin Test",
+                email="holder-superadmin-pass@test.com",
+                name="Holder SuperAdmin Pass",
                 password=hash_password("Pass1234!"),
                 status="active",
                 role="HOLDER",
@@ -707,9 +746,8 @@ class TestRequireSuperAdmin:
             "/api/admin/pending-registrations",
             headers={"Authorization": f"Bearer {token}"},
         )
-        assert response.status_code == 403
-        data = response.json()
-        assert "administrador" in data["detail"].lower()
+        # HOLDER has access via require_admin_or_holder
+        assert response.status_code == 200
 
     async def test_require_super_admin_with_teacher_fails(self, client: AsyncClient):
         """TEACHER user fails require_super_admin (403)."""
@@ -751,7 +789,125 @@ class TestRequireSuperAdmin:
         assert response.status_code == 403
 
 # ─────────────────────────────────────────────
-# 5. E2E APPROVAL AND REJECTION FLOWS
+# 5. RE-APPROVAL OF REJECTED USER
+# ─────────────────────────────────────────────
+@pytest.mark.asyncio
+class TestReapproveRejectedUser:
+    """Tests for re-approving a previously rejected user."""
+
+    async def test_approve_rejected_user_success(self, client: AsyncClient):
+        """Re-approve a rejected user should return success and set status=active."""
+        admin = await _create_admin_user(client)
+
+        # Create a pending user
+        import database as db_module
+        from models.db_models import User
+        from sqlalchemy import select
+
+        async with db_module.async_session() as session:
+            user_data = await _create_pending_user(session, "reapprove@test.com", "TEACHER")
+            await session.commit()
+
+        # First reject the user
+        reject_resp = await client.post(
+            f"/api/admin/reject/{user_data['id']}",
+            json={"reason": "Documentación incompleta"},
+            headers={"Authorization": f"Bearer {admin['token']}"},
+        )
+        assert reject_resp.status_code == 200
+
+        # Now re-approve
+        response = await client.post(
+            f"/api/admin/approve/{user_data['id']}",
+            json={"reason": "Documentación completa ahora"},
+            headers={"Authorization": f"Bearer {admin['token']}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["status"] == "active"
+        assert "aprobado" in data["message"].lower()
+
+        # Verify in DB: status=active, rejection data cleared
+        async with db_module.async_session() as session:
+            result = await session.execute(select(User).where(User.id == user_data["id"]))
+            user = result.scalar_one_or_none()
+            assert user is not None
+            assert user.status == "active"
+            assert user.rejection_reason is None, f"Expected None, got {user.rejection_reason}"
+            assert user.rejected_at is None, f"Expected None, got {user.rejected_at}"
+            assert user.approved_by == "superadmin@example.com"
+
+    async def test_approve_rejected_user_clears_audit_trail(self, client: AsyncClient):
+        """Re-approval of rejected user should clear rejection_reason and rejected_at in DB."""
+        admin = await _create_admin_user(client)
+
+        import database as db_module
+        from models.db_models import User
+        from sqlalchemy import select
+
+        async with db_module.async_session() as session:
+            user_data = await _create_pending_user(session, "reapprove-clear@test.com", "TEACHER")
+            await session.commit()
+
+        # Reject with a specific reason
+        await client.post(
+            f"/api/admin/reject/{user_data['id']}",
+            json={"reason": "Falta documentación"},
+            headers={"Authorization": f"Bearer {admin['token']}"},
+        )
+
+        # Verify rejection data exists before re-approval
+        async with db_module.async_session() as session:
+            result = await session.execute(select(User).where(User.id == user_data["id"]))
+            user = result.scalar_one_or_none()
+            assert user.rejection_reason == "Falta documentación"
+            assert user.rejected_at is not None
+
+        # Re-approve
+        await client.post(
+            f"/api/admin/approve/{user_data['id']}",
+            json={"reason": "Documentación recibida"},
+            headers={"Authorization": f"Bearer {admin['token']}"},
+        )
+
+        # Verify rejection data is cleared
+        async with db_module.async_session() as session:
+            result = await session.execute(select(User).where(User.id == user_data["id"]))
+            user = result.scalar_one_or_none()
+            assert user.status == "active"
+            assert user.rejection_reason is None
+            assert user.rejected_at is None
+
+    async def test_approve_rejected_user_accepts_without_reason(self, client: AsyncClient):
+        """Re-approving a rejected user works even without a reason in the body."""
+        admin = await _create_admin_user(client)
+
+        import database as db_module
+        async with db_module.async_session() as session:
+            user_data = await _create_pending_user(session, "reapprove-noreason@test.com", "TEACHER")
+            await session.commit()
+
+        # Reject first
+        await client.post(
+            f"/api/admin/reject/{user_data['id']}",
+            json={"reason": "Falta info"},
+            headers={"Authorization": f"Bearer {admin['token']}"},
+        )
+
+        # Re-approve with null reason (edge case: the body has reason as optional/null)
+        response = await client.post(
+            f"/api/admin/approve/{user_data['id']}",
+            json={"reason": None},
+            headers={"Authorization": f"Bearer {admin['token']}"},
+        )
+        # Should still work — reason is not required for approval
+        assert response.status_code == 200
+        assert response.json()["status"] == "active"
+
+
+# ─────────────────────────────────────────────
+# 6. E2E APPROVAL AND REJECTION FLOWS
 # ─────────────────────────────────────────────
 @pytest.mark.asyncio
 class TestE2EApprovalFlow:
