@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Spinner, EmptyState, ErrorMessage } from '@tiza/ui';
-import { School, Plus, Building2, ExternalLink, X } from 'lucide-react';
+import { School, Plus, Building2, ExternalLink, X, Copy, Check } from 'lucide-react';
 import { useTenants, useCreateTenant } from '@/hooks/useRelevoApi';
 
 export default function ColegiosPage() {
@@ -14,6 +14,17 @@ export default function ColegiosPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', subdomain: '' });
   const [formError, setFormError] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyCode = async (tenantId: string, code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedId(tenantId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Clipboard not available — silently fail
+    }
+  };
 
   const handleOpenModal = () => {
     setForm({ name: '', subdomain: '' });
@@ -113,6 +124,23 @@ export default function ColegiosPage() {
                   <div className="min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{tenant.name}</h3>
                     <p className="text-sm text-gray-500 truncate">{tenant.subdomain}.relevo.cl</p>
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                      <span className="text-xs text-gray-400">Código:</span>
+                      <span className="font-mono text-sm font-medium tracking-wider bg-gray-100 rounded-md px-2 py-0.5 text-gray-600 select-all">
+                        {tenant.join_code}
+                      </span>
+                      <button
+                        onClick={() => handleCopyCode(tenant.id, tenant.join_code)}
+                        className="p-0.5 rounded text-gray-400 hover:text-brand-primary transition-colors"
+                        aria-label={`Copiar código de registro de ${tenant.name}`}
+                      >
+                        {copiedId === tenant.id ? (
+                          <Check size={14} className="text-green-500" />
+                        ) : (
+                          <Copy size={14} />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <Button
