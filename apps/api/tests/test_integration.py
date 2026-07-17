@@ -104,13 +104,14 @@ async def _setup_holder(_app) -> dict:
 async def _setup_teacher(_app, tenant_id: str) -> dict:
     """Create a TEACHER user directly in DB under a given tenant.
     Uses the app's overridden get_db dependency.
-    Returns dict with token and email.
+    Returns dict with token, email, and teacher_id.
     """
     from database import get_db
     from models.db_models import User
     from utils.security import hash_password
     from httpx import AsyncClient, ASGITransport
 
+    teacher_id = None
     override = _app.dependency_overrides.get(get_db)
     session_generator = override() if override else get_db()
     async for session in session_generator:
@@ -123,6 +124,8 @@ async def _setup_teacher(_app, tenant_id: str) -> dict:
             tenant_id=tenant_id,
         )
         session.add(teacher)
+        await session.flush()
+        teacher_id = teacher.id
         # Don't commit here — get_db() commits on generator exit
 
     # Login via API
@@ -135,7 +138,7 @@ async def _setup_teacher(_app, tenant_id: str) -> dict:
         assert login_resp.status_code == 200, f"Teacher login failed: {login_resp.text}"
         token = login_resp.json()["access_token"]
 
-    return {"token": token, "email": TEACHER_EMAIL}
+    return {"token": token, "email": TEACHER_EMAIL, "teacher_id": teacher_id}
 
 
 @pytest.mark.asyncio
@@ -740,11 +743,12 @@ class TestCoursesIntegration:
         return {
             "holder_token": holder["token"],
             "teacher_token": teacher["token"],
+            "teacher_id": teacher["teacher_id"],
             "tenant_id": holder["tenant_id"],
         }
 
     async def test_create_course_success(self, client: AsyncClient, teacher_context: dict):
-        """TEACHER creates a course under their tenant."""
+        """HOLDER creates a course for a teacher."""
         ctx = teacher_context
         resp = await client.post(
             "/api/courses",
@@ -752,8 +756,9 @@ class TestCoursesIntegration:
                 "name": COURSE_NAME,
                 "grade": COURSE_GRADE,
                 "subject": COURSE_SUBJECT,
+                "teacher_id": ctx["teacher_id"],
             },
-            headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
+            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
         assert resp.status_code == 201, f"Create course failed: {resp.text}"
         data = resp.json()
@@ -767,11 +772,14 @@ class TestCoursesIntegration:
     async def test_list_courses(self, client: AsyncClient, teacher_context: dict):
         """List courses for the tenant (should include the created course)."""
         ctx = teacher_context
-        # Create a course first
+        # Create a course first (HOLDER action)
         await client.post(
             "/api/courses",
-            json={"name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT},
-            headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
+            json={
+                "name": COURSE_NAME, "grade": COURSE_GRADE,
+                "subject": COURSE_SUBJECT, "teacher_id": ctx["teacher_id"],
+            },
+            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
         resp = await client.get(
             "/api/courses",
@@ -788,8 +796,11 @@ class TestCoursesIntegration:
         ctx = teacher_context
         create_resp = await client.post(
             "/api/courses",
-            json={"name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT},
-            headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
+            json={
+                "name": COURSE_NAME, "grade": COURSE_GRADE,
+                "subject": COURSE_SUBJECT, "teacher_id": ctx["teacher_id"],
+            },
+            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
         course_id = create_resp.json()["id"]
 
@@ -810,12 +821,15 @@ class TestCoursesIntegration:
         assert resp.status_code == 404
 
     async def test_delete_course(self, client: AsyncClient, teacher_context: dict):
-        """DELETE /api/courses/{id} removes the course."""
+        """DELETE /api/courses/{id} soft-deletes the course."""
         ctx = teacher_context
         create_resp = await client.post(
             "/api/courses",
-            json={"name": "Curso a eliminar", "grade": "1°", "subject": "Test"},
-            headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
+            json={
+                "name": "Curso a eliminar", "grade": "1°",
+                "subject": "Matemáticas", "teacher_id": ctx["teacher_id"],
+            },
+            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
         course_id = create_resp.json()["id"]
 
@@ -825,7 +839,7 @@ class TestCoursesIntegration:
         )
         assert resp.status_code == 200
 
-        # Verify it's gone
+        # Verify soft-delete hides it
         resp2 = await client.get(
             f"/api/courses/{course_id}",
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
@@ -836,7 +850,7 @@ class TestCoursesIntegration:
         """Courses endpoints require auth."""
         resp = await client.post(
             "/api/courses",
-            json={"name": "X", "grade": "1°", "subject": "Test"},
+            json={"name": "X", "grade": "1°", "subject": "Matemáticas", "teacher_id": "x"},
         )
         assert resp.status_code == 401
 
@@ -854,15 +868,20 @@ class TestStudentsIntegration:
         holder = await _setup_holder(fastapi_app)
         teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
-        # Create course
+        # Create course (HOLDER action)
         course_resp = await client.post(
             "/api/courses",
-            json={"name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT},
-            headers={"Authorization": f"Bearer {teacher['token']}"},
+            json={
+                "name": COURSE_NAME, "grade": COURSE_GRADE,
+                "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+            },
+            headers={"Authorization": f"Bearer {holder['token']}"},
         )
         course_id = course_resp.json()["id"]
         return {
             "teacher_token": teacher["token"],
+            "holder_token": holder["token"],
+            "teacher_id": teacher["teacher_id"],
             "tenant_id": holder["tenant_id"],
             "course_id": course_id,
             "course_name": COURSE_NAME,
@@ -957,10 +976,28 @@ class TestEvaluationsIntegration:
 
     @pytest.fixture
     async def eval_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create HOLDER → tenant → TEACHER."""
+        """Create HOLDER → tenant → TEACHER → course."""
         holder = await _setup_holder(fastapi_app)
         teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
-        return {"teacher_token": teacher["token"], "tenant_id": holder["tenant_id"]}
+
+        # Create a course first (needed for evaluations — N-07)
+        course_resp = await client.post(
+            "/api/courses",
+            json={
+                "name": "Eval Course", "grade": COURSE_GRADE,
+                "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+            },
+            headers={"Authorization": f"Bearer {holder['token']}"},
+        )
+        course_id = course_resp.json()["id"]
+
+        return {
+            "teacher_token": teacher["token"],
+            "holder_token": holder["token"],
+            "teacher_id": teacher["teacher_id"],
+            "tenant_id": holder["tenant_id"],
+            "course_id": course_id,
+        }
 
     async def test_create_evaluation(self, client: AsyncClient, eval_context: dict):
         """Create evaluation with rubric returns 201."""
@@ -972,6 +1009,7 @@ class TestEvaluationsIntegration:
                 "subject": COURSE_SUBJECT,
                 "grade": COURSE_GRADE,
                 "rubric": self.RUBRIC,
+                "course_id": ctx["course_id"],
             },
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
@@ -989,12 +1027,18 @@ class TestEvaluationsIntegration:
         ctx = eval_context
         await client.post(
             "/api/evaluations",
-            json={"title": "Eval-1", "subject": "Matemáticas", "grade": "1°", "rubric": self.RUBRIC},
+            json={
+                "title": "Eval-1", "subject": "Matemáticas", "grade": "1°",
+                "rubric": self.RUBRIC, "course_id": ctx["course_id"],
+            },
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         await client.post(
             "/api/evaluations",
-            json={"title": "Eval-2", "subject": "Lenguaje", "grade": "2°", "rubric": self.RUBRIC},
+            json={
+                "title": "Eval-2", "subject": "Lenguaje", "grade": "2°",
+                "rubric": self.RUBRIC, "course_id": ctx["course_id"],
+            },
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         resp = await client.get(
@@ -1013,7 +1057,10 @@ class TestEvaluationsIntegration:
         ctx = eval_context
         create_resp = await client.post(
             "/api/evaluations",
-            json={"title": "Specific Eval", "subject": "Cs Naturales", "grade": "3°", "rubric": self.RUBRIC},
+            json={
+                "title": "Specific Eval", "subject": "Lenguaje", "grade": "3°",
+                "rubric": self.RUBRIC, "course_id": ctx["course_id"],
+            },
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         eval_id = create_resp.json()["id"]
@@ -1034,11 +1081,14 @@ class TestEvaluationsIntegration:
         assert resp.status_code == 404
 
     async def test_delete_evaluation(self, client: AsyncClient, eval_context: dict):
-        """DELETE /api/evaluations/{id}."""
+        """DELETE /api/evaluations/{id} (soft delete)."""
         ctx = eval_context
         create_resp = await client.post(
             "/api/evaluations",
-            json={"title": "To Delete", "subject": "X", "grade": "1°", "rubric": self.RUBRIC},
+            json={
+                "title": "To Delete", "subject": "Matemáticas", "grade": "1°",
+                "rubric": self.RUBRIC, "course_id": ctx["course_id"],
+            },
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         eval_id = create_resp.json()["id"]
@@ -1048,7 +1098,7 @@ class TestEvaluationsIntegration:
         )
         assert resp.status_code == 200
 
-        # Verify gone
+        # Verify soft-delete hides it
         resp2 = await client.get(
             f"/api/evaluations/{eval_id}",
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
@@ -1074,10 +1124,11 @@ class TestResultsIntegration:
         holder = await _setup_holder(fastapi_app)
         teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
-        # Course
+        # Course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
-            "name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT,
-        }, headers={"Authorization": f"Bearer {teacher['token']}"})
+            "name": COURSE_NAME, "grade": COURSE_GRADE,
+            "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+        }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
         # Students
@@ -1087,15 +1138,18 @@ class TestResultsIntegration:
             headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
-        # Evaluation
+        # Evaluation (requires course_id — N-07)
         e_resp = await client.post("/api/evaluations", json={
             "title": EVAL_TITLE, "subject": COURSE_SUBJECT,
             "grade": COURSE_GRADE, "rubric": self.RUBRIC,
+            "course_id": course_id,
         }, headers={"Authorization": f"Bearer {teacher['token']}"})
         eval_id = e_resp.json()["id"]
 
         return {
             "teacher_token": teacher["token"],
+            "holder_token": holder["token"],
+            "teacher_id": teacher["teacher_id"],
             "tenant_id": holder["tenant_id"],
             "course_id": course_id,
             "eval_id": eval_id,
@@ -1184,10 +1238,11 @@ class TestResultsIntegration:
         holder = await _setup_holder(fastapi_app)
 
         # Create teacher via /api/users (HOLDER action)
-        await client.post("/api/users", json={
+        teacher_resp = await client.post("/api/users", json={
             "email": "teacher-nostudents@test.com", "password": TEACHER_PASS,
             "name": "Teacher No Students", "role": "teacher", "tenant_id": holder["tenant_id"],
         }, headers={"Authorization": f"Bearer {holder['token']}"})
+        teacher_id = teacher_resp.json()["id"]
 
         # Approve the teacher before login (users created via /api/users are pending)
         import database as db_module
@@ -1201,13 +1256,17 @@ class TestResultsIntegration:
 
         teacher_token = await _login(fastapi_app, "teacher-nostudents@test.com", TEACHER_PASS)
 
+        # Create course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
-            "name": "Empty Course", "grade": "1°", "subject": "X",
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+            "name": "Empty Course", "grade": "1°", "subject": "Matemáticas",
+            "teacher_id": teacher_id,
+        }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
+        # Create evaluation (requires course_id — N-07)
         e_resp = await client.post("/api/evaluations", json={
-            "title": "Empty Eval", "subject": "X", "grade": "1°", "rubric": self.RUBRIC,
+            "title": "Empty Eval", "subject": "Matemáticas", "grade": "1°",
+            "rubric": self.RUBRIC, "course_id": course_id,
         }, headers={"Authorization": f"Bearer {teacher_token}"})
         eval_id = e_resp.json()["id"]
 
@@ -1236,9 +1295,11 @@ class TestDashboardIntegration:
         holder = await _setup_holder(fastapi_app)
         teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
+        # Course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
-            "name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT,
-        }, headers={"Authorization": f"Bearer {teacher['token']}"})
+            "name": COURSE_NAME, "grade": COURSE_GRADE,
+            "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+        }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
         await client.post(
@@ -1247,9 +1308,11 @@ class TestDashboardIntegration:
             headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
+        # Evaluation (requires course_id — N-07)
         e_resp = await client.post("/api/evaluations", json={
             "title": EVAL_TITLE, "subject": COURSE_SUBJECT,
             "grade": COURSE_GRADE, "rubric": self.RUBRIC,
+            "course_id": course_id,
         }, headers={"Authorization": f"Bearer {teacher['token']}"})
         eval_id = e_resp.json()["id"]
 
@@ -1479,9 +1542,11 @@ class TestResultReviewIntegration:
         holder = await _setup_holder(fastapi_app)
         teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
+        # Create course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
-            "name": "Review Course", "grade": "1°", "subject": "Test",
-        }, headers={"Authorization": f"Bearer {teacher['token']}"})
+            "name": "Review Course", "grade": "1°", "subject": "Matemáticas",
+            "teacher_id": teacher["teacher_id"],
+        }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
         await client.post(
@@ -1490,8 +1555,10 @@ class TestResultReviewIntegration:
             headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
+        # Create evaluation (requires course_id — N-07)
         e_resp = await client.post("/api/evaluations", json={
-            "title": "Review Eval", "subject": "Test", "grade": "1°", "rubric": self.RUBRIC,
+            "title": "Review Eval", "subject": "Matemáticas", "grade": "1°",
+            "rubric": self.RUBRIC, "course_id": course_id,
         }, headers={"Authorization": f"Bearer {teacher['token']}"})
         eval_id = e_resp.json()["id"]
 
