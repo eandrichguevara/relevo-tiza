@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List, Optional
 
-from database import get_db, current_tenant_id, _is_postgres as _is_pg
+from database import get_db, current_tenant_id
 from models.db_models import Evaluation, User, Course, Student
 from models.schemas import CreateEvaluationRequest, EvaluationResponse
 from utils.security import verify_tenant_access
@@ -25,7 +25,6 @@ async def create_evaluation(
 ):
     """Create a new evaluation with rubric."""
     evaluation = Evaluation(
-        tenant_id=current_tenant_id.get() or current_user.tenant_id,
         title=body.title,
         subject=body.subject,
         grade=body.grade,
@@ -47,10 +46,7 @@ async def list_evaluations(
     offset: int = 0,
 ):
     """List evaluations for the current tenant (isolated via search_path)."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
     query = select(Evaluation)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
     if status:
         query = query.where(Evaluation.status == status)
     query = (
@@ -69,11 +65,9 @@ async def get_evaluation(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single evaluation by ID (isolated via search_path)."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -87,11 +81,9 @@ async def generate_pdf(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a printable PDF for the evaluation."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -120,11 +112,9 @@ async def process_scanned(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload and process a scanned evaluation PDF."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -166,11 +156,9 @@ async def delete_evaluation(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete an evaluation."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -190,19 +178,16 @@ async def generate_answer_sheet(
     """Generate answer sheets for all students in a course."""
     from services.pdf import generate_answer_sheet_pdf
 
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    eval_query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        eval_query = eval_query.where(Evaluation.tenant_id == _tid)
-    eval_result = await db.execute(eval_query)
+    eval_result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
 
-    course_query = select(Course).where(Course.id == course_id)
-    if _tid:
-        course_query = course_query.where(Course.tenant_id == _tid)
-    course_result = await db.execute(course_query)
+    course_result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
     course = course_result.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -236,19 +221,16 @@ async def simulate_answers(
     from models.db_models import Result as ResultModel
     import random
 
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    eval_query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        eval_query = eval_query.where(Evaluation.tenant_id == _tid)
-    eval_result = await db.execute(eval_query)
+    eval_result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
 
-    course_query = select(Course).where(Course.id == course_id)
-    if _tid:
-        course_query = course_query.where(Course.tenant_id == _tid)
-    course_result = await db.execute(course_query)
+    course_result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
     if not course_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -336,11 +318,9 @@ async def process_scanned_async(
     to check progress. The pipeline runs OCR + LLM grading in the background.
     The sync POST /{id}/process endpoint is still available for direct use.
     """
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -350,7 +330,7 @@ async def process_scanned_async(
     # Process via the async pipeline (saves to storage, enqueues, updates status)
     job_id = await ai_pipeline.process_evaluation(
         evaluation_id=evaluation.id,
-        tenant_id=evaluation.tenant_id,
+        tenant_id=current_tenant_id.get(),
         rubric=evaluation.rubric if isinstance(evaluation.rubric, list) else [],
         pdf_bytes=contents,
         db_session=db,
@@ -377,11 +357,9 @@ async def get_processing_status(
     Returns the evaluation status + a summary of results if complete.
     Use this for polling after submitting via process-async.
     """
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")

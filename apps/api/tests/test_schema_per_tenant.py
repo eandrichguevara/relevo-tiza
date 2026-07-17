@@ -122,8 +122,8 @@ class TestCreateTenantSchema:
         await create_tenant_schema("00000000-0000-0000-0000-000000000000")
 
         # Should have called execute at least:
-        # 1 for CREATE SCHEMA + 4 tables + 5 indexes = 10 calls
-        assert mock_conn.execute.call_count >= 10
+        # 1 for CREATE SCHEMA + 4 tables + 4 indexes = 9 calls
+        assert mock_conn.execute.call_count >= 9
 
     @patch("database._is_postgres", return_value=False)
     @patch("database.engine")

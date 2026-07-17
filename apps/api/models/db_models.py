@@ -34,8 +34,9 @@ class Tenant(Base):
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     users = relationship("User", back_populates="tenant", cascade="all, delete-orphan")
-    evaluations = relationship("Evaluation", back_populates="tenant", cascade="all, delete-orphan")
     members = relationship("TenantMember", back_populates="tenant", cascade="all, delete-orphan")
+    # NOTE: evaluations and courses relationships removed — they live in
+    # tenant-specific schemas and cannot be joined cross-schema via ORM.
 
 
 class User(Base):
@@ -68,12 +69,10 @@ class User(Base):
 class Evaluation(Base):
     __tablename__ = "evaluations"
     __table_args__ = (
-        Index("ix_evaluations_tenant_id", "tenant_id"),
         Index("ix_evaluations_status", "status"),
     )
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     title = Column(String, nullable=False)
     subject = Column(String, nullable=False)
     grade = Column(String, nullable=False)
@@ -83,7 +82,6 @@ class Evaluation(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    tenant = relationship("Tenant", back_populates="evaluations")
     results = relationship("Result", back_populates="evaluation", cascade="all, delete-orphan")
 
 
@@ -131,12 +129,10 @@ class AuditLog(Base):
 class Course(Base):
     __tablename__ = "courses"
     __table_args__ = (
-        Index("ix_courses_tenant_id", "tenant_id"),
         Index("ix_courses_teacher_id", "teacher_id"),
     )
 
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
     grade = Column(String, nullable=False)
     subject = Column(String, nullable=False)
@@ -144,7 +140,6 @@ class Course(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
-    tenant = relationship("Tenant")
     students = relationship("Student", back_populates="course", cascade="all, delete-orphan")
 
 

@@ -175,7 +175,6 @@ class CreateEvaluationRequest(BaseModel):
 
 class EvaluationResponse(BaseModel):
     id: str
-    tenant_id: str
     title: str
     subject: str
     grade: str
@@ -249,7 +248,6 @@ class CreateCourseRequest(BaseModel):
 
 class CourseResponse(BaseModel):
     id: str
-    tenant_id: str
     name: str
     grade: str
     subject: str

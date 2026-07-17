@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import List
 
-from database import get_db, current_tenant_id, _is_postgres as _is_pg
+from database import get_db
 from models.db_models import Student, Course, User
 from models.schemas import CreateStudentRequest, StudentResponse, BulkCreateStudentsRequest, BulkCreateStudentsResponse
 from utils.security import verify_tenant_access
@@ -20,12 +20,10 @@ async def bulk_create_students(
     db: AsyncSession = Depends(get_db),
 ):
     """Create multiple students at once for a course."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
     # Verify course exists (search_path provides isolation)
-    course_query = select(Course).where(Course.id == course_id)
-    if _tid:
-        course_query = course_query.where(Course.tenant_id == _tid)
-    result = await db.execute(course_query)
+    result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
     course = result.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
@@ -81,11 +79,9 @@ async def list_students(
     db: AsyncSession = Depends(get_db),
 ):
     """List all students in a course."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    course_query = select(Course).where(Course.id == course_id)
-    if _tid:
-        course_query = course_query.where(Course.tenant_id == _tid)
-    result = await db.execute(course_query)
+    result = await db.execute(
+        select(Course).where(Course.id == course_id)
+    )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Course not found")
 
@@ -102,11 +98,9 @@ async def delete_student(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a student."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Student).where(Student.id == student_id)
-    if _tid:
-        query = query.join(Course, Student.course_id == Course.id).where(Course.tenant_id == _tid)
-    result = await db.execute(query)
+    result = await db.execute(
+        select(Student).where(Student.id == student_id)
+    )
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")

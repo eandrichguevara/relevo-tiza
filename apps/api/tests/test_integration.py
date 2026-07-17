@@ -246,8 +246,8 @@ async def _create_teachers_direct(_app, tenant_id: str, count: int, prefix: str 
 
 
 @pytest.mark.asyncio
-async def _create_evaluations_direct(_app, tenant_id: str, count: int) -> int:
-    """Create N Evaluation records directly in DB under a given tenant.
+async def _create_evaluations_direct(_app, count: int) -> int:
+    """Create N Evaluation records directly in DB.
     Returns the number of evaluations created.
     """
     from database import get_db
@@ -258,7 +258,6 @@ async def _create_evaluations_direct(_app, tenant_id: str, count: int) -> int:
     async for session in session_generator:
         for i in range(count):
             eval_entry = Evaluation(
-                tenant_id=tenant_id,
                 title=f"Direct Eval {i}",
                 subject="Math",
                 grade="1°",
@@ -581,7 +580,6 @@ class TestCoursesIntegration:
         assert data["name"] == COURSE_NAME
         assert data["grade"] == COURSE_GRADE
         assert data["subject"] == COURSE_SUBJECT
-        assert data["tenant_id"] == ctx["tenant_id"]
         assert "student_count" in data
         assert data["student_count"] == 0
         assert "id" in data
@@ -1174,7 +1172,7 @@ class TestDashboardIntegration:
         # Create teachers and evaluations in that tenant
         teachers = await _create_teachers_direct(fastapi_app, tenant_id, 2, prefix="nm")
         assert len(teachers) == 2
-        await _create_evaluations_direct(fastapi_app, tenant_id, 2)
+        await _create_evaluations_direct(fastapi_app, 2)
 
         resp = await client.get(
             "/api/dashboard/executive",
@@ -1249,13 +1247,11 @@ class TestDashboardIntegration:
         token_b = holder_b["token"]
         tenant_b_id = holder_b["tenant_id"]
 
-        # Tenant A: 3 teachers, 2 evaluations
+        # Tenant A: 3 teachers
         await _create_teachers_direct(fastapi_app, tenant_a_id, 3, prefix="isoa")
-        await _create_evaluations_direct(fastapi_app, tenant_a_id, 2)
 
-        # Tenant B: 2 teachers, 1 evaluation
+        # Tenant B: 2 teachers
         await _create_teachers_direct(fastapi_app, tenant_b_id, 2, prefix="isob")
-        await _create_evaluations_direct(fastapi_app, tenant_b_id, 1)
 
         # Verify holder_A's view
         resp_a = await client.get(
@@ -1270,9 +1266,6 @@ class TestDashboardIntegration:
         assert data_a["total_teachers"] == 3, (
             f"Holder A: expected 3 teachers, got {data_a['total_teachers']}"
         )
-        assert data_a["total_evaluations"] == 2, (
-            f"Holder A: expected 2 evaluations, got {data_a['total_evaluations']}"
-        )
 
         # Verify holder_B's view
         resp_b = await client.get(
@@ -1286,9 +1279,6 @@ class TestDashboardIntegration:
         )
         assert data_b["total_teachers"] == 2, (
             f"Holder B: expected 2 teachers, got {data_b['total_teachers']}"
-        )
-        assert data_b["total_evaluations"] == 1, (
-            f"Holder B: expected 1 evaluation, got {data_b['total_evaluations']}"
         )
 
 

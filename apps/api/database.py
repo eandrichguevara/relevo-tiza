@@ -50,8 +50,7 @@ async def set_tenant_search_path(session: AsyncSession, tenant_id: str | None):
     then fall back to public. Otherwise, only public is visible.
 
     ponytail: SQLite has no schemas — this is a no-op in tests/local dev
-    with SQLite; tenant isolation is handled via WHERE tenant_id = ?
-    in those environments.
+    with SQLite. Tenant isolation is handled via the search_path in PG.
     """
     if not _is_postgres():
         return  # SQLite has no schemas — tenant isolation via app-level filters
@@ -87,7 +86,6 @@ async def create_tenant_schema(tenant_id: str):
         await conn.execute(text(f"""
             CREATE TABLE IF NOT EXISTS {schema}.evaluations (
                 id VARCHAR PRIMARY KEY,
-                tenant_id VARCHAR NOT NULL,
                 title VARCHAR NOT NULL,
                 subject VARCHAR NOT NULL,
                 grade VARCHAR NOT NULL,
@@ -101,7 +99,6 @@ async def create_tenant_schema(tenant_id: str):
         await conn.execute(text(f"""
             CREATE TABLE IF NOT EXISTS {schema}.courses (
                 id VARCHAR PRIMARY KEY,
-                tenant_id VARCHAR NOT NULL,
                 name VARCHAR NOT NULL,
                 grade VARCHAR NOT NULL,
                 subject VARCHAR NOT NULL,
@@ -142,10 +139,6 @@ async def create_tenant_schema(tenant_id: str):
         await conn.execute(text(f"""
             CREATE INDEX IF NOT EXISTS ix_{tenant_id}_evaluations_status
             ON {schema}.evaluations (status)
-        """))
-        await conn.execute(text(f"""
-            CREATE INDEX IF NOT EXISTS ix_{tenant_id}_evaluations_tenant_id
-            ON {schema}.evaluations (tenant_id)
         """))
         await conn.execute(text(f"""
             CREATE INDEX IF NOT EXISTS ix_{tenant_id}_courses_teacher_id

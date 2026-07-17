@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 
-from database import get_db, current_tenant_id, _is_postgres as _is_pg
+from database import get_db
 from models.db_models import Result, Evaluation, User
 from models.schemas import ResultResponse, ReviewRequest
 from utils.security import verify_tenant_access
@@ -20,11 +20,9 @@ async def list_results(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all results for an evaluation (isolated via search_path)."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    eval_query = select(Evaluation).where(Evaluation.id == evaluation_id)
-    if _tid:
-        eval_query = eval_query.where(Evaluation.tenant_id == _tid)
-    eval_result = await db.execute(eval_query)
+    eval_result = await db.execute(
+        select(Evaluation).where(Evaluation.id == evaluation_id)
+    )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -41,7 +39,6 @@ async def get_pending_reviews(
     db: AsyncSession = Depends(get_db),
 ):
     """Get all results pending teacher review (isolated via search_path)."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
     query = (
         select(Result)
         .join(Evaluation, Result.evaluation_id == Evaluation.id)
@@ -52,8 +49,6 @@ async def get_pending_reviews(
         .order_by(Result.created_at.desc())
         .limit(50)
     )
-    if _tid:
-        query = query.where(Evaluation.tenant_id == _tid)
     res = await db.execute(query)
     return res.scalars().all()
 
@@ -65,11 +60,9 @@ async def get_result(
     db: AsyncSession = Depends(get_db),
 ):
     """Get a single result (isolated via search_path)."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Result).where(Result.id == result_id)
-    if _tid:
-        query = query.join(Evaluation, Result.evaluation_id == Evaluation.id).where(Evaluation.tenant_id == _tid)
-    res = await db.execute(query)
+    res = await db.execute(
+        select(Result).where(Result.id == result_id)
+    )
     result = res.scalar_one_or_none()
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
@@ -84,11 +77,9 @@ async def review_result(
     db: AsyncSession = Depends(get_db),
 ):
     """Teacher reviews and corrects AI grading."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Result).where(Result.id == result_id)
-    if _tid:
-        query = query.join(Evaluation, Result.evaluation_id == Evaluation.id).where(Evaluation.tenant_id == _tid)
-    res = await db.execute(query)
+    res = await db.execute(
+        select(Result).where(Result.id == result_id)
+    )
     result = res.scalar_one_or_none()
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
@@ -130,11 +121,9 @@ async def generate_report(
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a PDF report for a student result."""
-    _tid = current_tenant_id.get() if not _is_pg() else None
-    query = select(Result).where(Result.id == result_id)
-    if _tid:
-        query = query.join(Evaluation, Result.evaluation_id == Evaluation.id).where(Evaluation.tenant_id == _tid)
-    res = await db.execute(query)
+    res = await db.execute(
+        select(Result).where(Result.id == result_id)
+    )
     result = res.scalar_one_or_none()
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
