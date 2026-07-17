@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useAppStore } from '@/store/useAppStore';
+import { useFeatures } from '@/hooks/useFeatures';
+import { usePendingReviews } from '@/hooks/useApi';
 import {
   LayoutDashboard,
   FileText,
@@ -14,21 +16,29 @@ import {
   BookOpen,
   Menu,
   X,
+  CreditCard,
 } from 'lucide-react';
-
-const navItems = [
-  { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
-  { href: '/dashboard/cursos', label: 'Cursos', icon: BookOpen },
-  { href: '/dashboard/evaluaciones', label: 'Evaluaciones', icon: FileText },
-  { href: '/dashboard/revisar', label: 'Revisar', icon: AlertTriangle },
-  { href: '/dashboard/reportes', label: 'Reportes', icon: BarChart3 },
-];
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const { sidebarOpen, toggleSidebar, setSidebarOpen } = useAppStore();
+  const { features, isLoaded } = useFeatures();
+  const { data: pendingReviews } = usePendingReviews();
+  const pendingCount = pendingReviews?.length ?? 0;
+
+  const navItems = [
+    { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { href: '/dashboard/cursos', label: 'Cursos', icon: BookOpen },
+    { href: '/dashboard/evaluaciones', label: 'Evaluaciones', icon: FileText },
+    { href: '/dashboard/revisar', label: 'Revisar', icon: AlertTriangle },
+    { href: '/dashboard/reportes', label: 'Reportes', icon: BarChart3 },
+    // Facturación visible solo si billing feature flag está activo
+    ...(isLoaded && features.billing
+      ? [{ href: '/dashboard/facturacion' as const, label: 'Facturación', icon: CreditCard }]
+      : []),
+  ];
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -103,9 +113,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               >
                 <Icon size={18} />
                 {item.label}
-                {item.href === '/dashboard/revisar' && (
-                  <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    !
+                {item.href === '/dashboard/revisar' && pendingCount > 0 && (
+                  <span
+                    className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full"
+                    aria-label={`${pendingCount} evaluaciones pendientes de revisión`}
+                  >
+                    {pendingCount > 9 ? '9+' : pendingCount}
                   </span>
                 )}
               </Link>
