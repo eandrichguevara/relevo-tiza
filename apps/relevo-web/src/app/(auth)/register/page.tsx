@@ -6,6 +6,13 @@ import Link from 'next/link';
 import { Input, Button, ErrorMessage } from '@tiza/ui';
 import { apiFetch } from '@/lib/api';
 import type { ApiError } from '@/lib/api';
+import {
+  validateName,
+  validateSchool,
+  validateEmail,
+  validatePassword,
+  validateConfirmPassword,
+} from '@/lib/validators';
 
 interface FormErrors {
   name?: string;
@@ -13,35 +20,6 @@ interface FormErrors {
   email?: string;
   password?: string;
   confirmPassword?: string;
-}
-
-function validateName(name: string): string | undefined {
-  if (!name.trim()) return 'El nombre es obligatorio';
-  if (name.trim().length < 2) return 'El nombre debe tener al menos 2 caracteres';
-  return undefined;
-}
-
-function validateSchool(school: string): string | undefined {
-  if (!school.trim()) return 'El nombre del colegio es obligatorio';
-  return undefined;
-}
-
-function validateEmail(email: string): string | undefined {
-  if (!email.trim()) return 'El email es obligatorio';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Formato de email inválido';
-  return undefined;
-}
-
-function validatePassword(password: string): string | undefined {
-  if (!password) return 'La contraseña es obligatoria';
-  if (password.length < 6) return 'La contraseña debe tener al menos 6 caracteres';
-  return undefined;
-}
-
-function validateConfirmPassword(password: string, confirmPassword: string): string | undefined {
-  if (!confirmPassword) return 'Debes confirmar tu contraseña';
-  if (password !== confirmPassword) return 'Las contraseñas no coinciden';
-  return undefined;
 }
 
 export default function RegisterPage() {
@@ -60,11 +38,11 @@ export default function RegisterPage() {
 
     // ── Client-side validation ──
     const errors: FormErrors = {
-      name: validateName(name),
-      school: validateSchool(school),
-      email: validateEmail(email),
-      password: validatePassword(password),
-      confirmPassword: validateConfirmPassword(password, confirmPassword),
+      name: validateName(name) ?? undefined,
+      school: validateSchool(school) ?? undefined,
+      email: validateEmail(email) ?? undefined,
+      password: validatePassword(password) ?? undefined,
+      confirmPassword: validateConfirmPassword(password, confirmPassword) ?? undefined,
     };
     setFieldErrors(errors);
     setGeneralError('');
@@ -88,7 +66,7 @@ export default function RegisterPage() {
         }),
       });
 
-      router.push('/login?registered=true');
+      router.push('/pending');
     } catch (err: unknown) {
       console.error('[Register Error]', err);
       const apiErr = err as ApiError;
@@ -169,9 +147,9 @@ export default function RegisterPage() {
           setPassword(e.target.value);
           if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
         }}
-        placeholder="Mínimo 6 caracteres"
+        placeholder="Mínimo 8 caracteres"
         error={fieldErrors.password}
-        hint="Mínimo 6 caracteres"
+        hint="Mínimo 8 caracteres"
         autoComplete="new-password"
         required
       />

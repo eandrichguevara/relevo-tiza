@@ -19,6 +19,7 @@ interface AuthContextValue {
   accessToken: string | null; // alias for backward compat
   isAuthenticated: boolean;
   isLoading: boolean;
+  userStatus: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: {
     name: string;
@@ -87,14 +88,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/');
   }, [router]);
 
+  const userStatus = user?.status ?? null;
+
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
         accessToken: token,
-        isAuthenticated: !!token && !!user,
+        isAuthenticated: !!token && !!user && user.status === 'active',
         isLoading,
+        userStatus,
         login,
         register,
         logout,

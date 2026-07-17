@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
     email: String(payload.email ?? ''),
     name: String(payload.name ?? ''),
     role: String(payload.role ?? ''),
+    status: String(payload.status ?? 'active'),
     tenantId: String(payload.tenant_id ?? ''),
   };
 

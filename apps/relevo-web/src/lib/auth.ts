@@ -21,6 +21,8 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  status: string;
+  rejectionReason?: string;
   tenantId: string;
 }
 
@@ -113,6 +115,8 @@ export async function loginUser(
     email: string;
     name: string;
     role: string;
+    status: string;
+    rejection_reason?: string;
     tenant_id: string;
   }>('/api/auth/me', {
     token: loginRes.access_token,
@@ -123,6 +127,8 @@ export async function loginUser(
     email: userData.email,
     name: userData.name,
     role: userData.role,
+    status: userData.status,
+    rejectionReason: userData.rejection_reason,
     tenantId: userData.tenant_id,
   };
 

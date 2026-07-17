@@ -1,6 +1,7 @@
 export type Brand = 'tiza' | 'relevo';
 export type Role = 'TEACHER' | 'HOLDER' | 'ADMIN';
 export type TenantMemberRole = 'owner' | 'admin' | 'member';
+export type UserStatus = 'pending' | 'active' | 'rejected';
 export type QuestionType = 'multiple_choice' | 'written';
 export type ProcessingStatus =
   'pending' | 'processing' | 'completed' | 'requires_review' | 'reviewed';
@@ -32,6 +33,8 @@ export interface User {
   email: string;
   name: string;
   role: Role;
+  status: UserStatus;
+  rejectionReason?: string;
   tenantId: string;
   tenant?: Tenant;
   tenantMemberships?: TenantMember[];

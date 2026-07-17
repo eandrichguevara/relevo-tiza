@@ -1,54 +1,34 @@
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Input, Button, ErrorMessage } from '@tiza/ui';
 import { useAuth } from '@/hooks/useAuth';
 import type { ApiError } from '@/lib/api';
+import { validateEmail, validatePassword } from '@/lib/validators';
 
 interface FormErrors {
   email?: string;
   password?: string;
 }
 
-function validateEmail(email: string): string | undefined {
-  if (!email.trim()) return 'El email es obligatorio';
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return 'Formato de email inválido';
-  return undefined;
-}
-
-function validatePassword(password: string): string | undefined {
-  if (!password) return 'La contraseña es obligatoria';
-  if (password.length < 6) return 'La contraseña debe tener al menos 6 caracteres';
-  return undefined;
-}
-
 function LoginForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [generalError, setGeneralError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
-
-  // Check for success message from registration redirect
-  useEffect(() => {
-    if (searchParams?.get('registered')) {
-      setSuccessMessage('Solicitud enviada correctamente. Te contactaremos pronto.');
-    }
-  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // ── Client-side validation ──
     const errors: FormErrors = {
-      email: validateEmail(email),
-      password: validatePassword(password),
+      email: validateEmail(email) ?? undefined,
+      password: validatePassword(password) ?? undefined,
     };
     setFieldErrors(errors);
     setGeneralError('');
@@ -62,12 +42,36 @@ function LoginForm() {
       await login(email.trim(), password);
       router.push('/dashboard');
     } catch (err: unknown) {
-      console.error('[Login Error]', err);
+      // Structured error logging — avoids `{}` in monitoring tools
       const apiErr = err as ApiError;
-      if (apiErr?.status === 401) {
+      const isApiErr = typeof apiErr?.status === 'number' && apiErr.status > 0;
+      console.error('[Login Error]', {
+        isApiError: isApiErr,
+        status: isApiErr ? apiErr.status : undefined,
+        detail: isApiErr ? apiErr.detail : undefined,
+        message: err instanceof Error ? err.message : undefined,
+        raw: err,
+      });
+      if (isApiErr && apiErr.status === 401) {
         setGeneralError('Credenciales incorrectas. Verifica tu email y contraseña.');
+      } else if (isApiErr && apiErr.status === 403) {
+        const detailLower = (apiErr.detail || '').toLowerCase();
+        if (detailLower.includes('pendiente') || detailLower.includes('pending')) {
+          setGeneralError(
+            'Tu cuenta está pendiente de aprobación. Serás redirigido a la página de estado...'
+          );
+          setTimeout(() => router.push('/pending'), 2000);
+        } else if (detailLower.includes('rechaz') || detailLower.includes('rejected')) {
+          setGeneralError('Tu solicitud fue rechazada. Contacta al administrador.');
+        } else {
+          setGeneralError('Acceso denegado. No tienes permisos para acceder.');
+        }
+      } else if (isApiErr && apiErr.translatedMessage) {
+        setGeneralError(apiErr.translatedMessage);
+      } else if (err instanceof Error) {
+        setGeneralError(err.message || 'Error de conexión. Intenta de nuevo.');
       } else {
-        setGeneralError(apiErr?.translatedMessage || 'Error de conexión. Intenta de nuevo.');
+        setGeneralError('Error de conexión. Intenta de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -84,8 +88,6 @@ function LoginForm() {
       aria-label="Formulario de acceso"
     >
       <h2 className="text-xl font-semibold text-center mb-6">Acceso RELEVO</h2>
-
-      {successMessage && <ErrorMessage message={successMessage} variant="success" />}
 
       {generalError && (
         <ErrorMessage message={generalError} variant="error" onDismiss={clearError} />
