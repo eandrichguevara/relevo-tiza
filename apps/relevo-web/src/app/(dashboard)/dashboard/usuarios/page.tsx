@@ -90,6 +90,7 @@ function UsuariosContent() {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [passwordCopied, setPasswordCopied] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   const selectedTenant = useMemo(
     () => tenants?.find((t) => t.id === selectedTenantId),
@@ -142,7 +143,8 @@ function UsuariosContent() {
         email,
         name,
         password: generatedPassword,
-        tenantId: selectedTenantId,
+        tenant_id: selectedTenantId,
+        role: 'teacher',
       });
       setFormSuccess(`Profesor creado exitosamente. Contraseña: ${generatedPassword}`);
       setForm({ email: '', name: '' });
@@ -161,6 +163,16 @@ function UsuariosContent() {
     } catch {
       // Fallback: select the text manually
       setPasswordCopied(false);
+    }
+  };
+
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(selectedTenant?.join_code ?? '');
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      setCodeCopied(false);
     }
   };
 
@@ -230,7 +242,23 @@ function UsuariosContent() {
               ))}
             </select>
           )}
-          {selectedTenant && <Badge variant="info">{selectedTenant.subdomain}.relevo.cl</Badge>}
+          {selectedTenant && (
+            <>
+              <Badge variant="info">{selectedTenant.subdomain}.relevo.cl</Badge>
+              <span className="text-gray-300 mx-1">|</span>
+              <span className="text-xs text-gray-400">Código:</span>
+              <span className="font-mono text-sm font-medium tracking-wider bg-gray-100 rounded-md px-2 py-0.5 text-gray-600 select-all">
+                {selectedTenant.join_code}
+              </span>
+              <button
+                onClick={handleCopyCode}
+                className="p-0.5 rounded text-gray-400 hover:text-brand-primary transition-colors"
+                aria-label="Copiar código de registro"
+              >
+                {codeCopied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+              </button>
+            </>
+          )}
         </div>
       </Card>
 
