@@ -7,7 +7,7 @@ from typing import List
 from database import get_db
 from models.db_models import Course, Student, User
 from models.schemas import CreateCourseRequest, CourseResponse
-from utils.security import verify_tenant_access
+from utils.security import verify_tenant_access, require_role
 
 router = APIRouter()
 
@@ -15,15 +15,15 @@ router = APIRouter()
 @router.post("", response_model=CourseResponse, status_code=201)
 async def create_course(
     body: CreateCourseRequest,
-    current_user: User = Depends(verify_tenant_access),
+    current_user: User = Depends(require_role("HOLDER")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new course for the current teacher."""
+    """Create a new course for a teacher. Only HOLDER/ADMIN can create courses."""
     course = Course(
         name=body.name,
         grade=body.grade,
         subject=body.subject,
-        teacher_id=current_user.id,
+        teacher_id=body.teacher_id,
     )
     db.add(course)
     await db.flush()

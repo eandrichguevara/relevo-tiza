@@ -292,6 +292,7 @@ class CreateCourseRequest(BaseModel):
     name: str
     grade: str
     subject: str
+    teacher_id: str  # HOLDER/ADMIN assigns a teacher when creating
 
 class CourseResponse(BaseModel):
     id: str
