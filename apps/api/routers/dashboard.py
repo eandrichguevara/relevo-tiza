@@ -7,14 +7,14 @@ from datetime import datetime, timedelta, timezone
 from database import get_db, current_tenant_id, _is_postgres as _is_pg
 from models.db_models import Evaluation, Result, User, Course, Student, Tenant, TenantMember
 from models.schemas import DashboardStatsResponse, MacroStatsResponse
-from utils.security import get_current_user, require_role
+from utils.security import verify_tenant_access, require_role
 
 router = APIRouter()
 
 
 @router.get("/teacher", response_model=DashboardStatsResponse)
 async def teacher_dashboard(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
     """Get teacher dashboard stats (isolated via search_path)."""
@@ -215,7 +215,7 @@ async def executive_dashboard(
 @router.get("/course/{course_id}")
 async def course_stats(
     course_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
     """Get stats for a specific course (isolated via search_path)."""

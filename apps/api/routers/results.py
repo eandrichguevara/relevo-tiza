@@ -1,13 +1,13 @@
 """Results router - get, review, generate reports."""
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
 
-from database import get_db
+from database import get_db, current_tenant_id, _is_postgres as _is_pg
 from models.db_models import Result, Evaluation, User
 from models.schemas import ResultResponse, ReviewRequest
-from utils.security import get_current_user, get_tenant_id
+from utils.security import verify_tenant_access
 from services.pdf import generate_result_report_pdf
 
 router = APIRouter()
@@ -16,17 +16,15 @@ router = APIRouter()
 @router.get("/evaluation/{evaluation_id}", response_model=List[ResultResponse])
 async def list_results(
     evaluation_id: str,
-    request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get all results for an evaluation."""
-    eval_result = await db.execute(
-        select(Evaluation).where(
-            Evaluation.id == evaluation_id,
-            Evaluation.tenant_id == get_tenant_id(request, current_user),
-        )
-    )
+    """Get all results for an evaluation (isolated via search_path)."""
+    _tid = current_tenant_id.get() if not _is_pg() else None
+    eval_query = select(Evaluation).where(Evaluation.id == evaluation_id)
+    if _tid:
+        eval_query = eval_query.where(Evaluation.tenant_id == _tid)
+    eval_result = await db.execute(eval_query)
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluation not found")
@@ -39,41 +37,39 @@ async def list_results(
 
 @router.get("/pending-review", response_model=List[ResultResponse])
 async def get_pending_reviews(
-    request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get all results pending teacher review for the current tenant."""
-    res = await db.execute(
+    """Get all results pending teacher review (isolated via search_path)."""
+    _tid = current_tenant_id.get() if not _is_pg() else None
+    query = (
         select(Result)
-        .join(Evaluation)
+        .join(Evaluation, Result.evaluation_id == Evaluation.id)
         .where(
-            Evaluation.tenant_id == get_tenant_id(request, current_user),
             Result.requires_review == True,
             Result.status == "requires_review",
         )
         .order_by(Result.created_at.desc())
         .limit(50)
     )
+    if _tid:
+        query = query.where(Evaluation.tenant_id == _tid)
+    res = await db.execute(query)
     return res.scalars().all()
 
 
 @router.get("/{result_id}", response_model=ResultResponse)
 async def get_result(
     result_id: str,
-    request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single result."""
-    res = await db.execute(
-        select(Result)
-        .join(Evaluation)
-        .where(
-            Result.id == result_id,
-            Evaluation.tenant_id == get_tenant_id(request, current_user),
-        )
-    )
+    """Get a single result (isolated via search_path)."""
+    _tid = current_tenant_id.get() if not _is_pg() else None
+    query = select(Result).where(Result.id == result_id)
+    if _tid:
+        query = query.join(Evaluation, Result.evaluation_id == Evaluation.id).where(Evaluation.tenant_id == _tid)
+    res = await db.execute(query)
     result = res.scalar_one_or_none()
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
@@ -84,19 +80,15 @@ async def get_result(
 async def review_result(
     result_id: str,
     body: ReviewRequest,
-    request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
     """Teacher reviews and corrects AI grading."""
-    res = await db.execute(
-        select(Result)
-        .join(Evaluation)
-        .where(
-            Result.id == result_id,
-            Evaluation.tenant_id == get_tenant_id(request, current_user),
-        )
-    )
+    _tid = current_tenant_id.get() if not _is_pg() else None
+    query = select(Result).where(Result.id == result_id)
+    if _tid:
+        query = query.join(Evaluation, Result.evaluation_id == Evaluation.id).where(Evaluation.tenant_id == _tid)
+    res = await db.execute(query)
     result = res.scalar_one_or_none()
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")
@@ -134,19 +126,15 @@ async def review_result(
 @router.get("/{result_id}/report")
 async def generate_report(
     result_id: str,
-    request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
     """Generate a PDF report for a student result."""
-    res = await db.execute(
-        select(Result)
-        .join(Evaluation)
-        .where(
-            Result.id == result_id,
-            Evaluation.tenant_id == get_tenant_id(request, current_user),
-        )
-    )
+    _tid = current_tenant_id.get() if not _is_pg() else None
+    query = select(Result).where(Result.id == result_id)
+    if _tid:
+        query = query.join(Evaluation, Result.evaluation_id == Evaluation.id).where(Evaluation.tenant_id == _tid)
+    res = await db.execute(query)
     result = res.scalar_one_or_none()
     if not result:
         raise HTTPException(status_code=404, detail="Result not found")

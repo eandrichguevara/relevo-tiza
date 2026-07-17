@@ -119,7 +119,7 @@ class TestCreateTenantSchema:
         # engine.begin() returns an async context manager
         mock_engine.begin.return_value.__aenter__.return_value = mock_conn
 
-        await create_tenant_schema("test-tenant-uuid-1234")
+        await create_tenant_schema("00000000-0000-0000-0000-000000000000")
 
         # Should have called execute at least:
         # 1 for CREATE SCHEMA + 4 tables + 5 indexes = 10 calls
@@ -134,7 +134,7 @@ class TestCreateTenantSchema:
         mock_conn = AsyncMock()
         mock_engine.begin = AsyncMock()
 
-        await create_tenant_schema("test-tenant-uuid-1234")
+        await create_tenant_schema("00000000-0000-0000-0000-000000000000")
         mock_engine.begin.assert_not_called()
 
 

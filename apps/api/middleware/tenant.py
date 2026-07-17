@@ -163,19 +163,23 @@ class TenantMiddleware(BaseHTTPMiddleware):
                 tenant_id = jwt_tid
                 # Brand stays at default "tiza" — JWT doesn't carry brand
 
-        # ── 5. X-Tenant-Brand header (always respected for brand) ──
-        x_brand = request.headers.get("X-Tenant-Brand", "").lower()
-        if x_brand in ("tiza", "relevo"):
-            brand = x_brand
+        # ── 5. X-Tenant-Brand header (development only) ────────────
+        if settings.ENVIRONMENT == "development":
+            x_brand = request.headers.get("X-Tenant-Brand", "").lower()
+            if x_brand in ("tiza", "relevo"):
+                brand = x_brand
 
         # Inject what we have so far (brand always, tenant_id if resolved)
+        token = None
         if tenant_id:
             request.state.tenant_id = tenant_id
-            current_tenant_id.set(tenant_id)
+            token = current_tenant_id.set(tenant_id)
         request.state.brand = brand
 
         # ── 6. Auth-required endpoints: no tenant context needed ───
         if path in self.NO_TENANT_PATHS or path.startswith(self.NO_TENANT_PREFIXES):
+            if token is not None:
+                current_tenant_id.reset(token)
             return await call_next(request)
 
         # ── 7. SECURITY: All other endpoints MUST have a tenant context ──
@@ -183,6 +187,8 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # endpoint's auth dependency returns a proper 401. If it has auth
         # but no tenant, return 400 — the client must specify a tenant.
         if not tenant_id:
+            if token is not None:
+                current_tenant_id.reset(token)
             auth = request.headers.get("authorization", "")
             if auth.startswith("Bearer "):
                 return JSONResponse(
@@ -192,5 +198,9 @@ class TenantMiddleware(BaseHTTPMiddleware):
             # No auth → let the endpoint handle 401
             return await call_next(request)
 
-        response = await call_next(request)
-        return response
+        try:
+            response = await call_next(request)
+            return response
+        finally:
+            if token is not None:
+                current_tenant_id.reset(token)
