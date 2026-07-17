@@ -7,7 +7,7 @@ from typing import List
 
 from database import get_db
 from models.db_models import Course, Student, User
-from models.schemas import CreateCourseRequest, CourseResponse
+from models.schemas import CreateCourseRequest, CourseResponse, SubjectEnum
 from utils.security import verify_tenant_access, require_role
 
 router = APIRouter()
@@ -30,6 +30,12 @@ async def create_course(
     await db.flush()
     await db.refresh(course)
     return {**course.__dict__, "student_count": 0}
+
+
+@router.get("/subjects")
+async def list_subjects():
+    """Return the list of available subjects (hardcoded: Lenguaje and Matemáticas)."""
+    return {"subjects": [s.value for s in SubjectEnum]}
 
 
 @router.get("", response_model=List[CourseResponse])

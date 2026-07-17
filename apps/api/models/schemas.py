@@ -41,6 +41,12 @@ class QuestionTypeEnum(str, Enum):
     written = "written"
 
 
+class SubjectEnum(str, Enum):
+    """Asignaturas disponibles en la plataforma (hardcodeadas por ahora)."""
+    LENGUAJE = "Lenguaje"
+    MATEMATICAS = "Matemáticas"
+
+
 # ─── Auth ─────────────────────────────────
 
 
@@ -215,7 +221,7 @@ class RubricItem(BaseModel):
 
 class CreateEvaluationRequest(BaseModel):
     title: str
-    subject: str
+    subject: SubjectEnum
     grade: str
     rubric: List[RubricItem]
 
@@ -291,7 +297,7 @@ class MacroStatsResponse(BaseModel):
 class CreateCourseRequest(BaseModel):
     name: str
     grade: str
-    subject: str
+    subject: SubjectEnum
     teacher_id: str  # HOLDER/ADMIN assigns a teacher when creating
 
 class CourseResponse(BaseModel):
