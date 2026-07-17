@@ -1,4 +1,5 @@
 """Evaluations router - CRUD, upload, processing."""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,8 +46,9 @@ async def list_evaluations(
     limit: int = 50,
     offset: int = 0,
 ):
-    """List evaluations for the current tenant (isolated via search_path)."""
-    query = select(Evaluation)
+    """List evaluations for the current tenant (isolated via search_path).
+    Excludes soft-deleted evaluations."""
+    query = select(Evaluation).where(Evaluation.deleted_at.is_(None))
     if status:
         query = query.where(Evaluation.status == status)
     query = (
@@ -64,9 +66,9 @@ async def get_evaluation(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single evaluation by ID (isolated via search_path)."""
+    """Get a single evaluation by ID (isolated via search_path). Excludes soft-deleted."""
     result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
@@ -82,7 +84,7 @@ async def generate_pdf(
 ):
     """Generate a printable PDF for the evaluation."""
     result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
@@ -113,7 +115,7 @@ async def process_scanned(
 ):
     """Upload and process a scanned evaluation PDF."""
     result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
@@ -155,17 +157,17 @@ async def delete_evaluation(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete an evaluation."""
+    """Soft delete an evaluation. Sets deleted_at instead of removing from DB."""
     result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
-    await db.delete(evaluation)
+    evaluation.deleted_at = datetime.now(timezone.utc)
     await db.flush()
-    return {"message": "Evaluación eliminada"}
+    return {"message": "Evaluación eliminada (soft delete)"}
 
 
 @router.get("/{evaluation_id}/answer-sheet/{course_id}")
@@ -179,21 +181,21 @@ async def generate_answer_sheet(
     from services.pdf import generate_answer_sheet_pdf
 
     eval_result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     course_result = await db.execute(
-        select(Course).where(Course.id == course_id)
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     course = course_result.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     students_result = await db.execute(
-        select(Student).where(Student.course_id == course_id).order_by(Student.full_name)
+        select(Student).where(Student.course_id == course_id, Student.deleted_at.is_(None)).order_by(Student.full_name)
     )
     students = students_result.scalars().all()
 
@@ -222,20 +224,20 @@ async def simulate_answers(
     import random
 
     eval_result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:
         raise HTTPException(status_code=404, detail="Evaluación no encontrada")
 
     course_result = await db.execute(
-        select(Course).where(Course.id == course_id)
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     if not course_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     students_result = await db.execute(
-        select(Student).where(Student.course_id == course_id)
+        select(Student).where(Student.course_id == course_id, Student.deleted_at.is_(None))
     )
     students = students_result.scalars().all()
 
@@ -319,7 +321,7 @@ async def process_scanned_async(
     The sync POST /{id}/process endpoint is still available for direct use.
     """
     result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:
@@ -358,7 +360,7 @@ async def get_processing_status(
     Use this for polling after submitting via process-async.
     """
     result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = result.scalar_one_or_none()
     if not evaluation:

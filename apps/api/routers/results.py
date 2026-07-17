@@ -21,7 +21,7 @@ async def list_results(
 ):
     """Get all results for an evaluation (isolated via search_path)."""
     eval_result = await db.execute(
-        select(Evaluation).where(Evaluation.id == evaluation_id)
+        select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
     evaluation = eval_result.scalar_one_or_none()
     if not evaluation:

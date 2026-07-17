@@ -70,6 +70,7 @@ class Evaluation(Base):
     __tablename__ = "evaluations"
     __table_args__ = (
         Index("ix_evaluations_status", "status"),
+        Index("ix_evaluations_deleted_at", "deleted_at"),
     )
 
     id = Column(String, primary_key=True, default=generate_uuid)
@@ -79,6 +80,7 @@ class Evaluation(Base):
     rubric = Column(JSON, nullable=False, default=list)
     pdf_url = Column(String, nullable=True)
     status = Column(String, default="pending")
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -130,6 +132,7 @@ class Course(Base):
     __tablename__ = "courses"
     __table_args__ = (
         Index("ix_courses_teacher_id", "teacher_id"),
+        Index("ix_courses_deleted_at", "deleted_at"),
     )
 
     id = Column(String, primary_key=True, default=generate_uuid)
@@ -137,6 +140,7 @@ class Course(Base):
     grade = Column(String, nullable=False)
     subject = Column(String, nullable=False)
     teacher_id = Column(String, nullable=False)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -148,6 +152,7 @@ class Student(Base):
     __table_args__ = (
         UniqueConstraint("course_id", "student_code", name="uq_student_course"),
         Index("ix_students_course_id", "course_id"),
+        Index("ix_students_deleted_at", "deleted_at"),
     )
 
     id = Column(String, primary_key=True, default=generate_uuid)
@@ -156,6 +161,7 @@ class Student(Base):
     student_code = Column(String, nullable=False)
     rut = Column(String, nullable=True)
     email = Column(String, nullable=True)
+    deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

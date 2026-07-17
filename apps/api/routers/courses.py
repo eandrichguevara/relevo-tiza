@@ -1,4 +1,5 @@
 """Courses router - CRUD for courses/classes."""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -36,8 +37,13 @@ async def list_courses(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """List courses for the current tenant (isolated via search_path)."""
-    query = select(Course).order_by(Course.created_at.desc())
+    """List courses for the current tenant (isolated via search_path).
+    Excludes soft-deleted courses."""
+    query = (
+        select(Course)
+        .where(Course.deleted_at.is_(None))
+        .order_by(Course.created_at.desc())
+    )
     result = await db.execute(query)
     courses = result.scalars().all()
 
@@ -60,9 +66,9 @@ async def get_course(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get a single course (isolated via search_path)."""
+    """Get a single course (isolated via search_path). Excludes soft-deleted."""
     result = await db.execute(
-        select(Course).where(Course.id == course_id)
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     course = result.scalar_one_or_none()
     if not course:
@@ -83,13 +89,13 @@ async def delete_course(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a course and all its students."""
+    """Soft delete a course. Sets deleted_at instead of removing from DB."""
     result = await db.execute(
-        select(Course).where(Course.id == course_id)
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     course = result.scalar_one_or_none()
     if not course:
         raise HTTPException(status_code=404, detail="Curso no encontrado")
-    await db.delete(course)
+    course.deleted_at = datetime.now(timezone.utc)
     await db.flush()
-    return {"message": "Curso eliminado"}
+    return {"message": "Curso eliminado (soft delete)"}

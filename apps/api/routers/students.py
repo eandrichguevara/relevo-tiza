@@ -1,4 +1,5 @@
 """Students router - CRUD for students."""
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -20,9 +21,9 @@ async def bulk_create_students(
     db: AsyncSession = Depends(get_db),
 ):
     """Create multiple students at once for a course."""
-    # Verify course exists (search_path provides isolation)
+    # Verify course exists (search_path provides isolation). Excludes soft-deleted.
     result = await db.execute(
-        select(Course).where(Course.id == course_id)
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     course = result.scalar_one_or_none()
     if not course:
@@ -80,13 +81,13 @@ async def list_students(
 ):
     """List all students in a course."""
     result = await db.execute(
-        select(Course).where(Course.id == course_id)
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
     )
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Curso no encontrado")
 
     students_result = await db.execute(
-        select(Student).where(Student.course_id == course_id).order_by(Student.full_name)
+        select(Student).where(Student.course_id == course_id, Student.deleted_at.is_(None)).order_by(Student.full_name)
     )
     return students_result.scalars().all()
 
@@ -97,13 +98,13 @@ async def delete_student(
     current_user: User = Depends(verify_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Delete a student."""
+    """Soft delete a student. Sets deleted_at instead of removing from DB."""
     result = await db.execute(
-        select(Student).where(Student.id == student_id)
+        select(Student).where(Student.id == student_id, Student.deleted_at.is_(None))
     )
     student = result.scalar_one_or_none()
     if not student:
         raise HTTPException(status_code=404, detail="Estudiante no encontrado")
-    await db.delete(student)
+    student.deleted_at = datetime.now(timezone.utc)
     await db.flush()
-    return {"message": "Estudiante eliminado"}
+    return {"message": "Estudiante eliminado (soft delete)"}
