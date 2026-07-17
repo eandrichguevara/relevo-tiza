@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from database import get_db
 from models.db_models import Tenant, TenantMember, User, generate_join_code
 from models.schemas import CreateTenantRequest, TenantResponse, TenantLookupResponse
-from utils.security import require_role, get_tenant_id
+from utils.security import require_role
 
 router = APIRouter()
 
@@ -128,9 +128,14 @@ async def list_tenants(
         # Safe fallback: only return the user's own tenant.
         # HOLDERs without TenantMember entries should still only see
         # the tenant they're directly assigned to.
+        # Use current_user.tenant_id (DB value, not manipulable)
+        # instead of get_tenant_id() which reads headers — Consistent
+        # with executive_dashboard() fallback, defense against IDOR.
+        if not current_user.tenant_id:
+            return []
         result = await db.execute(
             select(Tenant)
-            .where(Tenant.id == get_tenant_id(request, current_user))
+            .where(Tenant.id == current_user.tenant_id)
             .order_by(Tenant.created_at.desc())
         )
 

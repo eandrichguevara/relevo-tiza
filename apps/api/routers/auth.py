@@ -201,7 +201,7 @@ async def login(
             )
 
     token = create_access_token(
-        data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id}
+        data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id, "status": user.status}
     )
     return TokenResponse(access_token=token)
 

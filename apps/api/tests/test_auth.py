@@ -5,6 +5,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from httpx import AsyncClient
+from config import settings
 
 
 async def _approve_user(email: str):
@@ -28,7 +29,7 @@ class TestAuthRegister:
     """Tests for POST /api/auth/register."""
 
     async def test_register_creates_holder_with_auto_tenant(self, client: AsyncClient):
-        """Register a HOLDER should auto-create a tenant and return 201."""
+        """Register a HOLDER should auto-create a tenant and return 201 with pending status."""
         response = await client.post("/api/auth/register", json={
             "email": "director@example.com",
             "password": "SecurePass123!",
@@ -39,6 +40,7 @@ class TestAuthRegister:
         assert "id" in data
         assert data["email"] == "director@example.com"
         assert data["role"] == "HOLDER"
+        assert data["status"] == "pending"
         assert "tenant_id" in data
         # Password should NOT be returned
         assert "password" not in data
@@ -194,6 +196,100 @@ class TestAuthLogin:
 
 
 @pytest.mark.asyncio
+class TestAuthLoginStatus:
+    """Tests for login with non-active user statuses."""
+
+    async def test_login_pending_user_returns_403(self, client: AsyncClient):
+        """Login with pending user should return 403."""
+        # Register a user (creates with status="pending") — do NOT approve
+        reg_resp = await client.post("/api/auth/register", json={
+            "email": "pending@example.com",
+            "password": "SecurePass123!",
+            "role": "director",
+        })
+        assert reg_resp.status_code == 201
+
+        # Try to login — should fail with 403
+        response = await client.post("/api/auth/login", json={
+            "email": "pending@example.com",
+            "password": "SecurePass123!",
+        })
+        assert response.status_code == 403
+        data = response.json()
+        assert "pendiente" in data["detail"].lower()
+
+    async def test_login_rejected_user_returns_403(self, client: AsyncClient):
+        """Login with rejected user should return 403."""
+        # Register a user
+        reg_resp = await client.post("/api/auth/register", json={
+            "email": "rejected_u@example.com",
+            "password": "SecurePass123!",
+            "role": "director",
+        })
+        assert reg_resp.status_code == 201
+
+        # Manually set status to rejected in DB
+        import database as db_module
+        from sqlalchemy import text
+        async with db_module.async_session() as session:
+            await session.execute(
+                text("UPDATE users SET status = 'rejected', rejection_reason = 'Documentación incompleta' WHERE email = :email"),
+                {"email": "rejected_u@example.com"},
+            )
+            await session.commit()
+
+        # Try to login — should fail with 403
+        response = await client.post("/api/auth/login", json={
+            "email": "rejected_u@example.com",
+            "password": "SecurePass123!",
+        })
+        assert response.status_code == 403
+        data = response.json()
+        assert "rechazada" in data["detail"].lower()
+        assert "Documentación incompleta" in data["detail"]
+
+    async def test_login_suspended_user_returns_403(self, client: AsyncClient):
+        """Login with suspended user should return 403."""
+        import database as db_module
+        from sqlalchemy import text
+        from models.db_models import Tenant, User, TenantMember
+        from utils.security import hash_password
+        from models.db_models import generate_join_code
+
+        # Create user directly with suspended status
+        async with db_module.async_session() as session:
+            tenant = Tenant(
+                subdomain="suspended-tenant",
+                name="Suspended School",
+                brand="relevo",
+                status="active",
+                join_code=generate_join_code(),
+            )
+            session.add(tenant)
+            await session.flush()
+
+            user = User(
+                email="suspended@example.com",
+                name="Suspended User",
+                password=hash_password("SecurePass123!"),
+                status="suspended",
+                role="TEACHER",
+                tenant_id=tenant.id,
+            )
+            session.add(user)
+            await session.commit()
+
+        # Try to login — should fail with 403
+        response = await client.post("/api/auth/login", json={
+            "email": "suspended@example.com",
+            "password": "SecurePass123!",
+        })
+        assert response.status_code == 403
+        data = response.json()
+        assert "suspendida" in data["detail"].lower()
+
+
+@pytest.mark.asyncio
 class TestAuthMe:
     """Tests for GET /api/auth/me."""
 
@@ -224,5 +320,168 @@ class TestAuthMe:
         response = await client.get(
             "/api/auth/me",
             headers={"Authorization": "Bearer invalid-token-here"},
+        )
+        assert response.status_code == 401
+
+    async def test_get_me_with_pending_user_returns_401(self, client: AsyncClient):
+        """GET /me with a pending user token should return 401 'pendiente'."""
+        import database as db_module
+        from utils.security import create_access_token, hash_password
+        from models.db_models import Tenant, User
+        from models.db_models import generate_join_code
+
+        async with db_module.async_session() as session:
+            tenant = Tenant(
+                subdomain="pending-me-tenant",
+                name="Pending Me School",
+                brand="relevo",
+                status="active",
+                join_code=generate_join_code(),
+            )
+            session.add(tenant)
+            await session.flush()
+
+            user = User(
+                email="pending-me@example.com",
+                name="Pending Me User",
+                password=hash_password("SecurePass123!"),
+                status="pending",
+                role="TEACHER",
+                tenant_id=tenant.id,
+            )
+            session.add(user)
+            await session.flush()
+            user_id = user.id
+
+            token = create_access_token(data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id})
+            await session.commit()
+
+        # Try /me with token from a pending user — should fail with 401
+        response = await client.get(
+            "/api/auth/me",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert response.status_code == 401
+        data = response.json()
+        assert "pendiente" in data["detail"].lower()
+
+
+@pytest.mark.asyncio
+class TestAuthJWTClaims:
+    """Tests for JWT token claims."""
+
+    async def test_login_jwt_includes_status(self, client: AsyncClient, test_user_data: dict):
+        """JWT token must include 'status' claim matching user's status."""
+        # Register a HOLDER (creates with status="pending")
+        reg_resp = await client.post("/api/auth/register", json=test_user_data)
+        assert reg_resp.status_code == 201
+
+        # Approve the user in DB
+        await _approve_user(test_user_data["email"])
+
+        # Login
+        login_resp = await client.post("/api/auth/login", json={
+            "email": test_user_data["email"],
+            "password": test_user_data["password"],
+        })
+        assert login_resp.status_code == 200
+        token = login_resp.json()["access_token"]
+
+        # Decode and verify
+        import jwt as pyjwt
+        decoded = pyjwt.decode(token, settings.JWT_SECRET, algorithms=[settings.JWT_ALGORITHM])
+        assert decoded.get("status") == "active"
+        assert decoded.get("sub") is not None
+        assert decoded.get("role") is not None
+        assert decoded.get("tenant_id") is not None
+
+    async def test_login_jwt_includes_status_for_rejected_user(self, client: AsyncClient):
+        """JWT should never be issued for rejected user, but verify claim logic."""
+        import database as db_module
+        from sqlalchemy import text
+        from datetime import datetime, timezone
+
+        # Register
+        reg_resp = await client.post("/api/auth/register", json={
+            "email": "jwt-rejected@test.com",
+            "password": "SecurePass123!",
+            "role": "director",
+        })
+        assert reg_resp.status_code == 201
+
+        # Set rejected in DB
+        async with db_module.async_session() as session:
+            await session.execute(
+                text("UPDATE users SET status = 'rejected', rejection_reason = 'Docs falsos' WHERE email = :email"),
+                {"email": "jwt-rejected@test.com"},
+            )
+            await session.commit()
+
+        # Login should be rejected (403)
+        login_resp = await client.post("/api/auth/login", json={
+            "email": "jwt-rejected@test.com",
+            "password": "SecurePass123!",
+        })
+        assert login_resp.status_code == 403
+
+
+@pytest.mark.asyncio
+class TestAuthSession:
+    """Tests for GET /api/auth/session."""
+
+    async def test_session_returns_user_info(self, client: AsyncClient, registered_user: dict):
+        """GET /session with valid token should return session info."""
+        response = await client.get(
+            "/api/auth/session",
+            headers={"Authorization": f"Bearer {registered_user['token']}"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["email"] == registered_user["email"]
+        assert data["role"] == "HOLDER"
+        assert data["tenant_id"] == registered_user["tenant_id"]
+        assert data["authenticated"] is True
+        assert "id" in data
+        assert "name" in data
+
+    async def test_session_without_token_returns_401(self, client: AsyncClient):
+        """GET /session without token should return 401."""
+        response = await client.get("/api/auth/session")
+        assert response.status_code == 401
+
+    async def test_session_with_pending_user_returns_401(self, client: AsyncClient):
+        """GET /session with a pending user token should return 401."""
+        import database as db_module
+        from utils.security import create_access_token, hash_password
+        from models.db_models import Tenant, User
+        from models.db_models import generate_join_code
+
+        async with db_module.async_session() as session:
+            tenant = Tenant(
+                subdomain="session-pending-tenant",
+                name="Session Pending School",
+                brand="tiza",
+                status="active",
+                join_code=generate_join_code(),
+            )
+            session.add(tenant)
+            await session.flush()
+
+            user = User(
+                email="session-pending@example.com",
+                name="Session Pending User",
+                password=hash_password("SecurePass123!"),
+                status="pending",
+                role="TEACHER",
+                tenant_id=tenant.id,
+            )
+            session.add(user)
+            await session.flush()
+
+            token = create_access_token(data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id})
+
+        response = await client.get(
+            "/api/auth/session",
+            headers={"Authorization": f"Bearer {token}"},
         )
         assert response.status_code == 401

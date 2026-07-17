@@ -204,7 +204,6 @@ app.add_middleware(
         "Authorization",
         "Content-Type",
         "X-Tenant-Brand",
-        "X-Tenant-Id",
         "X-Tenant-Subdomain",
     ],
 )

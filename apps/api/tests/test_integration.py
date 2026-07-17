@@ -152,6 +152,123 @@ async def _login(_app, email: str, password: str) -> str:
         return resp.json()["access_token"]
 
 
+@pytest.mark.asyncio
+async def _setup_holder_custom(
+    _app,
+    email: str,
+    password: str = "CustomPass999!",
+    name: str | None = None,
+    with_member: bool = True,
+) -> dict:
+    """Create a HOLDER user + tenant directly in DB (bypasses register/pending).
+    If with_member=True (default), also creates a TenantMember entry.
+    Returns dict with token and tenant_id.
+    """
+    from database import get_db
+    from models.db_models import Tenant, User, TenantMember, generate_join_code
+    from utils.security import hash_password
+    from httpx import AsyncClient, ASGITransport
+
+    override = _app.dependency_overrides.get(get_db)
+    session_generator = override() if override else get_db()
+    async for session in session_generator:
+        import time
+        import random
+        ts = f"{time.time()}-{random.randint(1000,9999)}"
+        tenant = Tenant(
+            subdomain=f"custom-{email.split('@')[0]}-{ts}",
+            name=f"Custom School {email} {ts}",
+            brand="relevo",
+            status="active",
+            join_code=generate_join_code(),
+        )
+        session.add(tenant)
+        await session.flush()
+
+        holder = User(
+            email=email,
+            name=name or f"Holder {email}",
+            password=hash_password(password),
+            status="active",
+            role="HOLDER",
+            tenant_id=tenant.id,
+        )
+        session.add(holder)
+        await session.flush()
+
+        if with_member:
+            member = TenantMember(
+                tenant_id=tenant.id,
+                user_id=holder.id,
+                role="owner",
+            )
+            session.add(member)
+
+        tenant_id = tenant.id
+
+    # Login via API
+    transport = ASGITransport(app=_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        login_resp = await c.post("/api/auth/login", json={
+            "email": email,
+            "password": password,
+        })
+        assert login_resp.status_code == 200, f"Holder login failed: {login_resp.text}"
+        token = login_resp.json()["access_token"]
+
+    return {"token": token, "tenant_id": tenant_id}
+
+
+@pytest.mark.asyncio
+async def _create_teachers_direct(_app, tenant_id: str, count: int, prefix: str = "teacher") -> list[str]:
+    """Create N TEACHER users directly in DB under a given tenant.
+    Returns list of created emails.
+    """
+    from database import get_db
+    from models.db_models import User
+    from utils.security import hash_password
+
+    override = _app.dependency_overrides.get(get_db)
+    session_generator = override() if override else get_db()
+    async for session in session_generator:
+        for i in range(count):
+            email = f"{prefix}-{i}@direct.test"
+            teacher = User(
+                email=email,
+                name=f"Teacher {prefix} {i}",
+                password=hash_password("DummyPass123!"),
+                status="active",
+                role="TEACHER",
+                tenant_id=tenant_id,
+            )
+            session.add(teacher)
+    return [f"{prefix}-{i}@direct.test" for i in range(count)]
+
+
+@pytest.mark.asyncio
+async def _create_evaluations_direct(_app, tenant_id: str, count: int) -> int:
+    """Create N Evaluation records directly in DB under a given tenant.
+    Returns the number of evaluations created.
+    """
+    from database import get_db
+    from models.db_models import Evaluation
+
+    override = _app.dependency_overrides.get(get_db)
+    session_generator = override() if override else get_db()
+    async for session in session_generator:
+        for i in range(count):
+            eval_entry = Evaluation(
+                tenant_id=tenant_id,
+                title=f"Direct Eval {i}",
+                subject="Math",
+                grade="1°",
+                rubric=[],
+                status="pending",
+            )
+            session.add(eval_entry)
+    return count
+
+
 # ═════════════════════════════════════════════
 #  1. TENANTS  (HOLDER only)
 # ═════════════════════════════════════════════
@@ -274,6 +391,17 @@ class TestTenantsIntegration:
             "tenant_id": tenant_id,
         }, headers={"Authorization": f"Bearer {holder_token}"})
         assert teacher_resp.status_code == 201
+
+        # Approve the teacher before login (users created via /api/users are pending)
+        import database as db_module
+        from sqlalchemy import text
+        async with db_module.async_session() as session:
+            await session.execute(
+                text("UPDATE users SET status = 'active', approved_at = CURRENT_TIMESTAMP, approved_by = 'test_admin' WHERE email = :email"),
+                {"email": "teacher-no-tenant@test.com"},
+            )
+            await session.commit()
+
         teacher_token = await _login(fastapi_app, "teacher-no-tenant@test.com", "Pass1234!")
 
         # TEACHER tries to create a tenant → 403
@@ -882,6 +1010,17 @@ class TestResultsIntegration:
             "email": "teacher-nostudents@test.com", "password": TEACHER_PASS,
             "name": "Teacher No Students", "role": "teacher", "tenant_id": holder["tenant_id"],
         }, headers={"Authorization": f"Bearer {holder['token']}"})
+
+        # Approve the teacher before login (users created via /api/users are pending)
+        import database as db_module
+        from sqlalchemy import text
+        async with db_module.async_session() as session:
+            await session.execute(
+                text("UPDATE users SET status = 'active', approved_at = CURRENT_TIMESTAMP, approved_by = 'test_admin' WHERE email = :email"),
+                {"email": "teacher-nostudents@test.com"},
+            )
+            await session.commit()
+
         teacher_token = await _login(fastapi_app, "teacher-nostudents@test.com", TEACHER_PASS)
 
         c_resp = await client.post("/api/courses", json={
@@ -1015,6 +1154,142 @@ class TestDashboardIntegration:
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         assert resp.status_code == 404
+
+    # ─────────────────────────────────────────────
+    #  REGRESSION — tenant isolation & IDOR (Raven bugs → tests)
+    # ─────────────────────────────────────────────
+
+    async def test_dashboard_executive_holder_without_tenantmember(
+        self, client: AsyncClient, fastapi_app
+    ):
+        """HOLDER without TenantMember must still see their own tenant data
+        via the fallback path (current_user.tenant_id), not global data."""
+        # Create holder WITHOUT TenantMember entry
+        holder = await _setup_holder_custom(
+            fastapi_app, "holdernm@test.com", "HolderNM999!", with_member=False
+        )
+        token = holder["token"]
+        tenant_id = holder["tenant_id"]
+
+        # Create teachers and evaluations in that tenant
+        teachers = await _create_teachers_direct(fastapi_app, tenant_id, 2, prefix="nm")
+        assert len(teachers) == 2
+        await _create_evaluations_direct(fastapi_app, tenant_id, 2)
+
+        resp = await client.get(
+            "/api/dashboard/executive",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Must NOT be global — should only see own tenant
+        assert data["total_schools"] == 1, (
+            f"Expected 1 school (own tenant only), got {data['total_schools']}"
+        )
+        assert data["total_teachers"] == 2, (
+            f"Expected 2 teachers, got {data['total_teachers']}"
+        )
+        assert data["total_evaluations"] == 2, (
+            f"Expected 2 evaluations, got {data['total_evaluations']}"
+        )
+
+    async def test_dashboard_executive_header_injection(
+        self, client: AsyncClient, fastapi_app
+    ):
+        """X-Tenant-Id header must NOT alter dashboard results.
+        Regression: IDOR vulnerability where header was used for tenant resolution."""
+        # Create two holders with their own tenants
+        holder_a = await _setup_holder_custom(
+            fastapi_app, "inject-a@test.com", "InjectA999!", with_member=True
+        )
+        token_a = holder_a["token"]
+        tenant_a_id = holder_a["tenant_id"]
+
+        holder_b = await _setup_holder_custom(
+            fastapi_app, "inject-b@test.com", "InjectB999!", with_member=True
+        )
+        tenant_b_id = holder_b["tenant_id"]
+
+        # Create 5 teachers in tenant_A, 2 in tenant_B
+        await _create_teachers_direct(fastapi_app, tenant_a_id, 5, prefix="inja")
+        await _create_teachers_direct(fastapi_app, tenant_b_id, 2, prefix="injb")
+
+        # Call with holder_A's token but inject X-Tenant-Id for tenant_B
+        resp = await client.get(
+            "/api/dashboard/executive",
+            headers={
+                "Authorization": f"Bearer {token_a}",
+                "X-Tenant-Id": tenant_b_id,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        # Must be 5 (tenant A's teachers), NOT 2 (tenant B's)
+        assert data["total_teachers"] == 5, (
+            f"Expected 5 teachers (tenant A), got {data['total_teachers']}. "
+            "X-Tenant-Id injection must not alter results."
+        )
+        assert data["total_schools"] == 1
+
+    async def test_dashboard_executive_tenant_isolation(
+        self, client: AsyncClient, fastapi_app
+    ):
+        """Tenants must have fully isolated dashboard executive data."""
+        # Create tenant_A with holder_A
+        holder_a = await _setup_holder_custom(
+            fastapi_app, "isol-a@test.com", "IsoA999!", with_member=True
+        )
+        token_a = holder_a["token"]
+        tenant_a_id = holder_a["tenant_id"]
+
+        # Create tenant_B with holder_B
+        holder_b = await _setup_holder_custom(
+            fastapi_app, "isol-b@test.com", "IsoB999!", with_member=True
+        )
+        token_b = holder_b["token"]
+        tenant_b_id = holder_b["tenant_id"]
+
+        # Tenant A: 3 teachers, 2 evaluations
+        await _create_teachers_direct(fastapi_app, tenant_a_id, 3, prefix="isoa")
+        await _create_evaluations_direct(fastapi_app, tenant_a_id, 2)
+
+        # Tenant B: 2 teachers, 1 evaluation
+        await _create_teachers_direct(fastapi_app, tenant_b_id, 2, prefix="isob")
+        await _create_evaluations_direct(fastapi_app, tenant_b_id, 1)
+
+        # Verify holder_A's view
+        resp_a = await client.get(
+            "/api/dashboard/executive",
+            headers={"Authorization": f"Bearer {token_a}"},
+        )
+        assert resp_a.status_code == 200
+        data_a = resp_a.json()
+        assert data_a["total_schools"] == 1, (
+            f"Holder A: expected 1 school, got {data_a['total_schools']}"
+        )
+        assert data_a["total_teachers"] == 3, (
+            f"Holder A: expected 3 teachers, got {data_a['total_teachers']}"
+        )
+        assert data_a["total_evaluations"] == 2, (
+            f"Holder A: expected 2 evaluations, got {data_a['total_evaluations']}"
+        )
+
+        # Verify holder_B's view
+        resp_b = await client.get(
+            "/api/dashboard/executive",
+            headers={"Authorization": f"Bearer {token_b}"},
+        )
+        assert resp_b.status_code == 200
+        data_b = resp_b.json()
+        assert data_b["total_schools"] == 1, (
+            f"Holder B: expected 1 school, got {data_b['total_schools']}"
+        )
+        assert data_b["total_teachers"] == 2, (
+            f"Holder B: expected 2 teachers, got {data_b['total_teachers']}"
+        )
+        assert data_b["total_evaluations"] == 1, (
+            f"Holder B: expected 1 evaluation, got {data_b['total_evaluations']}"
+        )
 
 
 # ═════════════════════════════════════════════

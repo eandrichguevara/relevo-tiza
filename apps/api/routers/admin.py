@@ -1,12 +1,14 @@
 """Admin router — user registration approval workflow."""
+import uuid
 from datetime import datetime, timezone
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models.db_models import User, Tenant
+from models.db_models import User, Tenant, AuditLog
 from models.schemas import (
     PendingListResponse,
     PendingRegistrationResponse,
@@ -79,7 +81,7 @@ async def list_pending_registrations(
 
 @router.post("/api/admin/approve/{user_id}", response_model=ApprovalActionResponse)
 async def approve_registration(
-    user_id: str,
+    user_id: UUID,
     body: ApproveRejectRequest,
     current_user: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
@@ -88,8 +90,14 @@ async def approve_registration(
 
     If the user is a HOLDER or ADMIN, also approves their tenant.
     """
+    user_id_str = str(user_id)
+    previous_status = "pending"
+
     result = await db.execute(
-        select(User).where(User.id == user_id).options(selectinload(User.tenant))
+        select(User)
+        .where(User.id == user_id_str)
+        .options(selectinload(User.tenant))
+        .with_for_update()
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -100,7 +108,7 @@ async def approve_registration(
 
     if user.status != "pending":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"El usuario no está pendiente. Estado actual: {user.status}",
         )
 
@@ -118,6 +126,26 @@ async def approve_registration(
             tenant.approved_by = current_user.email
 
     await db.flush()
+
+    # ── Audit log ────────────────────────────────────────────────
+    audit = AuditLog(
+        id=str(uuid.uuid4()),
+        tenant_id=user.tenant_id or "system",
+        user_id=current_user.id,
+        action="user_approved",
+        resource="user",
+        resource_id=user_id_str,
+        details={
+            "target_email": user.email,
+            "target_role": user.role,
+            "previous_status": previous_status,
+            "new_status": user.status,
+            "reason": body.reason,
+        },
+        ip_address="0.0.0.0",
+    )
+    db.add(audit)
+
     await db.commit()
 
     return ApprovalActionResponse(
@@ -130,7 +158,7 @@ async def approve_registration(
 
 @router.post("/api/admin/reject/{user_id}", response_model=ApprovalActionResponse)
 async def reject_registration(
-    user_id: str,
+    user_id: UUID,
     body: ApproveRejectRequest,
     current_user: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
@@ -146,8 +174,14 @@ async def reject_registration(
             detail="El motivo de rechazo es obligatorio.",
         )
 
+    user_id_str = str(user_id)
+    previous_status = "pending"
+
     result = await db.execute(
-        select(User).where(User.id == user_id).options(selectinload(User.tenant))
+        select(User)
+        .where(User.id == user_id_str)
+        .options(selectinload(User.tenant))
+        .with_for_update()
     )
     user = result.scalar_one_or_none()
     if not user:
@@ -158,7 +192,7 @@ async def reject_registration(
 
     if user.status != "pending":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail=f"El usuario no está pendiente. Estado actual: {user.status}",
         )
 
@@ -166,7 +200,6 @@ async def reject_registration(
     user.status = "rejected"
     user.rejection_reason = body.reason.strip()
     user.rejected_at = now
-    user.approved_by = current_user.email
 
     # If HOLDER or ADMIN, also reject the tenant
     if user.role in ("HOLDER", "ADMIN") and user.tenant:
@@ -175,9 +208,28 @@ async def reject_registration(
             tenant.status = "rejected"
             tenant.rejection_reason = body.reason.strip()
             tenant.rejected_at = now
-            tenant.approved_by = current_user.email
 
     await db.flush()
+
+    # ── Audit log ────────────────────────────────────────────────
+    audit = AuditLog(
+        id=str(uuid.uuid4()),
+        tenant_id=user.tenant_id or "system",
+        user_id=current_user.id,
+        action="user_rejected",
+        resource="user",
+        resource_id=user_id_str,
+        details={
+            "target_email": user.email,
+            "target_role": user.role,
+            "previous_status": previous_status,
+            "new_status": user.status,
+            "reason": body.reason.strip(),
+        },
+        ip_address="0.0.0.0",
+    )
+    db.add(audit)
+
     await db.commit()
 
     return ApprovalActionResponse(

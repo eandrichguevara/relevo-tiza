@@ -135,26 +135,25 @@ async def require_super_admin(current_user: User = Depends(get_current_user)) ->
 def get_tenant_id(request: Request, current_user: User = None) -> str:
     """Extract tenant_id from request.state (set by TenantMiddleware).
 
-    Falls back to X-Tenant-Id header, then current_user.tenant_id for
-    backward compatibility with tests and direct API calls.
+    Falls back to current_user.tenant_id for backward compatibility.
+
+    SECURITY: X-Tenant-Id header is NOT supported (removed as SEC-1 IDOR fix).
+    Tenant resolution uses: subdomain → user's tenant_id (DB value, not manipulable).
     """
     # 1. TenantMiddleware injected value
     tid = getattr(request.state, "tenant_id", None)
     if tid:
         return tid
 
-    # 2. Direct X-Tenant-Id header (dev/test convenience)
-    tid = request.headers.get("X-Tenant-Id")
-    if tid:
-        return tid
-
-    # 3. Authenticated user's default tenant (backward compat)
+    # 2. Authenticated user's default tenant (secure — DB value, not manipulable)
+    # NOTE: X-Tenant-Id header was removed as a fallback (SEC-1 IDOR fix).
+    # Tenant resolution now exclusively uses: subdomain → user's tenant_id.
     if current_user and current_user.tenant_id:
         return current_user.tenant_id
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
-        detail="No tenant context. Provide a valid subdomain or X-Tenant-Id header.",
+        detail="No tenant context. Provide a valid subdomain.",
     )
 
 

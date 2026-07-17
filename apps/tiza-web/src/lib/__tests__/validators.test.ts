@@ -4,6 +4,7 @@ import {
   validatePassword,
   validateName,
   validateConfirmPassword,
+  validateTenantCode,
 } from '@/lib/validators';
 
 describe('validateEmail', () => {
@@ -28,21 +29,22 @@ describe('validateEmail', () => {
 });
 
 describe('validatePassword', () => {
-  it('retorna null para una contraseña válida (≥ 6 caracteres)', () => {
-    expect(validatePassword('123456')).toBeNull();
+  it('retorna null para una contraseña válida (≥ 8 caracteres)', () => {
+    expect(validatePassword('12345678')).toBeNull();
     expect(validatePassword('abcdefgh')).toBeNull();
     expect(validatePassword('secreto!')).toBeNull();
     expect(validatePassword('a'.repeat(100))).toBeNull();
   });
 
-  it('retorna mensaje de error para contraseña corta', () => {
-    expect(validatePassword('12345')).toBe('La contraseña debe tener al menos 6 caracteres');
-    expect(validatePassword('a')).toBe('La contraseña debe tener al menos 6 caracteres');
-    expect(validatePassword('')).toBe('La contraseña es obligatoria');
+  it('retorna mensaje de error para contraseña corta (< 8 caracteres)', () => {
+    expect(validatePassword('1234567')).toBe('La contraseña debe tener al menos 8 caracteres');
+    expect(validatePassword('a')).toBe('La contraseña debe tener al menos 8 caracteres');
+    expect(validatePassword('123456')).toBe('La contraseña debe tener al menos 8 caracteres');
   });
 
   it('retorna mensaje de error para contraseña vacía', () => {
     expect(validatePassword('')).toBe('La contraseña es obligatoria');
+    expect(validatePassword('')).not.toBeNull();
   });
 });
 
@@ -58,9 +60,11 @@ describe('validateName', () => {
     expect(validateName('   ')).toBe('El nombre es obligatorio');
   });
 
-  it('retorna mensaje de error para nombre demasiado corto', () => {
-    // Note: single character after trim is valid (exactly 2 chars not needed)
-    // The validation checks `name.trim().length < 2`
+  it('retorna mensaje de error para nombre de menos de 2 caracteres', () => {
+    expect(validateName('A')).toBe('El nombre debe tener al menos 2 caracteres');
+    expect(validateName(' a ')).toBe('El nombre debe tener al menos 2 caracteres');
+    expect(validateName('')).toBe('El nombre es obligatorio');
+    expect(validateName('   ')).toBe('El nombre es obligatorio');
   });
 });
 
@@ -77,5 +81,34 @@ describe('validateConfirmPassword', () => {
 
   it('retorna mensaje de error cuando confirmación está vacía', () => {
     expect(validateConfirmPassword('secreto123', '')).toBe('Debes confirmar tu contraseña');
+  });
+});
+
+describe('validateTenantCode', () => {
+  it('retorna null para código alfanumérico válido', () => {
+    expect(validateTenantCode('ABC123')).toBeNull();
+    expect(validateTenantCode('abc')).toBeNull();
+    expect(validateTenantCode('123')).toBeNull();
+    expect(validateTenantCode('  ABC123  ')).toBeNull();
+  });
+
+  it('retorna mensaje de error para código vacío', () => {
+    expect(validateTenantCode('')).toBe('El código del colegio es obligatorio');
+    expect(validateTenantCode('   ')).toBe('El código del colegio es obligatorio');
+  });
+
+  it('retorna mensaje de error para código con caracteres especiales', () => {
+    expect(validateTenantCode('ABC-123')).toBe(
+      'El código debe ser alfanumérico (solo letras y números)'
+    );
+    expect(validateTenantCode('ABC 123')).toBe(
+      'El código debe ser alfanumérico (solo letras y números)'
+    );
+    expect(validateTenantCode('hola!')).toBe(
+      'El código debe ser alfanumérico (solo letras y números)'
+    );
+    expect(validateTenantCode('ñandu')).toBe(
+      'El código debe ser alfanumérico (solo letras y números)'
+    );
   });
 });

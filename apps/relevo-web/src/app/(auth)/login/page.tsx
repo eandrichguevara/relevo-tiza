@@ -21,6 +21,7 @@ function LoginForm() {
   const [generalError, setGeneralError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
+  const [isPendingAccount, setIsPendingAccount] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,9 +59,9 @@ function LoginForm() {
         const detailLower = (apiErr.detail || '').toLowerCase();
         if (detailLower.includes('pendiente') || detailLower.includes('pending')) {
           setGeneralError(
-            'Tu cuenta está pendiente de aprobación. Serás redirigido a la página de estado...'
+            'Tu cuenta está pendiente de aprobación. Te notificaremos por correo cuando sea aprobada.'
           );
-          setTimeout(() => router.push('/pending'), 2000);
+          setIsPendingAccount(true);
         } else if (detailLower.includes('rechaz') || detailLower.includes('rejected')) {
           setGeneralError('Tu solicitud fue rechazada. Contacta al administrador.');
         } else {
@@ -78,7 +79,10 @@ function LoginForm() {
     }
   };
 
-  const clearError = () => setGeneralError('');
+  const clearError = () => {
+    setGeneralError('');
+    setIsPendingAccount(false);
+  };
 
   return (
     <form
@@ -91,6 +95,13 @@ function LoginForm() {
 
       {generalError && (
         <ErrorMessage message={generalError} variant="error" onDismiss={clearError} />
+      )}
+      {isPendingAccount && (
+        <p className="text-center">
+          <Link href="/pending" className="text-sm text-[#1A3A5C] hover:underline font-medium">
+            Ver estado de mi solicitud &rarr;
+          </Link>
+        </p>
       )}
 
       <Input

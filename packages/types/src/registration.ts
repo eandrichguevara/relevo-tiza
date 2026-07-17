@@ -4,6 +4,8 @@ export interface PendingRegistration {
   email: string;
   role: string;
   tenant_id: string;
+  tenant_name?: string;
+  brand?: string;
   created_at: string;
 }
 
@@ -19,5 +21,8 @@ export interface ApproveRejectRequest {
 }
 
 export interface ApprovalActionResponse {
+  success: boolean;
   message: string;
+  user_id?: string;
+  status?: string;
 }

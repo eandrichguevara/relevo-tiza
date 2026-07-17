@@ -72,8 +72,8 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
 
     # ─── Super Admin ───────────────────────────────────────────────
-    SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "admin@relevo-tiza.app")
-    SUPER_ADMIN_PASSWORD: str = os.getenv("SUPER_ADMIN_PASSWORD", "Admin123!Segura")
+    SUPER_ADMIN_EMAIL: str = os.getenv("SUPER_ADMIN_EMAIL", "")
+    SUPER_ADMIN_PASSWORD: str = os.getenv("SUPER_ADMIN_PASSWORD", "")
 
     # ─── Queue ─────────────────────────────────────────────────────
     QUEUE_BACKEND: str = "memory"

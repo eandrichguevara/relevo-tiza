@@ -11,10 +11,6 @@ from utils.security import hash_password
 
 MAX_SEED_CODE_ATTEMPTS = 10
 
-# Super admin defaults when env vars are not set
-_DEFAULT_SUPER_ADMIN_EMAIL = "admin@relevo-tiza.app"
-_DEFAULT_SUPER_ADMIN_PASSWORD = "Admin123!Segura"
-
 
 async def _get_seed_join_code(db) -> str:
     """Generate a unique join_code for seed data."""
@@ -82,6 +78,7 @@ async def seed():
                     email=email,
                     name=name,
                     password=hash_password(password),
+                    status="active",
                     role=role,
                     tenant_id=tenant.id,
                 )
@@ -111,8 +108,17 @@ async def seed():
                 print("   ✅ TenantMember 'director@demo.cl' → 'colegio-demo' (owner)")
 
         # ─── Super Admin ────────────────────────────────────────────
-        super_admin_email = os.getenv("SUPER_ADMIN_EMAIL", _DEFAULT_SUPER_ADMIN_EMAIL)
-        super_admin_password = os.getenv("SUPER_ADMIN_PASSWORD", _DEFAULT_SUPER_ADMIN_PASSWORD)
+        import secrets
+        super_admin_email = os.getenv("SUPER_ADMIN_EMAIL", "")
+        super_admin_password = os.getenv("SUPER_ADMIN_PASSWORD", "")
+
+        # Dev fallback: generate random password if env var not set
+        if not super_admin_password:
+            super_admin_password = secrets.token_urlsafe(16)
+            print(f"   🔑 Generated random password for super admin (SUPER_ADMIN_PASSWORD not set)")
+        if not super_admin_email:
+            super_admin_email = "admin@dev.local"
+            print(f"   ℹ️  Using dev email '{super_admin_email}' (SUPER_ADMIN_EMAIL not set)")
 
         result = await db.execute(select(User).where(User.email == super_admin_email))
         existing_admin = result.scalar_one_or_none()
@@ -157,10 +163,7 @@ async def seed():
     print(f"   Super Admin: {super_admin_email} / {super_admin_password}")
     print("   TenantMember: director@demo.cl → colegio-demo (owner)")
 
-    # Warn if using default credentials
-    if super_admin_email == _DEFAULT_SUPER_ADMIN_EMAIL or super_admin_password == _DEFAULT_SUPER_ADMIN_PASSWORD:
-        print("   ⚠️  WARNING: Using default super admin credentials!")
-        print("       Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD env vars for production.")
+
 
 
 if __name__ == "__main__":

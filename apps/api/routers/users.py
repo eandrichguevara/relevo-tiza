@@ -36,11 +36,26 @@ async def create_user(
     tenant_result = await db.execute(
         select(Tenant).where(Tenant.id == body.tenant_id)
     )
-    if not tenant_result.scalar_one_or_none():
+    tenant = tenant_result.scalar_one_or_none()
+    if not tenant:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tenant not found",
         )
+
+    # SEC-2: Verify HOLDER is a member of this tenant (tenant isolation)
+    if current_user.role != "ADMIN":
+        member_result = await db.execute(
+            select(TenantMember).where(
+                TenantMember.tenant_id == body.tenant_id,
+                TenantMember.user_id == current_user.id,
+            )
+        )
+        if not member_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not a member of this tenant",
+            )
 
     # Check email uniqueness
     existing = await db.execute(select(User).where(User.email == body.email))
@@ -54,6 +69,7 @@ async def create_user(
         email=body.email,
         name=body.name,
         password=hash_password(body.password),
+        status="pending",
         role=resolved_role,
         tenant_id=body.tenant_id,
     )

@@ -7,7 +7,7 @@ import { Button, Card, Spinner, ErrorMessage } from '@tiza/ui';
 import { Clock, CheckCircle2, Hourglass } from 'lucide-react';
 import { fetchTokenFromSession, getStoredUser } from '@/lib/auth';
 
-type PendingState = 'loading' | 'pending' | 'active' | 'error';
+type PendingState = 'loading' | 'pending' | 'error';
 
 export default function PendingPage() {
   const router = useRouter();
@@ -17,21 +17,17 @@ export default function PendingPage() {
   useEffect(() => {
     (async () => {
       try {
-        // Check if user is already active (approved while on this page)
         const token = await fetchTokenFromSession();
         const storedUser = getStoredUser();
 
         if (token && storedUser && storedUser.status === 'active') {
-          setState('active');
+          // User already approved — redirect to dashboard
+          router.push('/dashboard');
           return;
         }
 
-        if (token) {
-          setState('pending');
-        } else {
-          // No token — user landed here directly, redirect to login
-          router.push('/login');
-        }
+        // No token or user is pending — show the informative page
+        setState('pending');
       } catch {
         setState('error');
         setErrorMessage('Error al verificar el estado de tu solicitud. Intenta de nuevo.');
@@ -44,24 +40,6 @@ export default function PendingPage() {
     setErrorMessage('');
     window.location.reload();
   };
-
-  // ── Active state — user was approved ──
-  if (state === 'active') {
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" aria-hidden="true" />
-          <h2 className="text-xl font-semibold text-gray-900 mt-4">¡Solicitud aprobada!</h2>
-          <p className="text-gray-500 mt-2">
-            Tu cuenta ya está activa. Puedes acceder al sistema ahora.
-          </p>
-        </div>
-        <Button brand="relevo" className="w-full" onClick={() => router.push('/dashboard')}>
-          Ir al dashboard
-        </Button>
-      </div>
-    );
-  }
 
   // ── Error state ──
   if (state === 'error') {

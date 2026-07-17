@@ -85,11 +85,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!isLoading) {
+      // First: check if user exists but is not active — redirect to pending
+      if (user && user.status && user.status !== 'active') {
+        router.push('/pending');
+        return;
+      }
+      // Then: check authentication
       if (!isAuthenticated) {
         router.push('/login');
-      } else if (user && user.status && user.status !== 'active') {
-        router.push('/pending');
-      } else if (user && user.role !== 'HOLDER' && user.role !== 'ADMIN') {
+        return;
+      }
+      // Then: check role
+      if (user && user.role !== 'HOLDER' && user.role !== 'ADMIN') {
         const tizaUrl = process.env.NEXT_PUBLIC_TIZA_URL || 'http://localhost:3001';
         window.location.href = `${tizaUrl}${pathname}`;
       }
