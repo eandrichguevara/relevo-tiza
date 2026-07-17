@@ -107,7 +107,7 @@ export default function RegisterPage() {
           setName(e.target.value);
           if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
         }}
-        placeholder="Juan Pérez"
+        placeholder="Tu nombre completo"
         error={fieldErrors.name}
         autoComplete="name"
         required
@@ -115,12 +115,13 @@ export default function RegisterPage() {
 
       <Input
         label="Nombre del colegio"
+        type="text"
         value={school}
         onChange={(e) => {
           setSchool(e.target.value);
           if (fieldErrors.school) setFieldErrors((prev) => ({ ...prev, school: undefined }));
         }}
-        placeholder="Colegio San Martín"
+        placeholder="Nombre de tu colegio"
         error={fieldErrors.school}
         required
       />
@@ -133,7 +134,7 @@ export default function RegisterPage() {
           setEmail(e.target.value);
           if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
         }}
-        placeholder="director@colegio.cl"
+        placeholder="tu@correo.com"
         error={fieldErrors.email}
         autoComplete="email"
         required
@@ -164,7 +165,7 @@ export default function RegisterPage() {
             setFieldErrors((prev) => ({ ...prev, confirmPassword: undefined }));
           }
         }}
-        placeholder="Repite tu contraseña"
+        placeholder="Confirma tu contraseña"
         error={fieldErrors.confirmPassword}
         autoComplete="new-password"
         required

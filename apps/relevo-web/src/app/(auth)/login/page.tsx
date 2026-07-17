@@ -112,7 +112,7 @@ function LoginForm() {
           setEmail(e.target.value);
           if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
         }}
-        placeholder="director@colegio.cl"
+        placeholder="tu@correo.com"
         error={fieldErrors.email}
         autoComplete="email"
         required
@@ -126,7 +126,7 @@ function LoginForm() {
           setPassword(e.target.value);
           if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
         }}
-        placeholder="••••••••"
+        placeholder="Tu contraseña"
         error={fieldErrors.password}
         autoComplete="current-password"
         required

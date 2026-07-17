@@ -11,7 +11,10 @@ export default function RelevoHome() {
             <span className="text-2xl font-bold">RELEVO</span>
           </div>
           <nav className="flex items-center gap-6">
-            <Link href="/login" className="hover:text-brand-accent/80 transition-colors">
+            <Link
+              href="/login"
+              className="border-2 border-white text-white hover:bg-white hover:text-brand-primary px-4 py-2 rounded-lg font-medium transition-colors"
+            >
               Iniciar sesión
             </Link>
             <Link
