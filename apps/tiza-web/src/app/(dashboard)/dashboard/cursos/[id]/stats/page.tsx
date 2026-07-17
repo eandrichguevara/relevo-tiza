@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, Badge, Spinner, EmptyState } from '@tiza/ui';
-import { ArrowLeft, Users, BarChart3, Target, Award, TrendingUp } from 'lucide-react';
+import { Card, Badge, Spinner, EmptyState, ErrorMessage, Button } from '@tiza/ui';
+import { ArrowLeft, Users, BarChart3, Target, Award, TrendingUp, RefreshCw } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -13,24 +13,36 @@ export default function CourseStatsPage() {
   const courseId = params.id as string;
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useState(() => {
-    (async () => {
-      try {
-        const session = await fetch('/api/auth/session').then((r) => r.json());
-        const token = (session as any)?.accessToken;
-        const res = await fetch(`${API_URL}/api/dashboard/course/${courseId}`, {
-          headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
-        });
-        const data = await res.json();
-        setStats(data);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
+  const fetchStats = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const session = await fetch('/api/auth/session').then((r) => r.json());
+      const token = (session as any)?.accessToken;
+      const res = await fetch(`${API_URL}/api/dashboard/course/${courseId}`, {
+        headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
+      });
+      if (!res.ok) {
+        throw new Error('Error al cargar las estadísticas');
       }
-    })();
-  });
+      const data = await res.json();
+      setStats(data);
+    } catch (e) {
+      const message =
+        (e as any)?.translatedMessage ||
+        (e as any)?.message ||
+        'Error al cargar las estadísticas. Intenta de nuevo.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
 
   if (loading)
     return (
@@ -38,7 +50,33 @@ export default function CourseStatsPage() {
         <Spinner size="lg" />
       </div>
     );
-  if (!stats) return <EmptyState title="Error al cargar estadísticas" />;
+  if (error) {
+    return (
+      <div>
+        <Link
+          href="/dashboard/cursos"
+          className="text-brand-primary text-sm hover:underline mb-2 inline-block"
+        >
+          <ArrowLeft size={14} className="inline mr-1" />
+          Volver a cursos
+        </Link>
+        <div className="mt-4">
+          <ErrorMessage message={error} />
+          <Button
+            brand="tiza"
+            onClick={() => {
+              fetchStats();
+            }}
+            className="mt-3"
+          >
+            <RefreshCw size={16} className="mr-1" />
+            Reintentar
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  if (!stats) return <EmptyState title="Sin datos disponibles" />;
 
   const avgGrade = stats.average_grade || 0;
   const barWidth = Math.min((avgGrade / 7) * 100, 100);

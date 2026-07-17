@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { Card, Button, Badge, Spinner, EmptyState, Input } from '@tiza/ui';
-import { Plus, ArrowLeft, Users, Trash2 } from 'lucide-react';
+import { Card, Button, Badge, Spinner, EmptyState, Input, ErrorMessage } from '@tiza/ui';
+import { Plus, ArrowLeft, Users, Trash2, RefreshCw } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -17,8 +17,11 @@ export default function AlumnosPage() {
   const [namesInput, setNamesInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [courseName, setCourseName] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   const fetchStudents = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const session = await fetch('/api/auth/session').then((r) => r.json());
       const token = (session as any)?.accessToken;
@@ -30,26 +33,34 @@ export default function AlumnosPage() {
           headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
         }),
       ]);
+      if (!courseRes.ok || !studentsRes.ok) {
+        throw new Error('Error al cargar los datos del curso');
+      }
       const courseData = await courseRes.json();
       setCourseName(courseData.name || 'Curso');
       const studentsData = await studentsRes.json();
       setStudents(Array.isArray(studentsData) ? studentsData : []);
     } catch (e) {
-      console.error(e);
+      const message =
+        (e as any)?.translatedMessage ||
+        (e as any)?.message ||
+        'Error al cargar los alumnos. Intenta de nuevo.';
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchStudents();
-  });
+  }, []);
 
   const handleBulkAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const names = namesInput.split('\n').filter((n) => n.trim());
     if (names.length === 0) return;
     setSubmitting(true);
+    setError(null);
     try {
       const session = await fetch('/api/auth/session').then((r) => r.json());
       const token = (session as any)?.accessToken;
@@ -66,22 +77,41 @@ export default function AlumnosPage() {
         setShowBulk(false);
         setNamesInput('');
         fetchStudents();
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData?.detail || 'Error al agregar alumnos');
       }
     } catch (e) {
-      console.error(e);
+      const message =
+        (e as any)?.translatedMessage ||
+        (e as any)?.message ||
+        'Error al agregar alumnos. Intenta de nuevo.';
+      setError(message);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDelete = async (studentId: string) => {
-    const session = await fetch('/api/auth/session').then((r) => r.json());
-    const token = (session as any)?.accessToken;
-    await fetch(`${API_URL}/api/students/${studentId}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
-    });
-    fetchStudents();
+    setError(null);
+    try {
+      const session = await fetch('/api/auth/session').then((r) => r.json());
+      const token = (session as any)?.accessToken;
+      const res = await fetch(`${API_URL}/api/students/${studentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
+      });
+      if (!res.ok) {
+        throw new Error('Error al eliminar el alumno');
+      }
+      fetchStudents();
+    } catch (e) {
+      const message =
+        (e as any)?.translatedMessage ||
+        (e as any)?.message ||
+        'Error al eliminar el alumno. Intenta de nuevo.';
+      setError(message);
+    }
   };
 
   if (loading)
@@ -133,6 +163,23 @@ export default function AlumnosPage() {
             </div>
           </form>
         </Card>
+      )}
+
+      {/* Error banner */}
+      {error && (
+        <div className="mb-6">
+          <ErrorMessage message={error} onDismiss={() => setError(null)} />
+          <button
+            onClick={() => {
+              setError(null);
+              fetchStudents();
+            }}
+            className="mt-2 inline-flex items-center gap-1 text-sm text-brand-primary hover:underline"
+          >
+            <RefreshCw size={14} />
+            Reintentar
+          </button>
+        </div>
       )}
 
       {students.length === 0 ? (
