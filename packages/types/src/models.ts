@@ -20,6 +20,7 @@ export interface TenantMember {
 export interface Tenant {
   id: string;
   subdomain: string;
+  join_code: string;
   name: string;
   brand: Brand;
   settings: Record<string, unknown>;
@@ -50,7 +51,6 @@ export interface RubricItem {
 
 export interface Evaluation {
   id: string;
-  tenantId: string;
   title: string;
   subject: string;
   grade: string;
