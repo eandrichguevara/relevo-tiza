@@ -1,8 +1,9 @@
 """Admin router — user registration approval workflow."""
+import logging
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -16,7 +17,10 @@ from models.schemas import (
     ApprovalActionResponse,
     UserStatusEnum,
 )
+from services.email import send_approval_notification, send_rejection_notification
 from utils.security import require_admin_or_holder
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -109,6 +113,7 @@ async def list_pending_registrations(
 async def approve_registration(
     user_id: UUID,
     body: ApproveRejectRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
 ):
@@ -198,6 +203,22 @@ async def approve_registration(
 
     await db.commit()
 
+    # ── Fire-and-forget approval email ──────────────────────────
+    # Capture data into locals before passing to background task
+    # to avoid SQLAlchemy session expiry issues after commit.
+    if user.email and user.name:
+        bg_email = user.email
+        bg_name = user.name
+        bg_tenant = user.tenant.name if user.tenant else ""
+        bg_brand = user.tenant.brand if user.tenant else "TIZA"
+        background_tasks.add_task(
+            send_approval_notification,
+            to=bg_email,
+            user_name=bg_name,
+            tenant_name=bg_tenant,
+            brand=bg_brand,
+        )
+
     return ApprovalActionResponse(
         success=True,
         message="Usuario aprobado exitosamente.",
@@ -210,6 +231,7 @@ async def approve_registration(
 async def reject_registration(
     user_id: UUID,
     body: ApproveRejectRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
 ):
@@ -297,6 +319,20 @@ async def reject_registration(
     db.add(audit)
 
     await db.commit()
+
+    # ── Fire-and-forget rejection email ──────────────────────────
+    if user.email and user.name:
+        bg_email = user.email
+        bg_name = user.name
+        bg_reason = body.reason.strip()
+        bg_brand = user.tenant.brand if user.tenant else "TIZA"
+        background_tasks.add_task(
+            send_rejection_notification,
+            to=bg_email,
+            user_name=bg_name,
+            rejection_reason=bg_reason,
+            brand=bg_brand,
+        )
 
     return ApprovalActionResponse(
         success=True,
