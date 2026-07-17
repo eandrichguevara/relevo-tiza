@@ -124,6 +124,7 @@ async def register(
                 subdomain=tenant_subdomain,
                 name=tenant_name,
                 brand=brand,
+                status="pending",
                 join_code=join_code,
             )
             db.add(tenant)
@@ -148,6 +149,7 @@ async def register(
         email=body.email,
         name=body.name or body.email.split("@")[0],
         password=hash_password(body.password),
+        status="pending",
         role=resolved_role,
         tenant_id=tenant_id,
     )
@@ -178,6 +180,25 @@ async def login(
 
     if not user or not verify_password(body.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    # Block non-active users from logging in
+    if user.status != "active":
+        if user.status == "pending":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tu cuenta está pendiente de aprobación. Un administrador debe activarla antes de que puedas iniciar sesión.",
+            )
+        elif user.status == "rejected":
+            reason = f" Motivo: {user.rejection_reason}" if user.rejection_reason else ""
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Tu cuenta ha sido rechazada.{reason}",
+            )
+        elif user.status == "suspended":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tu cuenta ha sido suspendida. Contacta al administrador.",
+            )
 
     token = create_access_token(
         data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id}

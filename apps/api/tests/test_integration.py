@@ -41,30 +41,115 @@ EVAL_TITLE = "Prueba de Matemáticas Semana 12"
 # Helpers
 # ─────────────────────────────────────────────
 @pytest.mark.asyncio
-async def _register_holder(client: AsyncClient) -> dict:
-    """Register a HOLDER (auto-creates a tenant)."""
-    resp = await client.post("/api/auth/register", json={
-        "email": HOLDER_EMAIL,
-        "password": HOLDER_PASS,
-        "name": HOLDER_NAME,
-        "role": "director",
-    })
-    assert resp.status_code == 201, f"Holder register failed: {resp.text}"
-    data = resp.json()
-    assert data["role"] == "HOLDER"
-    assert "tenant_id" in data
-    return data
+async def _setup_holder(_app) -> dict:
+    """Create a HOLDER user + tenant directly in DB (bypasses register/pending).
+    Uses the app's overridden get_db dependency to ensure same session as the API.
+    Returns dict with token and tenant_id.
+    """
+    from database import get_db
+    from models.db_models import Tenant, User, TenantMember, generate_join_code
+    from utils.security import hash_password
+    from httpx import AsyncClient, ASGITransport
+
+    override = _app.dependency_overrides.get(get_db)
+    session_generator = override() if override else get_db()
+    async for session in session_generator:
+        import time
+        import random
+        ts = f"{time.time()}-{random.randint(1000,9999)}"
+        tenant = Tenant(
+            subdomain=f"integro-holder-{ts}",
+            name=f"Integro Holder School {ts}",
+            brand="relevo",
+            status="active",
+            join_code=generate_join_code(),
+        )
+        session.add(tenant)
+        await session.flush()
+
+        holder = User(
+            email=HOLDER_EMAIL,
+            name=HOLDER_NAME,
+            password=hash_password(HOLDER_PASS),
+            status="active",
+            role="HOLDER",
+            tenant_id=tenant.id,
+        )
+        session.add(holder)
+        await session.flush()
+
+        member = TenantMember(
+            tenant_id=tenant.id,
+            user_id=holder.id,
+            role="owner",
+        )
+        session.add(member)
+        tenant_id = tenant.id
+        # Don't commit here — get_db() commits on generator exit
+
+    # Login via API
+    transport = ASGITransport(app=_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        login_resp = await c.post("/api/auth/login", json={
+            "email": HOLDER_EMAIL,
+            "password": HOLDER_PASS,
+        })
+        assert login_resp.status_code == 200, f"Holder login failed: {login_resp.text}"
+        token = login_resp.json()["access_token"]
+
+    return {"token": token, "tenant_id": tenant_id}
 
 
 @pytest.mark.asyncio
-async def _login(client: AsyncClient, email: str, password: str) -> str:
-    """Login and return a Bearer token."""
-    resp = await client.post("/api/auth/login", json={
-        "email": email,
-        "password": password,
-    })
-    assert resp.status_code == 200, f"Login failed: {resp.text}"
-    return resp.json()["access_token"]
+async def _setup_teacher(_app, tenant_id: str) -> dict:
+    """Create a TEACHER user directly in DB under a given tenant.
+    Uses the app's overridden get_db dependency.
+    Returns dict with token and email.
+    """
+    from database import get_db
+    from models.db_models import User
+    from utils.security import hash_password
+    from httpx import AsyncClient, ASGITransport
+
+    override = _app.dependency_overrides.get(get_db)
+    session_generator = override() if override else get_db()
+    async for session in session_generator:
+        teacher = User(
+            email=TEACHER_EMAIL,
+            name=TEACHER_NAME,
+            password=hash_password(TEACHER_PASS),
+            status="active",
+            role="TEACHER",
+            tenant_id=tenant_id,
+        )
+        session.add(teacher)
+        # Don't commit here — get_db() commits on generator exit
+
+    # Login via API
+    transport = ASGITransport(app=_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        login_resp = await c.post("/api/auth/login", json={
+            "email": TEACHER_EMAIL,
+            "password": TEACHER_PASS,
+        })
+        assert login_resp.status_code == 200, f"Teacher login failed: {login_resp.text}"
+        token = login_resp.json()["access_token"]
+
+    return {"token": token, "email": TEACHER_EMAIL}
+
+
+@pytest.mark.asyncio
+async def _login(_app, email: str, password: str) -> str:
+    """Login via API and return a Bearer token."""
+    from httpx import AsyncClient, ASGITransport
+    transport = ASGITransport(app=_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        resp = await c.post("/api/auth/login", json={
+            "email": email,
+            "password": password,
+        })
+        assert resp.status_code == 200, f"Login failed ({email}): {resp.text}"
+        return resp.json()["access_token"]
 
 
 # ═════════════════════════════════════════════
@@ -74,10 +159,10 @@ async def _login(client: AsyncClient, email: str, password: str) -> str:
 class TestTenantsIntegration:
     """POST/GET /api/tenants — HOLDER creates and lists schools."""
 
-    async def test_create_tenant_success(self, client: AsyncClient):
+    async def test_create_tenant_success(self, client: AsyncClient, fastapi_app):
         """Create a tenant with valid data returns 201."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
 
         resp = await client.post(
             "/api/tenants",
@@ -91,10 +176,10 @@ class TestTenantsIntegration:
         assert data["brand"] == "tiza"
         assert "id" in data
 
-    async def test_create_tenant_duplicate_subdomain(self, client: AsyncClient):
+    async def test_create_tenant_duplicate_subdomain(self, client: AsyncClient, fastapi_app):
         """Duplicate subdomain returns 409."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         await client.post(
             "/api/tenants",
             json={"name": "Primero", "subdomain": "dup-sub"},
@@ -107,10 +192,10 @@ class TestTenantsIntegration:
         )
         assert resp.status_code == 409
 
-    async def test_create_tenant_duplicate_name(self, client: AsyncClient):
+    async def test_create_tenant_duplicate_name(self, client: AsyncClient, fastapi_app):
         """Duplicate name returns 409 (regression: linea 31 en tenants.py)."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         await client.post(
             "/api/tenants",
             json={"name": "Colegio Duplicado", "subdomain": "primero"},
@@ -124,10 +209,10 @@ class TestTenantsIntegration:
         assert resp.status_code == 409
         assert "registration failed" in resp.text.lower()
 
-    async def test_create_tenant_duplicate_name_and_subdomain(self, client: AsyncClient):
+    async def test_create_tenant_duplicate_name_and_subdomain(self, client: AsyncClient, fastapi_app):
         """Same name AND same subdomain returns 409 (redundant but valid)."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         await client.post(
             "/api/tenants",
             json={"name": "Full Dupe", "subdomain": "full-dupe"},
@@ -140,10 +225,10 @@ class TestTenantsIntegration:
         )
         assert resp.status_code == 409
 
-    async def test_list_tenants(self, client: AsyncClient):
+    async def test_list_tenants(self, client: AsyncClient, fastapi_app):
         """List tenants returns all created tenants."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
 
         # Create a couple of tenants
         await client.post(
@@ -173,23 +258,23 @@ class TestTenantsIntegration:
         resp = await client.get("/api/tenants")
         assert resp.status_code == 401
 
-    async def test_tenant_requires_holder_role(self, client: AsyncClient):
+    async def test_tenant_requires_holder_role(self, client: AsyncClient, fastapi_app):
         """A TEACHER (not HOLDER) cannot create tenants."""
         # Register HOLDER first to get a tenant
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        holder_token = holder["token"]
         tenant_id = holder["tenant_id"]
 
-        # Register a TEACHER
-        teacher_resp = await client.post("/api/auth/register", json={
+        # Create a TEACHER via /api/users (HOLDER action) — gets status="active" by default
+        teacher_resp = await client.post("/api/users", json={
             "email": "teacher-no-tenant@test.com",
             "password": "Pass1234!",
-            "role": "teacher",
             "name": "Teacher Sin Permiso",
+            "role": "teacher",
             "tenant_id": tenant_id,
-        })
+        }, headers={"Authorization": f"Bearer {holder_token}"})
         assert teacher_resp.status_code == 201
-        teacher_token = await _login(client, "teacher-no-tenant@test.com", "Pass1234!")
+        teacher_token = await _login(fastapi_app, "teacher-no-tenant@test.com", "Pass1234!")
 
         # TEACHER tries to create a tenant → 403
         resp = await client.post(
@@ -207,10 +292,10 @@ class TestTenantsIntegration:
 class TestUsersIntegration:
     """POST/GET /api/users — HOLDER creates and lists teachers."""
 
-    async def test_create_user_teacher_success(self, client: AsyncClient):
+    async def test_create_user_teacher_success(self, client: AsyncClient, fastapi_app):
         """Create a TEACHER under an existing tenant."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         tenant_id = holder["tenant_id"]
 
         resp = await client.post(
@@ -232,10 +317,10 @@ class TestUsersIntegration:
         assert data["tenant_id"] == tenant_id
         assert "password" not in data
 
-    async def test_create_user_invalid_role_returns_400(self, client: AsyncClient):
+    async def test_create_user_invalid_role_returns_400(self, client: AsyncClient, fastapi_app):
         """Only 'teacher' role can be created via /api/users."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         tenant_id = holder["tenant_id"]
 
         resp = await client.post(
@@ -251,10 +336,10 @@ class TestUsersIntegration:
         )
         assert resp.status_code == 400
 
-    async def test_create_user_duplicate_email_returns_409(self, client: AsyncClient):
+    async def test_create_user_duplicate_email_returns_409(self, client: AsyncClient, fastapi_app):
         """Duplicate user email returns 409."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         tenant_id = holder["tenant_id"]
 
         await client.post(
@@ -282,10 +367,10 @@ class TestUsersIntegration:
         assert resp.status_code == 409
         assert "already registered" in resp.text.lower()
 
-    async def test_create_user_invalid_tenant_returns_404(self, client: AsyncClient):
+    async def test_create_user_invalid_tenant_returns_404(self, client: AsyncClient, fastapi_app):
         """Non-existent tenant_id returns 404."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
 
         resp = await client.post(
             "/api/users",
@@ -300,10 +385,10 @@ class TestUsersIntegration:
         )
         assert resp.status_code == 404
 
-    async def test_list_users_filters_by_tenant(self, client: AsyncClient):
+    async def test_list_users_filters_by_tenant(self, client: AsyncClient, fastapi_app):
         """Listing users respects tenant_id filter."""
-        holder = await _register_holder(client)
-        token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        token = holder["token"]
         tenant_id = holder["tenant_id"]
 
         await client.post(
@@ -341,30 +426,14 @@ class TestCoursesIntegration:
     """POST/GET/DELETE /api/courses — teachers manage courses."""
 
     @pytest.fixture
-    async def teacher_context(self, client: AsyncClient) -> dict:
-        """Register HOLDER → create tenant → register TEACHER → return tokens + ids."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
-
-        # Create teacher via /api/users (HOLDER action)
-        teacher_resp = await client.post(
-            "/api/users",
-            json={
-                "email": TEACHER_EMAIL,
-                "password": TEACHER_PASS,
-                "name": TEACHER_NAME,
-                "role": "teacher",
-                "tenant_id": tenant_id,
-            },
-            headers={"Authorization": f"Bearer {holder_token}"},
-        )
-        assert teacher_resp.status_code == 201
-        teacher_token = await _login(client, TEACHER_EMAIL, TEACHER_PASS)
+    async def teacher_context(self, client: AsyncClient, fastapi_app) -> dict:
+        """Create HOLDER + TEACHER users directly in DB."""
+        holder = await _setup_holder(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
         return {
-            "holder_token": holder_token,
-            "teacher_token": teacher_token,
-            "tenant_id": tenant_id,
+            "holder_token": holder["token"],
+            "teacher_token": teacher["token"],
+            "tenant_id": holder["tenant_id"],
         }
 
     async def test_create_course_success(self, client: AsyncClient, teacher_context: dict):
@@ -474,36 +543,21 @@ class TestStudentsIntegration:
     """Bulk create and list students under a course."""
 
     @pytest.fixture
-    async def course_context(self, client: AsyncClient) -> dict:
+    async def course_context(self, client: AsyncClient, fastapi_app) -> dict:
         """Create HOLDER → tenant → TEACHER → course."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
-
-        # Create teacher
-        await client.post(
-            "/api/users",
-            json={
-                "email": TEACHER_EMAIL,
-                "password": TEACHER_PASS,
-                "name": TEACHER_NAME,
-                "role": "teacher",
-                "tenant_id": tenant_id,
-            },
-            headers={"Authorization": f"Bearer {holder_token}"},
-        )
-        teacher_token = await _login(client, TEACHER_EMAIL, TEACHER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
         # Create course
         course_resp = await client.post(
             "/api/courses",
             json={"name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT},
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
         course_id = course_resp.json()["id"]
         return {
-            "teacher_token": teacher_token,
-            "tenant_id": tenant_id,
+            "teacher_token": teacher["token"],
+            "tenant_id": holder["tenant_id"],
             "course_id": course_id,
             "course_name": COURSE_NAME,
         }
@@ -596,18 +650,11 @@ class TestEvaluationsIntegration:
     ]
 
     @pytest.fixture
-    async def eval_context(self, client: AsyncClient) -> dict:
-        """Create HOLDER → tenant → TEACHER → course."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
-
-        await client.post("/api/users", json={
-            "email": TEACHER_EMAIL, "password": TEACHER_PASS,
-            "name": TEACHER_NAME, "role": "teacher", "tenant_id": tenant_id,
-        }, headers={"Authorization": f"Bearer {holder_token}"})
-        teacher_token = await _login(client, TEACHER_EMAIL, TEACHER_PASS)
-        return {"teacher_token": teacher_token, "tenant_id": tenant_id}
+    async def eval_context(self, client: AsyncClient, fastapi_app) -> dict:
+        """Create HOLDER → tenant → TEACHER."""
+        holder = await _setup_holder(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        return {"teacher_token": teacher["token"], "tenant_id": holder["tenant_id"]}
 
     async def test_create_evaluation(self, client: AsyncClient, eval_context: dict):
         """Create evaluation with rubric returns 201."""
@@ -716,41 +763,34 @@ class TestResultsIntegration:
     ]
 
     @pytest.fixture
-    async def full_context(self, client: AsyncClient) -> dict:
+    async def full_context(self, client: AsyncClient, fastapi_app) -> dict:
         """Full setup: HOLDER → tenant → TEACHER → course → students → evaluation."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
-
-        await client.post("/api/users", json={
-            "email": TEACHER_EMAIL, "password": TEACHER_PASS,
-            "name": TEACHER_NAME, "role": "teacher", "tenant_id": tenant_id,
-        }, headers={"Authorization": f"Bearer {holder_token}"})
-        teacher_token = await _login(client, TEACHER_EMAIL, TEACHER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
         # Course
         c_resp = await client.post("/api/courses", json={
             "name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT,
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+        }, headers={"Authorization": f"Bearer {teacher['token']}"})
         course_id = c_resp.json()["id"]
 
         # Students
         await client.post(
             f"/api/students/course/{course_id}",
             json={"names": STUDENT_NAMES},
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
         # Evaluation
         e_resp = await client.post("/api/evaluations", json={
             "title": EVAL_TITLE, "subject": COURSE_SUBJECT,
             "grade": COURSE_GRADE, "rubric": self.RUBRIC,
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+        }, headers={"Authorization": f"Bearer {teacher['token']}"})
         eval_id = e_resp.json()["id"]
 
         return {
-            "teacher_token": teacher_token,
-            "tenant_id": tenant_id,
+            "teacher_token": teacher["token"],
+            "tenant_id": holder["tenant_id"],
             "course_id": course_id,
             "eval_id": eval_id,
         }
@@ -833,17 +873,16 @@ class TestResultsIntegration:
             assert "requires_review" in r
             assert "status" in r
 
-    async def test_simulate_no_students_returns_400(self, client: AsyncClient):
+    async def test_simulate_no_students_returns_400(self, client: AsyncClient, fastapi_app):
         """Simulate on course with no students returns 400."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
+        holder = await _setup_holder(fastapi_app)
 
+        # Create teacher via /api/users (HOLDER action)
         await client.post("/api/users", json={
             "email": "teacher-nostudents@test.com", "password": TEACHER_PASS,
-            "name": "Teacher No Students", "role": "teacher", "tenant_id": tenant_id,
-        }, headers={"Authorization": f"Bearer {holder_token}"})
-        teacher_token = await _login(client, "teacher-nostudents@test.com", TEACHER_PASS)
+            "name": "Teacher No Students", "role": "teacher", "tenant_id": holder["tenant_id"],
+        }, headers={"Authorization": f"Bearer {holder['token']}"})
+        teacher_token = await _login(fastapi_app, "teacher-nostudents@test.com", TEACHER_PASS)
 
         c_resp = await client.post("/api/courses", json={
             "name": "Empty Course", "grade": "1°", "subject": "X",
@@ -875,45 +914,38 @@ class TestDashboardIntegration:
     ]
 
     @pytest.fixture
-    async def dashboard_context(self, client: AsyncClient) -> dict:
+    async def dashboard_context(self, client: AsyncClient, fastapi_app) -> dict:
         """Full data setup including simulated results."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
-
-        await client.post("/api/users", json={
-            "email": TEACHER_EMAIL, "password": TEACHER_PASS,
-            "name": TEACHER_NAME, "role": "teacher", "tenant_id": tenant_id,
-        }, headers={"Authorization": f"Bearer {holder_token}"})
-        teacher_token = await _login(client, TEACHER_EMAIL, TEACHER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
         c_resp = await client.post("/api/courses", json={
             "name": COURSE_NAME, "grade": COURSE_GRADE, "subject": COURSE_SUBJECT,
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+        }, headers={"Authorization": f"Bearer {teacher['token']}"})
         course_id = c_resp.json()["id"]
 
         await client.post(
             f"/api/students/course/{course_id}",
             json={"names": STUDENT_NAMES},
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
         e_resp = await client.post("/api/evaluations", json={
             "title": EVAL_TITLE, "subject": COURSE_SUBJECT,
             "grade": COURSE_GRADE, "rubric": self.RUBRIC,
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+        }, headers={"Authorization": f"Bearer {teacher['token']}"})
         eval_id = e_resp.json()["id"]
 
         # Simulate to generate results
         await client.post(
             f"/api/evaluations/{eval_id}/simulate/{course_id}",
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
         return {
-            "holder_token": holder_token,
-            "teacher_token": teacher_token,
-            "tenant_id": tenant_id,
+            "holder_token": holder["token"],
+            "teacher_token": teacher["token"],
+            "tenant_id": holder["tenant_id"],
             "course_id": course_id,
         }
 
@@ -997,47 +1029,40 @@ class TestResultReviewIntegration:
     ]
 
     @pytest.fixture
-    async def review_context(self, client: AsyncClient) -> dict:
+    async def review_context(self, client: AsyncClient, fastapi_app) -> dict:
         """Setup + simulate to get a result to review."""
-        holder = await _register_holder(client)
-        holder_token = await _login(client, HOLDER_EMAIL, HOLDER_PASS)
-        tenant_id = holder["tenant_id"]
-
-        await client.post("/api/users", json={
-            "email": "teacher-review@test.com", "password": TEACHER_PASS,
-            "name": "Review Teacher", "role": "teacher", "tenant_id": tenant_id,
-        }, headers={"Authorization": f"Bearer {holder_token}"})
-        teacher_token = await _login(client, "teacher-review@test.com", TEACHER_PASS)
+        holder = await _setup_holder(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
         c_resp = await client.post("/api/courses", json={
             "name": "Review Course", "grade": "1°", "subject": "Test",
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+        }, headers={"Authorization": f"Bearer {teacher['token']}"})
         course_id = c_resp.json()["id"]
 
         await client.post(
             f"/api/students/course/{course_id}",
             json={"names": ["Review Student"]},
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
         e_resp = await client.post("/api/evaluations", json={
             "title": "Review Eval", "subject": "Test", "grade": "1°", "rubric": self.RUBRIC,
-        }, headers={"Authorization": f"Bearer {teacher_token}"})
+        }, headers={"Authorization": f"Bearer {teacher['token']}"})
         eval_id = e_resp.json()["id"]
 
         await client.post(
             f"/api/evaluations/{eval_id}/simulate/{course_id}",
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
 
         # Get the result
         list_resp = await client.get(
             f"/api/results/evaluation/{eval_id}",
-            headers={"Authorization": f"Bearer {teacher_token}"},
+            headers={"Authorization": f"Bearer {teacher['token']}"},
         )
         result_id = list_resp.json()[0]["id"]
 
-        return {"teacher_token": teacher_token, "result_id": result_id}
+        return {"teacher_token": teacher["token"], "result_id": result_id}
 
     async def test_review_result(self, client: AsyncClient, review_context: dict):
         """POST /api/results/{id}/review updates and returns the reviewed result."""

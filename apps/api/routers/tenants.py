@@ -1,5 +1,5 @@
 """Tenants router — multi-tenant management for HOLDERs."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from database import get_db
 from models.db_models import Tenant, TenantMember, User, generate_join_code
 from models.schemas import CreateTenantRequest, TenantResponse, TenantLookupResponse
-from utils.security import require_role
+from utils.security import require_role, get_tenant_id
 
 router = APIRouter()
 
@@ -102,6 +102,7 @@ async def create_tenant(
 
 @router.get("", response_model=list[TenantResponse])
 async def list_tenants(
+    request: Request,
     current_user: User = Depends(require_role("HOLDER")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -129,7 +130,7 @@ async def list_tenants(
         # the tenant they're directly assigned to.
         result = await db.execute(
             select(Tenant)
-            .where(Tenant.id == current_user.tenant_id)
+            .where(Tenant.id == get_tenant_id(request, current_user))
             .order_by(Tenant.created_at.desc())
         )
 

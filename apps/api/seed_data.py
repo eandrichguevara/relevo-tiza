@@ -11,6 +11,10 @@ from utils.security import hash_password
 
 MAX_SEED_CODE_ATTEMPTS = 10
 
+# Super admin defaults when env vars are not set
+_DEFAULT_SUPER_ADMIN_EMAIL = "admin@relevo-tiza.app"
+_DEFAULT_SUPER_ADMIN_PASSWORD = "Admin123!Segura"
+
 
 async def _get_seed_join_code(db) -> str:
     """Generate a unique join_code for seed data."""
@@ -106,12 +110,57 @@ async def seed():
                 db.add(tm)
                 print("   ✅ TenantMember 'director@demo.cl' → 'colegio-demo' (owner)")
 
+        # ─── Super Admin ────────────────────────────────────────────
+        super_admin_email = os.getenv("SUPER_ADMIN_EMAIL", _DEFAULT_SUPER_ADMIN_EMAIL)
+        super_admin_password = os.getenv("SUPER_ADMIN_PASSWORD", _DEFAULT_SUPER_ADMIN_PASSWORD)
+
+        result = await db.execute(select(User).where(User.email == super_admin_email))
+        existing_admin = result.scalar_one_or_none()
+        if existing_admin:
+            print(f"   ⏭️  Super admin '{super_admin_email}' already exists")
+        else:
+            # Super admin belongs to the demo tenant (or create a dedicated one)
+            admin_tenant = tenant
+            super_admin = User(
+                email=super_admin_email,
+                name="Super Admin",
+                password=hash_password(super_admin_password),
+                status="active",
+                role="ADMIN",
+                tenant_id=admin_tenant.id,
+            )
+            db.add(super_admin)
+            await db.flush()
+
+            # Also add as TenantMember owner
+            existing_member = await db.execute(
+                select(TenantMember).where(
+                    TenantMember.tenant_id == admin_tenant.id,
+                    TenantMember.user_id == super_admin.id,
+                )
+            )
+            if not existing_member.scalar_one_or_none():
+                tm = TenantMember(
+                    tenant_id=admin_tenant.id,
+                    user_id=super_admin.id,
+                    role="owner",
+                )
+                db.add(tm)
+
+            print(f"   ✅ Super admin '{super_admin_email}' created")
+
         await db.commit()
 
     print("✅ Seed complete!")
-    print("   Teacher: profesor@demo.cl / demo123")
-    print("   Holder:  director@demo.cl / demo123")
+    print("   Teacher:     profesor@demo.cl / demo123")
+    print("   Holder:      director@demo.cl / demo123")
+    print(f"   Super Admin: {super_admin_email} / {super_admin_password}")
     print("   TenantMember: director@demo.cl → colegio-demo (owner)")
+
+    # Warn if using default credentials
+    if super_admin_email == _DEFAULT_SUPER_ADMIN_EMAIL or super_admin_password == _DEFAULT_SUPER_ADMIN_PASSWORD:
+        print("   ⚠️  WARNING: Using default super admin credentials!")
+        print("       Set SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD env vars for production.")
 
 
 if __name__ == "__main__":

@@ -7,8 +7,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from database import engine, Base
-from routers import auth, evaluations, results, dashboard, courses, students, tenants, users
-
+from middleware.tenant import TenantMiddleware
+from routers import auth, evaluations, results, dashboard, courses, students, tenants, users, features, admin
 
 # ─── Security Headers Middleware ────────────────────────────────────
 # SECURITY: Adds hardening headers to all HTTP responses to prevent
@@ -87,16 +87,18 @@ async def lifespan(app: FastAPI):
         # (legacy migration that added the column without NOT NULL)
         # NOTE: We check information_schema first to avoid PostgreSQL aborting
         # the entire transaction on a "column already exists" error.
+        # PostgreSQL only — SQLite creates tables fresh with all columns.
         from sqlalchemy import text
 
-        col_exists = await conn.execute(
-            text(
-                "SELECT column_name FROM information_schema.columns "
-                "WHERE table_name = 'tenants' AND column_name = 'join_code'"
+        if engine.dialect.name != "sqlite":
+            col_exists = await conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'tenants' AND column_name = 'join_code'"
+                )
             )
-        )
-        if not col_exists.scalar():
-            await conn.execute(text("ALTER TABLE tenants ADD COLUMN join_code VARCHAR(10) UNIQUE"))
+            if not col_exists.scalar():
+                await conn.execute(text("ALTER TABLE tenants ADD COLUMN join_code VARCHAR(10) UNIQUE"))
 
         # Migration v2: backfill NULL join_codes for existing tenants that
         # were created before the join_code column was added
@@ -124,6 +126,61 @@ async def lifespan(app: FastAPI):
                     {"code": candidate, "id": row[0]},
                 )
             print("   ✅ join_code backfill complete.")
+
+        # Migration v3: add status & moderation columns to users table
+        if engine.dialect.name != "sqlite":
+            col_exists = await conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'users' AND column_name = 'status'"
+                )
+            )
+            if not col_exists.scalar():
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN rejection_reason TEXT"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN approved_at TIMESTAMPTZ"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN rejected_at TIMESTAMPTZ"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN approved_by VARCHAR(255)"
+                ))
+                await conn.execute(text(
+                    "CREATE INDEX IF NOT EXISTS ix_users_status ON users (status)"
+                ))
+                print("   ✅ Migration v3: added status & moderation columns to users.")
+
+        # Migration v4: add status & moderation columns to tenants table
+        if engine.dialect.name != "sqlite":
+            col_exists = await conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'tenants' AND column_name = 'status'"
+                )
+            )
+            if not col_exists.scalar():
+                await conn.execute(text(
+                    "ALTER TABLE tenants ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'active'"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE tenants ADD COLUMN rejection_reason TEXT"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE tenants ADD COLUMN approved_at TIMESTAMPTZ"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE tenants ADD COLUMN rejected_at TIMESTAMPTZ"
+                ))
+                await conn.execute(text(
+                    "ALTER TABLE tenants ADD COLUMN approved_by VARCHAR(255)"
+                ))
+                print("   ✅ Migration v4: added status & moderation columns to tenants.")
     yield
     # Shutdown
     rate_limit_store.clear()
@@ -148,8 +205,12 @@ app.add_middleware(
         "Content-Type",
         "X-Tenant-Brand",
         "X-Tenant-Id",
+        "X-Tenant-Subdomain",
     ],
 )
+
+# MULTI-TENANT: Resolve tenant from subdomain/header, inject into request.state
+app.add_middleware(TenantMiddleware)
 
 # SECURITY: Security hardening headers for all responses
 app.middleware("http")(security_headers_middleware)
@@ -168,6 +229,8 @@ app.include_router(courses.router, prefix="/api/courses", tags=["Courses"])
 app.include_router(students.router, prefix="/api/students", tags=["Students"])
 app.include_router(tenants.router, prefix="/api/tenants", tags=["Tenants"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
+app.include_router(features.router, prefix="/api/features", tags=["Features"])
+app.include_router(admin.router, tags=["Admin"])
 
 
 @app.get("/api/health")

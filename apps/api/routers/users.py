@@ -1,13 +1,13 @@
 """Users router — multi-tenant user management for HOLDERs."""
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from database import get_db
 from models.db_models import User, Tenant, TenantMember
 from models.schemas import CreateUserRequest, UserResponse
-from utils.security import hash_password, require_role
+from utils.security import hash_password, require_role, get_tenant_id
 
 router = APIRouter()
 
@@ -66,6 +66,7 @@ async def create_user(
 
 @router.get("", response_model=list[UserResponse])
 async def list_users(
+    request: Request,
     tenant_id: Optional[str] = Query(None, description="Filter by tenant UUID"),
     role: Optional[str] = Query(None, description="Filter by role (TEACHER, HOLDER, ADMIN)"),
     current_user: User = Depends(require_role("HOLDER")),
@@ -103,7 +104,7 @@ async def list_users(
             stmt = stmt.where(User.tenant_id.in_(member_tenant_ids))
         else:
             # Fallback: only current user's own tenant
-            stmt = stmt.where(User.tenant_id == current_user.tenant_id)
+            stmt = stmt.where(User.tenant_id == get_tenant_id(request, current_user))
 
     if role:
         stmt = stmt.where(User.role == role.upper().strip())

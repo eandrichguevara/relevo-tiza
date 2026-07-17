@@ -16,6 +16,13 @@ class RoleEnum(str, Enum):
     ADMIN = "ADMIN"
 
 
+class UserStatusEnum(str, Enum):
+    pending = "pending"
+    active = "active"
+    rejected = "rejected"
+    suspended = "suspended"
+
+
 class QuestionTypeEnum(str, Enum):
     multiple_choice = "multiple_choice"
     written = "written"
@@ -49,10 +56,54 @@ class UserResponse(BaseModel):
     email: str
     name: str
     role: RoleEnum
+    status: UserStatusEnum = UserStatusEnum.active
     tenant_id: str
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class AdminUserResponse(UserResponse):
+    """Extends UserResponse with moderation fields visible only to admins."""
+    rejection_reason: Optional[str] = None
+    approved_at: Optional[datetime] = None
+    rejected_at: Optional[datetime] = None
+    approved_by: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PendingRegistrationResponse(BaseModel):
+    """A pending user registration for the admin approval list."""
+    id: str
+    email: str
+    name: str
+    role: RoleEnum
+    tenant_id: str
+    tenant_name: Optional[str] = None
+    brand: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class PendingListResponse(BaseModel):
+    items: List[PendingRegistrationResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class ApproveRejectRequest(BaseModel):
+    reason: Optional[str] = None  # Required for reject, optional for approve
+
+
+class ApprovalActionResponse(BaseModel):
+    success: bool
+    message: str
+    user_id: str
+    status: UserStatusEnum
 
 
 # ─── Tenants ──────────────────────────────
@@ -75,6 +126,7 @@ class TenantResponse(BaseModel):
     name: str
     subdomain: str
     brand: str
+    status: str = "active"
     join_code: Optional[str] = None
     settings: Optional[dict] = {}
     created_at: datetime

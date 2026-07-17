@@ -18,42 +18,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from httpx import AsyncClient
 
 
-HOLDER_EMAIL = "regression-holder@test.com"
-HOLDER_PASS = "Regr3ss!onPass"
-
-
-@pytest.mark.asyncio
-async def _register_holder(client: AsyncClient) -> dict:
-    """Register a HOLDER (auto-creates a tenant) for test setup."""
-    resp = await client.post("/api/auth/register", json={
-        "email": HOLDER_EMAIL,
-        "password": HOLDER_PASS,
-        "name": "Regression Holder",
-        "role": "director",
-    })
-    assert resp.status_code == 201, f"Holder register failed: {resp.text}"
-    return resp.json()
-
-
-@pytest.mark.asyncio
-async def _login(client: AsyncClient) -> str:
-    """Login and return Bearer token."""
-    resp = await client.post("/api/auth/login", json={
-        "email": HOLDER_EMAIL,
-        "password": HOLDER_PASS,
-    })
-    assert resp.status_code == 200
-    return resp.json()["access_token"]
-
-
 @pytest.mark.asyncio
 class TestDuplicateTenantsRegression:
     """Regression: duplicate tenant names are rejected."""
 
-    async def test_duplicate_name_rejected(self, client: AsyncClient):
+    async def test_duplicate_name_rejected(self, client: AsyncClient, pre_approved_holder: dict):
         """BUG: Creating two tenants with same name returns 409."""
-        await _register_holder(client)
-        token = await _login(client)
+        token = pre_approved_holder["token"]
 
         # First tenant — should succeed
         resp1 = await client.post(
@@ -73,10 +44,9 @@ class TestDuplicateTenantsRegression:
             f"Expected 409 for duplicate name, got {resp2.status_code}: {resp2.text}"
         )
 
-    async def test_duplicate_name_error_message_generic(self, client: AsyncClient):
+    async def test_duplicate_name_error_message_generic(self, client: AsyncClient, pre_approved_holder: dict):
         """Error message is generic (no info leak)."""
-        await _register_holder(client)
-        token = await _login(client)
+        token = pre_approved_holder["token"]
 
         await client.post(
             "/api/tenants",
@@ -92,10 +62,9 @@ class TestDuplicateTenantsRegression:
         assert resp.status_code == 409
         assert data["detail"] == "Registration failed"
 
-    async def test_unique_names_allowed(self, client: AsyncClient):
+    async def test_unique_names_allowed(self, client: AsyncClient, pre_approved_holder: dict):
         """Different names with different subdomains are all accepted."""
-        await _register_holder(client)
-        token = await _login(client)
+        token = pre_approved_holder["token"]
 
         for i in range(3):
             resp = await client.post(
@@ -110,10 +79,9 @@ class TestDuplicateTenantsRegression:
                 f"Tenant {i} should be created: {resp.status_code} {resp.text}"
             )
 
-    async def test_duplicate_subdomain_still_rejected(self, client: AsyncClient):
+    async def test_duplicate_subdomain_still_rejected(self, client: AsyncClient, pre_approved_holder: dict):
         """Existing subdomain uniqueness is still enforced (no regression)."""
-        await _register_holder(client)
-        token = await _login(client)
+        token = pre_approved_holder["token"]
 
         await client.post(
             "/api/tenants",

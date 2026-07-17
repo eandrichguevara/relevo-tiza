@@ -1,5 +1,5 @@
 """Results router - get, review, generate reports."""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List
@@ -7,7 +7,7 @@ from typing import List
 from database import get_db
 from models.db_models import Result, Evaluation, User
 from models.schemas import ResultResponse, ReviewRequest
-from utils.security import get_current_user
+from utils.security import get_current_user, get_tenant_id
 from services.pdf import generate_result_report_pdf
 
 router = APIRouter()
@@ -16,6 +16,7 @@ router = APIRouter()
 @router.get("/evaluation/{evaluation_id}", response_model=List[ResultResponse])
 async def list_results(
     evaluation_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -23,7 +24,7 @@ async def list_results(
     eval_result = await db.execute(
         select(Evaluation).where(
             Evaluation.id == evaluation_id,
-            Evaluation.tenant_id == current_user.tenant_id,
+            Evaluation.tenant_id == get_tenant_id(request, current_user),
         )
     )
     evaluation = eval_result.scalar_one_or_none()
@@ -38,6 +39,7 @@ async def list_results(
 
 @router.get("/pending-review", response_model=List[ResultResponse])
 async def get_pending_reviews(
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -46,7 +48,7 @@ async def get_pending_reviews(
         select(Result)
         .join(Evaluation)
         .where(
-            Evaluation.tenant_id == current_user.tenant_id,
+            Evaluation.tenant_id == get_tenant_id(request, current_user),
             Result.requires_review == True,
             Result.status == "requires_review",
         )
@@ -59,6 +61,7 @@ async def get_pending_reviews(
 @router.get("/{result_id}", response_model=ResultResponse)
 async def get_result(
     result_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -68,7 +71,7 @@ async def get_result(
         .join(Evaluation)
         .where(
             Result.id == result_id,
-            Evaluation.tenant_id == current_user.tenant_id,
+            Evaluation.tenant_id == get_tenant_id(request, current_user),
         )
     )
     result = res.scalar_one_or_none()
@@ -81,6 +84,7 @@ async def get_result(
 async def review_result(
     result_id: str,
     body: ReviewRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -90,7 +94,7 @@ async def review_result(
         .join(Evaluation)
         .where(
             Result.id == result_id,
-            Evaluation.tenant_id == current_user.tenant_id,
+            Evaluation.tenant_id == get_tenant_id(request, current_user),
         )
     )
     result = res.scalar_one_or_none()
@@ -130,6 +134,7 @@ async def review_result(
 @router.get("/{result_id}/report")
 async def generate_report(
     result_id: str,
+    request: Request,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -139,7 +144,7 @@ async def generate_report(
         .join(Evaluation)
         .where(
             Result.id == result_id,
-            Evaluation.tenant_id == current_user.tenant_id,
+            Evaluation.tenant_id == get_tenant_id(request, current_user),
         )
     )
     result = res.scalar_one_or_none()
