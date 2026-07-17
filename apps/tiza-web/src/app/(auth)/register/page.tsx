@@ -132,7 +132,7 @@ export default function RegisterPage() {
           setName(e.target.value);
           if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: undefined }));
         }}
-        placeholder="María González"
+        placeholder="Tu nombre completo"
         error={fieldErrors.name}
         autoComplete="name"
         required
@@ -146,7 +146,7 @@ export default function RegisterPage() {
           setEmail(e.target.value);
           if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
         }}
-        placeholder="profesor@colegio.cl"
+        placeholder="tu@correo.com"
         error={fieldErrors.email}
         autoComplete="email"
         required
@@ -160,9 +160,9 @@ export default function RegisterPage() {
           setPassword(e.target.value);
           if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
         }}
-        placeholder="Mínimo 6 caracteres"
+        placeholder="Mínimo 8 caracteres"
         error={fieldErrors.password}
-        hint="Mínimo 6 caracteres"
+        hint="Mínimo 8 caracteres"
         autoComplete="new-password"
         required
       />

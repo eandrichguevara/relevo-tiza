@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, Button, Badge, Spinner, EmptyState, Input, ErrorMessage } from '@tiza/ui';
+import { getToken } from '@/lib/auth';
 import { Plus, ArrowLeft, Users, Trash2, RefreshCw } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -23,8 +24,8 @@ export default function AlumnosPage() {
     setLoading(true);
     setError(null);
     try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
-      const token = (session as any)?.accessToken;
+      const token = getToken();
+      if (!token) throw new Error('No token available');
       const [courseRes, studentsRes] = await Promise.all([
         fetch(`${API_URL}/api/courses/${courseId}`, {
           headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
@@ -62,8 +63,8 @@ export default function AlumnosPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
-      const token = (session as any)?.accessToken;
+      const token = getToken();
+      if (!token) throw new Error('No token available');
       const res = await fetch(`${API_URL}/api/students/course/${courseId}`, {
         method: 'POST',
         headers: {
@@ -95,8 +96,8 @@ export default function AlumnosPage() {
   const handleDelete = async (studentId: string) => {
     setError(null);
     try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
-      const token = (session as any)?.accessToken;
+      const token = getToken();
+      if (!token) throw new Error('No token available');
       const res = await fetch(`${API_URL}/api/students/${studentId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },

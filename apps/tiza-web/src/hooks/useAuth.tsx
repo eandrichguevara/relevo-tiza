@@ -9,6 +9,7 @@ import {
   fetchTokenFromSession,
   getStoredUser,
   storeUser,
+  setTokenJwt,
   type AuthUser,
 } from '@/lib/auth';
 
@@ -20,6 +21,7 @@ interface AuthContextValue {
   accessToken: string | null; // alias for backward compat with useApi
   isAuthenticated: boolean;
   isLoading: boolean;
+  userStatus: string | null;
   login: (email: string, password: string) => Promise<void>;
   register: (data: {
     name: string;
@@ -55,6 +57,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (storedToken && storedUser) {
           setToken(storedToken);
           setUser(storedUser);
+          setTokenJwt(storedToken);
+        } else if (storedToken && !storedUser) {
+          // Token exists but localStorage user is missing (e.g., incognito, cleared storage).
+          // Reconstruct user profile from the backend via /api/auth/me.
+          try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+            const meRes = await fetch(`${API_URL}/api/auth/me`, {
+              headers: { Authorization: `Bearer ${storedToken}` },
+            });
+            if (meRes.ok) {
+              const meData = await meRes.json();
+              const reconstructedUser: AuthUser = {
+                id: meData.id,
+                email: meData.email,
+                name: meData.name,
+                role: meData.role,
+                status: meData.status ?? 'active',
+                rejectionReason: meData.rejection_reason,
+                tenantId: meData.tenant_id,
+              };
+              storeUser(reconstructedUser);
+              setUser(reconstructedUser);
+              setToken(storedToken);
+              setTokenJwt(storedToken);
+            } else {
+              // Token is invalid or expired — clear everything and force re-login
+              await clearAuth();
+            }
+          } catch (e) {
+            console.error('[useAuth] Failed to restore user session:', e);
+          }
         }
       } catch {
         // Session restore failed — user will need to log in
@@ -90,14 +123,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/');
   }, [router]);
 
+  const userStatus = user?.status ?? null;
+
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
         accessToken: token,
-        isAuthenticated: !!token && !!user,
+        isAuthenticated: !!token && !!user && user.status === 'active',
         isLoading,
+        userStatus,
         login,
         register,
         logout,

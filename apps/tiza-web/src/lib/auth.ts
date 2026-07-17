@@ -21,6 +21,8 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  status: string;
+  rejectionReason?: string;
   tenantId: string;
 }
 
@@ -32,6 +34,40 @@ interface TokenResponse {
 // ─── Constants ──────────────────────────────────────────
 
 const USER_STORAGE_KEY = 'tiza-auth-user';
+const TOKEN_STORAGE_KEY = 'tiza-auth-token-jwt';
+
+/**
+ * Reads the JWT token from sessionStorage.
+ * The token is stored here during login and session restoration
+ * so client components can access it synchronously without a
+ * network call to /api/auth/session.
+ */
+export function getToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Stores the JWT token in sessionStorage for client-side access.
+ * Called automatically by loginUser() and by the AuthProvider
+ * when a session is restored on page refresh.
+ */
+export function setTokenJwt(token: string | null): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) {
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    } else {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // Silently fail — degraded UX but non-fatal
+  }
+}
 
 // ─── Cookie helpers ─────────────────────────────────────
 
@@ -113,6 +149,8 @@ export async function loginUser(
     email: string;
     name: string;
     role: string;
+    status: string;
+    rejection_reason?: string;
     tenant_id: string;
   }>('/api/auth/me', {
     token: loginRes.access_token,
@@ -123,12 +161,15 @@ export async function loginUser(
     email: userData.email,
     name: userData.name,
     role: userData.role,
+    status: userData.status,
+    rejectionReason: userData.rejection_reason,
     tenantId: userData.tenant_id,
   };
 
   // 3. Persist
   await setTokenCookie(loginRes.access_token);
   storeUser(user);
+  setTokenJwt(loginRes.access_token);
 
   return { user, token: loginRes.access_token };
 }
@@ -147,6 +188,13 @@ export async function registerUser(data: {
 }
 
 export async function clearAuth(): Promise<void> {
-  await clearTokenCookie();
-  clearStoredUser();
+  try {
+    await clearTokenCookie();
+  } catch {
+    // Cookie clear failed, but we still clean up localStorage
+    console.error('[clearAuth] Failed to clear token cookie');
+  } finally {
+    clearStoredUser();
+    setTokenJwt(null);
+  }
 }

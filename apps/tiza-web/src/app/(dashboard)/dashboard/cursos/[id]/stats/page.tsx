@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, Badge, Spinner, EmptyState, ErrorMessage, Button } from '@tiza/ui';
+import { getToken } from '@/lib/auth';
 import { ArrowLeft, Users, BarChart3, Target, Award, TrendingUp, RefreshCw } from 'lucide-react';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -19,8 +20,8 @@ export default function CourseStatsPage() {
     setLoading(true);
     setError(null);
     try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
-      const token = (session as any)?.accessToken;
+      const token = getToken();
+      if (!token) throw new Error('No token available');
       const res = await fetch(`${API_URL}/api/dashboard/course/${courseId}`, {
         headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
       });

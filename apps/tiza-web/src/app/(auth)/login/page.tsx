@@ -53,12 +53,24 @@ function LoginForm() {
       // Login successful — redirect to dashboard
       window.location.href = '/dashboard';
     } catch (err: unknown) {
-      console.error('[Login Error]', err);
+      // Structured error logging — avoids `{}` in monitoring tools
       const apiErr = err as ApiError;
-      if (apiErr?.status === 401) {
+      const isApiErr = typeof apiErr?.status === 'number' && apiErr.status > 0;
+      console.error('[Login Error]', {
+        isApiError: isApiErr,
+        status: isApiErr ? apiErr.status : undefined,
+        detail: isApiErr ? apiErr.detail : undefined,
+        message: err instanceof Error ? err.message : undefined,
+        raw: err,
+      });
+      if (isApiErr && apiErr.status === 401) {
         setGeneralError('Email o contraseña incorrectos. Verifica tus credenciales.');
+      } else if (isApiErr && apiErr.translatedMessage) {
+        setGeneralError(apiErr.translatedMessage);
+      } else if (err instanceof Error) {
+        setGeneralError(err.message || 'Error de conexión. Intenta de nuevo.');
       } else {
-        setGeneralError(apiErr?.translatedMessage || 'Error de conexión. Intenta de nuevo.');
+        setGeneralError('Error de conexión. Intenta de nuevo.');
       }
     } finally {
       setLoading(false);
@@ -90,7 +102,7 @@ function LoginForm() {
           setEmail(e.target.value);
           if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: undefined }));
         }}
-        placeholder="profesor@colegio.cl"
+        placeholder="tu@correo.com"
         error={fieldErrors.email}
         autoComplete="email"
         required
@@ -104,7 +116,7 @@ function LoginForm() {
           setPassword(e.target.value);
           if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
         }}
-        placeholder="••••••••"
+        placeholder="Tu contraseña"
         error={fieldErrors.password}
         autoComplete="current-password"
         required
