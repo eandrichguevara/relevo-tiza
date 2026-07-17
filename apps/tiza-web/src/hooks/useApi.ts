@@ -142,6 +142,60 @@ export function useDashboardStats() {
   });
 }
 
+// ─── Courses (Tiza) ────────────────────────────
+
+export interface Course {
+  id: string;
+  name: string;
+  grade: string;
+  subject: string;
+  student_count: number;
+  created_at: string;
+}
+
+export function useCourses() {
+  const { accessToken, isAuthenticated } = useAuth();
+
+  return useQuery<Course[]>({
+    queryKey: ['courses'],
+    queryFn: () => apiFetch<Course[]>('/api/courses', { token: accessToken }),
+    enabled: isAuthenticated,
+  });
+}
+
+export function useCreateCourse() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { name: string; grade: string; subject: string }) =>
+      apiFetch<Course>('/api/courses', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    },
+  });
+}
+
+export function useDeleteCourse() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch(`/api/courses/${id}`, {
+        method: 'DELETE',
+        token: accessToken,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    },
+  });
+}
+
 // ─── Report PDF ──────────────────────────
 
 export function useGenerateReport() {

@@ -2,19 +2,19 @@
 
 import Link from 'next/link';
 import { Card, Button, Badge, Spinner, EmptyState } from '@tiza/ui';
-import { Plus, Users, BookOpen, Trash2, BarChart3, ChevronRight } from 'lucide-react';
+import { Plus, Users, BookOpen, Trash2, BarChart3, ChevronRight, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+import { useCourses, useCreateCourse, useDeleteCourse, type Course } from '@/hooks/useApi';
 
 export default function CursosPage() {
-  const [courses, setCourses] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: courses, isLoading, error: coursesError } = useCourses();
+  const createCourse = useCreateCourse();
+  const deleteCourse = useDeleteCourse();
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
   const [grade, setGrade] = useState('1° básico');
   const [subject, setSubject] = useState('Lenguaje');
-  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const GRADES = [
     '1° básico',
@@ -32,70 +32,41 @@ export default function CursosPage() {
   ];
   const SUBJECTS = ['Lenguaje', 'Matemáticas', 'Ciencias', 'Historia', 'Inglés'];
 
-  const fetchCourses = async () => {
-    try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
-      const token = (session as any)?.accessToken;
-      const res = await fetch(`${API_URL}/api/courses`, {
-        headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
-      });
-      const data = await res.json();
-      setCourses(Array.isArray(data) ? data : []);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useState(() => {
-    fetchCourses();
-  });
-
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitting(true);
+    setError(null);
     try {
-      const session = await fetch('/api/auth/session').then((r) => r.json());
-      const token = (session as any)?.accessToken;
-      const res = await fetch(`${API_URL}/api/courses`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          'X-Tenant-Brand': 'tiza',
-        },
-        body: JSON.stringify({ name, grade, subject }),
-      });
-      if (res.ok) {
-        setShowForm(false);
-        setName('');
-        fetchCourses();
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSubmitting(false);
+      await createCourse.mutateAsync({ name, grade, subject });
+      setShowForm(false);
+      setName('');
+      setGrade('1° básico');
+      setSubject('Lenguaje');
+    } catch (err: any) {
+      setError(
+        err?.translatedMessage || err?.detail || 'Error al crear el curso. Intenta de nuevo.'
+      );
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este curso y todos sus alumnos?')) return;
-    const session = await fetch('/api/auth/session').then((r) => r.json());
-    const token = (session as any)?.accessToken;
-    await fetch(`${API_URL}/api/courses/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}`, 'X-Tenant-Brand': 'tiza' },
-    });
-    fetchCourses();
+    setError(null);
+    try {
+      await deleteCourse.mutateAsync(id);
+    } catch (err: any) {
+      setError(
+        err?.translatedMessage || err?.detail || 'Error al eliminar el curso. Intenta de nuevo.'
+      );
+    }
   };
 
-  if (loading)
+  if (isLoading) {
     return (
       <div className="flex justify-center py-12">
         <Spinner size="lg" />
       </div>
     );
+  }
 
   return (
     <div>
@@ -110,14 +81,40 @@ export default function CursosPage() {
         </Button>
       </div>
 
+      {/* Error banner */}
+      {(error || coursesError) && (
+        <div
+          className="mb-6 flex items-center gap-2 rounded-lg bg-red-50 p-4 text-sm text-red-700"
+          role="alert"
+        >
+          <AlertCircle size={18} className="shrink-0" aria-hidden="true" />
+          <span>
+            {error ||
+              (coursesError as any)?.translatedMessage ||
+              (coursesError as any)?.detail ||
+              'Error al cargar los cursos.'}
+          </span>
+          <button
+            onClick={() => setError(null)}
+            className="ml-auto shrink-0 text-red-500 hover:text-red-700"
+            aria-label="Cerrar mensaje de error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {showForm && (
         <Card className="mb-6">
           <form onSubmit={handleCreate} className="space-y-4">
             <h3 className="font-semibold">Crear nuevo curso</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Nombre del curso</label>
+                <label htmlFor="course-name" className="block text-sm font-medium mb-1">
+                  Nombre del curso
+                </label>
                 <input
+                  id="course-name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-lg border px-3 py-2"
@@ -126,8 +123,11 @@ export default function CursosPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Nivel</label>
+                <label htmlFor="course-grade" className="block text-sm font-medium mb-1">
+                  Nivel
+                </label>
                 <select
+                  id="course-grade"
                   value={grade}
                   onChange={(e) => setGrade(e.target.value)}
                   className="w-full rounded-lg border px-3 py-2"
@@ -138,8 +138,11 @@ export default function CursosPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Asignatura</label>
+                <label htmlFor="course-subject" className="block text-sm font-medium mb-1">
+                  Asignatura
+                </label>
                 <select
+                  id="course-subject"
                   value={subject}
                   onChange={(e) => setSubject(e.target.value)}
                   className="w-full rounded-lg border px-3 py-2"
@@ -151,7 +154,7 @@ export default function CursosPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <Button type="submit" brand="tiza" loading={submitting}>
+              <Button type="submit" brand="tiza" loading={createCourse.isPending}>
                 Crear curso
               </Button>
               <Button type="button" variant="ghost" onClick={() => setShowForm(false)}>
@@ -162,7 +165,7 @@ export default function CursosPage() {
         </Card>
       )}
 
-      {courses.length === 0 ? (
+      {!courses || courses.length === 0 ? (
         <EmptyState
           title="No tienes cursos"
           description="Crea tu primer curso para empezar a organizar tus evaluaciones"
@@ -175,7 +178,7 @@ export default function CursosPage() {
         />
       ) : (
         <div className="space-y-3">
-          {courses.map((course: any) => (
+          {courses.map((course: Course) => (
             <Card key={course.id} className="hover:shadow-md transition-shadow">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -191,22 +194,33 @@ export default function CursosPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Link href={`/dashboard/cursos/${course.id}/alumnos`}>
-                    <Button brand="tiza" variant="ghost" size="sm">
+                    <Button
+                      brand="tiza"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Alumnos de ${course.name}`}
+                    >
                       <Users size={16} />
                     </Button>
                   </Link>
                   <Link href={`/dashboard/cursos/${course.id}/stats`}>
-                    <Button brand="tiza" variant="ghost" size="sm">
+                    <Button
+                      brand="tiza"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Estadísticas de ${course.name}`}
+                    >
                       <BarChart3 size={16} />
                     </Button>
                   </Link>
                   <button
                     onClick={() => handleDelete(course.id)}
                     className="p-2 text-gray-400 hover:text-red-500"
+                    aria-label={`Eliminar ${course.name}`}
                   >
                     <Trash2 size={16} />
                   </button>
-                  <ChevronRight size={16} className="text-gray-400" />
+                  <ChevronRight size={16} className="text-gray-400" aria-hidden="true" />
                 </div>
               </div>
             </Card>
