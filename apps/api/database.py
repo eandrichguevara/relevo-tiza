@@ -8,11 +8,17 @@ from sqlalchemy import event, text
 
 _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
 
-# Priority: DATABASE_URL env var → PostgreSQL default (configured in apps/api/.env)
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://tiza_user:tiza_password@localhost:5432/tiza_dev",
-)
+# SECURITY: DATABASE_URL must be set via environment variable.
+# No hardcoded fallback — ever. In production, set DATABASE_URL in your
+# deployment environment. For local dev, use apps/api/.env or docker-compose.
+_DB_URL = os.getenv("DATABASE_URL")
+if not _DB_URL:
+    raise RuntimeError(
+        "DATABASE_URL environment variable is required. "
+        "Set it in your .env file or deployment environment. "
+        "Example: postgresql+asyncpg://user:password@host:5432/dbname"
+    )
+DATABASE_URL = _DB_URL
 
 _is_sqlite = DATABASE_URL.startswith("sqlite")
 
@@ -85,7 +91,7 @@ async def create_tenant_schema(tenant_id: str):
     # Both the schema name and index names must be double-quoted because
     # they contain UUID-derived hyphens (e.g., tenant_2777e7b7-a8ea-...).
     schema = f'"tenant_{tenant_id}"'
-    idx_prefix = f'"ix_{tenant_id}'  # closing quote added per index
+    idx_prefix = f"ix_{tenant_id}"  # full index name base
     async with engine.begin() as conn:
         await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
 

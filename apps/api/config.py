@@ -85,15 +85,19 @@ class Settings(BaseSettings):
 
     @property
     def rate_limit_enabled(self) -> bool:
-        """Rate limiting: enabled in production by default.
+        """Rate limiting: enabled by default (all environments).
         
         Override via RATE_LIMIT_ENABLED env var (true/false).
-        When not set, enabled in production, disabled in development.
+        When not set, rate limiting is active. To disable locally
+        during development, explicitly set RATE_LIMIT_ENABLED=false.
+        
+        SECURITY: Rate limiting is a critical control against
+        brute-force and DoS attacks. It is enabled by default.
         """
         env_val = os.getenv("RATE_LIMIT_ENABLED")
         if env_val is not None:
             return env_val.strip().lower() in ("true", "1", "yes")
-        return self.ENVIRONMENT != "development"
+        return True  # enabled by default for all environments
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

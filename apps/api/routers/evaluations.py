@@ -17,6 +17,43 @@ from services.pipeline import pipeline as ai_pipeline
 router = APIRouter()
 gemini_service = GeminiService()
 
+# ─── Upload Validation ──────────────────────────────────────────────
+# SECURITY: Prevent DoS via oversized uploads and restrict file types
+# to accepted MIME types. Adjust MAX_UPLOAD_SIZE if larger files are
+# needed (e.g., high-resolution multi-page scans).
+ALLOWED_UPLOAD_MIMETYPES: set[str] = {
+    "application/pdf",
+}
+MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10 MB
+
+
+async def _validate_upload(file: UploadFile) -> None:
+    """Validate uploaded file size and content type before processing.
+    
+    Raises HTTPException 400/413 if validation fails.
+    """
+    # Validate content-type early (before reading bytes)
+    content_type = file.content_type or ""
+    if content_type not in ALLOWED_UPLOAD_MIMETYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Tipo de archivo no permitido: {content_type}. Solo se aceptan PDFs.",
+        )
+
+    # Read first chunk to check size (fast rejection)
+    MAX_HEAD = MAX_UPLOAD_SIZE + 1
+    chunk = await file.read(MAX_HEAD)
+    file_size = len(chunk)
+
+    if file_size > MAX_UPLOAD_SIZE:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Archivo demasiado grande: {file_size} bytes. Máximo permitido: {MAX_UPLOAD_SIZE} bytes (10 MB).",
+        )
+
+    # Rewind the file position so subsequent reads get the full content
+    await file.seek(0)
+
 
 @router.post("", response_model=EvaluationResponse, status_code=201)
 async def create_evaluation(
@@ -132,6 +169,9 @@ async def process_scanned(
     db: AsyncSession = Depends(get_db),
 ):
     """Upload and process a scanned evaluation PDF."""
+    # SECURITY: Validate file type and size before any processing
+    await _validate_upload(file)
+
     result = await db.execute(
         select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
@@ -338,6 +378,9 @@ async def process_scanned_async(
     to check progress. The pipeline runs OCR + LLM grading in the background.
     The sync POST /{id}/process endpoint is still available for direct use.
     """
+    # SECURITY: Validate file type and size before any processing
+    await _validate_upload(file)
+
     result = await db.execute(
         select(Evaluation).where(Evaluation.id == evaluation_id, Evaluation.deleted_at.is_(None))
     )
