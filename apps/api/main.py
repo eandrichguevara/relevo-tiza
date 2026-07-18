@@ -189,6 +189,21 @@ async def lifespan(app: FastAPI):
                     "ALTER TABLE tenants ADD COLUMN approved_by VARCHAR(255)"
                 ))
                 print("   ✅ Migration v4: added status & moderation columns to tenants.")
+
+        # Migration v5: add deleted_at to tenant-scoped tables for soft delete
+        # (N-05). Iterates over all tenant_* schemas and adds the column
+        # idempotently via ADD COLUMN IF NOT EXISTS.
+        if engine.dialect.name != "sqlite":
+            schemas = await conn.execute(
+                text("SELECT schema_name FROM information_schema.schemata WHERE schema_name LIKE 'tenant_%'")
+            )
+            for row in schemas.fetchall():
+                sch = row[0]
+                for tbl in ("courses", "evaluations", "students"):
+                    await conn.execute(
+                        text(f"ALTER TABLE \"{sch}\".{tbl} ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ")
+                    )
+            print("   ✅ Migration v5: added deleted_at columns to tenant schemas.")
     yield
     # Shutdown
     rate_limit_store.clear()
