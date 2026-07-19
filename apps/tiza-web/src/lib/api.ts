@@ -15,14 +15,82 @@ const ERROR_TRANSLATIONS: Record<number, string> = {
   503: 'Servicio en mantenimiento. Intenta de nuevo más tarde.',
 };
 
+/**
+ * Translate specific backend error detail strings to Spanish.
+ * These are checked before falling back to the raw detail string.
+ */
+const DETAIL_TRANSLATIONS: Record<string, string> = {
+  'Invalid authentication credentials': 'Credenciales incorrectas o sesión expirada.',
+};
+
 export interface ApiError {
   status: number;
   detail: string;
   translatedMessage: string;
 }
 
-export function getTranslatedError(status: number, detail?: string): string {
-  return detail || ERROR_TRANSLATIONS[status] || `Error inesperado (${status}). Intenta de nuevo.`;
+/**
+ * Translate common Pydantic/FastAPI validation error messages to Spanish.
+ */
+const VALIDATION_TRANSLATIONS: Record<string, string> = {
+  'Field required': 'Este campo es obligatorio.',
+  'value is not a valid email address': 'El formato del email no es válido.',
+  'value is not a valid integer': 'El valor debe ser un número entero.',
+  'ensure this value has at least {min_length} characters':
+    'Debe tener al menos {min_length} caracteres.',
+  'ensure this value has at most {max_length} characters':
+    'Debe tener como máximo {max_length} caracteres.',
+  'string does not match regex': 'El formato no es válido.',
+  'value is not a valid uuid': 'El identificador no es válido.',
+  'Invalid date format': 'El formato de fecha no es válido.',
+};
+
+const FIELD_LABELS: Record<string, string> = {
+  email: 'Email',
+  name: 'Nombre',
+  password: 'Contraseña',
+  role: 'Rol',
+  tenant_id: 'Colegio',
+  tenantId: 'Colegio',
+  join_code: 'Código de colegio',
+};
+
+/**
+ * Returns a human-readable error message from an API error detail.
+ * Handles FastAPI validation errors where `detail` is an array of { msg, loc, ... } objects.
+ */
+export function getTranslatedError(status: number, detail?: unknown): string {
+  if (!detail)
+    return ERROR_TRANSLATIONS[status] || `Error inesperado (${status}). Intenta de nuevo.`;
+
+  // FastAPI validation errors: detail is an array of { msg, loc, type, ... }
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    if (first && typeof first === 'object' && 'msg' in first) {
+      const msg = String(first.msg || '');
+      const translated = VALIDATION_TRANSLATIONS[msg] || msg;
+
+      // Add field context if available
+      const loc = (first as any).loc as string[] | undefined;
+      if (loc && loc.length > 0) {
+        const field = loc[loc.length - 1];
+        const label = FIELD_LABELS[field];
+        if (label) {
+          return `${label}: ${translated}`;
+        }
+      }
+      return translated;
+    }
+    return typeof first === 'string'
+      ? first
+      : ERROR_TRANSLATIONS[status] || `Error inesperado (${status}). Intenta de nuevo.`;
+  }
+
+  // Plain string detail — check against DETAIL_TRANSLATIONS first
+  if (typeof detail === 'string') return DETAIL_TRANSLATIONS[detail] || detail;
+
+  // Fallback
+  return ERROR_TRANSLATIONS[status] || `Error inesperado (${status}). Intenta de nuevo.`;
 }
 
 interface FetchOptions extends RequestInit {
@@ -68,7 +136,7 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
       const translated = getTranslatedError(res.status, detail);
       const apiError: ApiError = {
         status: res.status,
-        detail: detail || translated,
+        detail: translated,
         translatedMessage: translated,
       };
       throw apiError;
@@ -109,6 +177,7 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
     }
 
     // Network error
+    console.error('[apiFetch] Network error:', err);
     const apiError: ApiError = {
       status: 0,
       detail: err?.message || 'Error de conexión. Verifica tu internet.',
@@ -157,7 +226,7 @@ export async function apiUpload<T = any>(
       const translated = getTranslatedError(res.status, detail);
       const apiError: ApiError = {
         status: res.status,
-        detail: detail || translated,
+        detail: translated,
         translatedMessage: translated,
       };
       throw apiError;
@@ -177,6 +246,7 @@ export async function apiUpload<T = any>(
       } as ApiError;
     }
 
+    console.error('[apiUpload] Network error:', err);
     throw {
       status: 0,
       detail: err?.message || 'Error de conexión.',

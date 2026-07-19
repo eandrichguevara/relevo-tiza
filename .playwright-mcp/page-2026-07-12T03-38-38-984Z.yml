@@ -1,0 +1,26 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "RELEVO" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Datos que transforman
+    - form "Formulario de acceso" [ref=e8]:
+      - heading "Acceso RELEVO" [level=2] [ref=e9]
+      - alert [ref=e20]:
+        - generic [ref=e23]: Credenciales incorrectas. Verifica tu email y contraseña.
+        - button "Cerrar mensaje" [ref=e24] [cursor=pointer]
+      - generic [ref=e10]:
+        - generic [ref=e11]: Email
+        - textbox "Email" [ref=e12]:
+          - /placeholder: director@colegio.cl
+          - text: director-qa2@test.com
+      - generic [ref=e13]:
+        - generic [ref=e14]: Contraseña
+        - textbox "Contraseña" [ref=e15]:
+          - /placeholder: ••••••••
+          - text: Test123456
+      - button "Ingresar" [ref=e16] [cursor=pointer]
+      - paragraph [ref=e17]:
+        - text: ¿Primera vez?
+        - link "Solicitar demo" [ref=e18] [cursor=pointer]:
+          - /url: /register
+  - alert [ref=e19]

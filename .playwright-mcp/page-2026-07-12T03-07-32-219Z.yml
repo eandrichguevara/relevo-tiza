@@ -1,0 +1,66 @@
+- generic [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - complementary [ref=f4e3]:
+      - generic [ref=f4e4]:
+        - link "RELEVO" [ref=f4e5] [cursor=pointer]:
+          - /url: /dashboard
+        - paragraph [ref=f4e12]: Datos que transforman
+      - navigation [ref=f4e13]:
+        - link "Dashboard" [ref=f4e14] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Colegios" [ref=f4e20] [cursor=pointer]:
+          - /url: /dashboard/colegios
+        - link "Anal&iacute;tica" [ref=f4e26] [cursor=pointer]:
+          - /url: /dashboard/analitica
+        - link "Usuarios" [ref=f4e29] [cursor=pointer]:
+          - /url: /dashboard/usuarios
+        - link "Facturaci&oacute;n" [active] [ref=f4e35] [cursor=pointer]:
+          - /url: /dashboard/facturacion
+      - generic [ref=f4e38]:
+        - generic [ref=f4e39]:
+          - generic [ref=f4e40]: J
+          - generic [ref=f4e41]:
+            - paragraph [ref=f4e42]: Juan Pérez
+            - paragraph [ref=f4e43]: director@colegio.cl
+        - button "Cerrar sesión" [ref=f4e44] [cursor=pointer]
+    - main [ref=f4e48]:
+      - generic [ref=f4e186]:
+        - heading "Facturación" [level=1] [ref=f4e187]
+        - paragraph [ref=f4e188]: Gestión de planes y pagos
+        - generic [ref=f4e189]:
+          - generic [ref=f4e190]:
+            - heading "Plan actual" [level=3] [ref=f4e192]
+            - generic [ref=f4e193]:
+              - generic [ref=f4e194]: Profesional
+              - paragraph [ref=f4e195]: $4,500/año
+              - paragraph [ref=f4e196]: 3 colegios incluidos
+          - generic [ref=f4e197]:
+            - heading "Próximo cobro" [level=3] [ref=f4e199]
+            - generic [ref=f4e200]:
+              - paragraph [ref=f4e201]: 15 Ene 2027
+              - paragraph [ref=f4e202]: Renovación anual
+          - generic [ref=f4e203]:
+            - heading "Método de pago" [level=3] [ref=f4e205]
+            - generic [ref=f4e206]:
+              - paragraph [ref=f4e209]: Configuración próximamente
+              - button "Agregar método" [ref=f4e210] [cursor=pointer]
+        - generic [ref=f4e211]:
+          - heading "Historial de facturas" [level=3] [ref=f4e213]
+          - generic [ref=f4e215]:
+            - generic [ref=f4e216]:
+              - generic [ref=f4e217]:
+                - paragraph [ref=f4e218]: INV-001
+                - paragraph [ref=f4e219]: 15 Ene 2026
+              - generic [ref=f4e220]:
+                - generic [ref=f4e221]: $4,500
+                - generic [ref=f4e222]: Pagada
+                - button [ref=f4e223] [cursor=pointer]
+            - generic [ref=f4e227]:
+              - generic [ref=f4e228]:
+                - paragraph [ref=f4e229]: INV-002
+                - paragraph [ref=f4e230]: 15 Ene 2025
+              - generic [ref=f4e231]:
+                - generic [ref=f4e232]: $4,500
+                - generic [ref=f4e233]: Pagada
+                - button [ref=f4e234] [cursor=pointer]
+  - alert [ref=f4e55]

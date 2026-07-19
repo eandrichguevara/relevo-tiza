@@ -2,13 +2,23 @@
 
 import Link from 'next/link';
 import { Card, Spinner, Badge, EmptyState } from '@tiza/ui';
-import { FileText, Clock, CheckCircle, AlertTriangle, Plus, BarChart3 } from 'lucide-react';
+import {
+  FileText,
+  Clock,
+  CheckCircle,
+  AlertTriangle,
+  Plus,
+  BarChart3,
+  MessageCircle,
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDashboardStats } from '@/hooks/useApi';
+import { useFeatures } from '@/hooks/useFeatures';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const { data: stats, isLoading } = useDashboardStats();
+  const { features, isLoaded } = useFeatures();
 
   if (isLoading) {
     return (
@@ -114,6 +124,19 @@ export default function DashboardPage() {
           </Link>
         </div>
       </Card>
+
+      {/* Chat support — solo visible si feature flag chatSupport está activo */}
+      {isLoaded && features.chatSupport && (
+        <button
+          onClick={() => {
+            /* TODO: abrir widget de chat */
+          }}
+          className="fixed bottom-6 right-6 z-50 bg-brand-primary text-white p-4 rounded-full shadow-lg hover:bg-brand-accent transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2"
+          aria-label="Abrir chat de soporte"
+        >
+          <MessageCircle size={24} />
+        </button>
+      )}
     </div>
   );
 }

@@ -8,14 +8,23 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "prettier --write .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:tiza": "cd apps/tiza-web && vitest run",
+    "test:relevo": "cd apps/relevo-web && vitest run",
+    "test:ui": "cd packages/ui && vitest run",
     "db:migrate": "turbo db:migrate",
     "db:generate": "turbo db:generate"
   },
   "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
     "playwright": "^1.61.1",
     "prettier": "^3.3.0",
     "turbo": "^2.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.10"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

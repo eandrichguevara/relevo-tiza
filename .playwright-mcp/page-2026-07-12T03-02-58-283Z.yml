@@ -1,0 +1,6 @@
+- generic [ref=f1e3]:
+  - heading "404" [level=1] [ref=f1e4]
+  - heading "Página no encontrada" [level=2] [ref=f1e5]
+  - paragraph [ref=f1e6]: La página que buscas no existe o fue movida. Revisa la URL o vuelve al inicio.
+  - link "Volver al inicio" [ref=f1e7] [cursor=pointer]:
+    - /url: /

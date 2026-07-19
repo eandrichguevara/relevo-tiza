@@ -1,0 +1,645 @@
+- generic [ref=f54e4]:
+  - generic [ref=f54e7]:
+    - generic [ref=f54e8]:
+      - heading "RELEVO + TIZA API 0.1.0 OAS 3.1" [level=1] [ref=f54e9]:
+        - text: RELEVO + TIZA API
+        - generic [ref=f54e10]:
+          - generic [ref=f54e11]: 0.1.0
+          - generic [ref=f54e13]: OAS 3.1
+      - link "/openapi.json" [ref=f54e15] [cursor=pointer]:
+        - /url: /openapi.json
+    - paragraph [ref=f54e19]: Backend unificado para RELEVO (B2B) y TIZA (B2C)
+  - button "Authorize" [ref=f54e23] [cursor=pointer]
+  - generic [ref=f54e29]:
+    - generic [ref=f54e31]:
+      - heading [level=3] [ref=f54e32] [cursor=pointer]:
+        - link "Auth" [ref=f54e33]:
+          - /url: "#/Auth"
+        - button "Collapse operation" [expanded] [ref=f54e34]
+      - generic [ref=f54e38]:
+        - generic [ref=f54e40]:
+          - generic [ref=f54e41] [cursor=pointer]:
+            - button "POST /api/auth/register Register" [expanded] [active] [ref=f54e42]:
+              - generic [ref=f54e43]: POST
+              - generic [ref=f54e44]:
+                - link [ref=f54e46]:
+                  - /url: "#/Auth/register_api_auth_register_post"
+                - generic [ref=f54e48]: Register
+            - generic "Copy to clipboard" [ref=f54e1050]
+            - button "post /api/auth/register" [expanded] [ref=f54e51]
+          - generic [ref=f54e1055]:
+            - generic [ref=f54e1058]:
+              - paragraph [ref=f54e1059]: Register a new user.
+              - list [ref=f54e1060]:
+                - listitem [ref=f54e1061]:
+                  - text: "TEACHER: requires an existing"
+                  - code [ref=f54e1062]: tenant_id
+                  - text: in body.
+                - listitem [ref=f54e1063]:
+                  - text: "HOLDER/ADMIN: creates a default tenant when"
+                  - code [ref=f54e1064]: tenant_id
+                  - text: is omitted.
+            - generic [ref=f54e1065]:
+              - generic [ref=f54e1066]:
+                - heading "Parameters" [level=4] [ref=f54e1069] [cursor=pointer]
+                - button "Try it out" [ref=f54e1071] [cursor=pointer]
+              - paragraph [ref=f54e1074]: No parameters
+              - generic [ref=f54e1075]:
+                - generic [ref=f54e1076]:
+                  - heading "Request bodyrequired" [level=4] [ref=f54e1077]
+                  - combobox "Request content type" [ref=f54e1080]:
+                    - option "application/json" [selected]
+                - generic [ref=f54e1083]:
+                  - tablist [ref=f54e1084]:
+                    - tab "Example Value" [selected] [ref=f54e1085] [cursor=pointer]
+                    - tab "Schema" [ref=f54e1086] [cursor=pointer]
+                  - tabpanel "Example Value" [ref=f54e1087]:
+                    - code [ref=f54e1090]: "{ \"email\": \"string\", \"password\": \"string\", \"name\": \"string\", \"role\": \"string\", \"school\": \"string\", \"tenant_id\": \"string\", \"join_code\": \"string\" }"
+            - generic [ref=f54e1092]:
+              - heading "Responses" [level=4] [ref=f54e1094]
+              - region [ref=f54e1096]:
+                - rowgroup [ref=f54e1097]:
+                  - row [ref=f54e1098]:
+                    - cell "Code" [ref=f54e1099]
+                    - cell "Description" [ref=f54e1100]
+                    - cell "Links" [ref=f54e1101]
+                - rowgroup [ref=f54e1102]:
+                  - row [ref=f54e1103]:
+                    - cell "201" [ref=f54e1104]
+                    - cell "Successful Response Media type application/json Controls Accept header. Example Value" [ref=f54e1105]:
+                      - paragraph [ref=f54e1108]: Successful Response
+                      - generic [ref=f54e1110]:
+                        - generic [ref=f54e1111]: Media type
+                        - combobox "Media Type" [ref=f54e1113]:
+                          - option "application/json" [selected]
+                        - generic [ref=f54e1114]:
+                          - text: Controls
+                          - code [ref=f54e1115]: Accept
+                          - text: header.
+                      - generic [ref=f54e1116]:
+                        - tablist [ref=f54e1117]:
+                          - tab "Example Value" [selected] [ref=f54e1118] [cursor=pointer]
+                          - tab "Schema" [ref=f54e1119] [cursor=pointer]
+                        - tabpanel "Example Value" [ref=f54e1120]:
+                          - code [ref=f54e1124]: "{ \"id\": \"string\", \"email\": \"string\", \"name\": \"string\", \"role\": \"TEACHER\", \"tenant_id\": \"string\", \"created_at\": \"2026-07-12T18:36:30.576Z\" }"
+                    - cell "No links" [ref=f54e1125]
+                  - row [ref=f54e1126]:
+                    - cell "422" [ref=f54e1127]
+                    - cell "Validation Error Media type application/json Example Value" [ref=f54e1128]:
+                      - paragraph [ref=f54e1131]: Validation Error
+                      - generic [ref=f54e1133]:
+                        - generic [ref=f54e1134]: Media type
+                        - combobox "Media Type" [ref=f54e1136]:
+                          - option "application/json" [selected]
+                      - generic [ref=f54e1137]:
+                        - tablist [ref=f54e1138]:
+                          - tab "Example Value" [selected] [ref=f54e1139] [cursor=pointer]
+                          - tab "Schema" [ref=f54e1140] [cursor=pointer]
+                        - tabpanel "Example Value" [ref=f54e1141]:
+                          - code [ref=f54e1145]: "{ \"detail\": [ { \"loc\": [ \"string\", 0 ], \"msg\": \"string\", \"type\": \"string\", \"input\": \"string\", \"ctx\": {} } ] }"
+                    - cell "No links" [ref=f54e1146]
+        - generic [ref=f54e56] [cursor=pointer]:
+          - button "POST /api/auth/login Login" [ref=f54e57]:
+            - generic [ref=f54e58]: POST
+            - generic [ref=f54e59]:
+              - link [ref=f54e61]:
+                - /url: "#/Auth/login_api_auth_login_post"
+              - generic [ref=f54e63]: Login
+          - generic "Copy to clipboard"
+          - button "post /api/auth/login" [ref=f54e66]
+        - generic [ref=f54e71] [cursor=pointer]:
+          - button "GET /api/auth/me Get Me" [ref=f54e72]:
+            - generic [ref=f54e73]: GET
+            - generic [ref=f54e74]:
+              - link [ref=f54e76]:
+                - /url: "#/Auth/get_me_api_auth_me_get"
+              - generic [ref=f54e78]: Get Me
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e81]
+          - button "get /api/auth/me" [ref=f54e84]
+    - generic [ref=f54e88]:
+      - heading [level=3] [ref=f54e89] [cursor=pointer]:
+        - link "Evaluations" [ref=f54e90]:
+          - /url: "#/Evaluations"
+        - button "Collapse operation" [expanded] [ref=f54e91]
+      - generic [ref=f54e95]:
+        - generic [ref=f54e98] [cursor=pointer]:
+          - button "POST /api/evaluations Create Evaluation" [ref=f54e99]:
+            - generic [ref=f54e100]: POST
+            - generic [ref=f54e101]:
+              - link [ref=f54e103]:
+                - /url: "#/Evaluations/create_evaluation_api_evaluations_post"
+              - generic [ref=f54e105]: Create Evaluation
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e108]
+          - button "post /api/evaluations" [ref=f54e111]
+        - generic [ref=f54e116] [cursor=pointer]:
+          - button "GET /api/evaluations List Evaluations" [ref=f54e117]:
+            - generic [ref=f54e118]: GET
+            - generic [ref=f54e119]:
+              - link [ref=f54e121]:
+                - /url: "#/Evaluations/list_evaluations_api_evaluations_get"
+              - generic [ref=f54e123]: List Evaluations
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e126]
+          - button "get /api/evaluations" [ref=f54e129]
+        - generic [ref=f54e134] [cursor=pointer]:
+          - 'button "GET /api/evaluations/{evaluation_id} Get Evaluation" [ref=f54e135]':
+            - generic [ref=f54e136]: GET
+            - generic [ref=f54e137]:
+              - link [ref=f54e139]:
+                - /url: "#/Evaluations/get_evaluation_api_evaluations__evaluation_id__get"
+              - generic [ref=f54e141]: Get Evaluation
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e144]
+          - 'button "get /api/evaluations/{evaluation_id}" [ref=f54e147]'
+        - generic [ref=f54e152] [cursor=pointer]:
+          - 'button "DELETE /api/evaluations/{evaluation_id} Delete Evaluation" [ref=f54e153]':
+            - generic [ref=f54e154]: DELETE
+            - generic [ref=f54e155]:
+              - link [ref=f54e157]:
+                - /url: "#/Evaluations/delete_evaluation_api_evaluations__evaluation_id__delete"
+              - generic [ref=f54e159]: Delete Evaluation
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e162]
+          - 'button "delete /api/evaluations/{evaluation_id}" [ref=f54e165]'
+        - generic [ref=f54e170] [cursor=pointer]:
+          - 'button "GET /api/evaluations/{evaluation_id}/pdf Generate Pdf" [ref=f54e171]':
+            - generic [ref=f54e172]: GET
+            - generic [ref=f54e173]:
+              - link [ref=f54e175]:
+                - /url: "#/Evaluations/generate_pdf_api_evaluations__evaluation_id__pdf_get"
+              - generic [ref=f54e177]: Generate Pdf
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e180]
+          - 'button "get /api/evaluations/{evaluation_id}/pdf" [ref=f54e183]'
+        - generic [ref=f54e188] [cursor=pointer]:
+          - 'button "POST /api/evaluations/{evaluation_id}/process Process Scanned" [ref=f54e189]':
+            - generic [ref=f54e190]: POST
+            - generic [ref=f54e191]:
+              - link [ref=f54e193]:
+                - /url: "#/Evaluations/process_scanned_api_evaluations__evaluation_id__process_post"
+              - generic [ref=f54e195]: Process Scanned
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e198]
+          - 'button "post /api/evaluations/{evaluation_id}/process" [ref=f54e201]'
+        - generic [ref=f54e206] [cursor=pointer]:
+          - 'button "GET /api/evaluations/{evaluation_id}/answer-sheet/{course_id} Generate Answer Sheet" [ref=f54e207]':
+            - generic [ref=f54e208]: GET
+            - generic [ref=f54e209]:
+              - link [ref=f54e211]:
+                - /url: "#/Evaluations/generate_answer_sheet_api_evaluations__evaluation_id__answer_sheet__course_id__get"
+              - generic [ref=f54e213]: Generate Answer Sheet
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e216]
+          - 'button "get /api/evaluations/{evaluation_id}/answer-sheet/{course_id}" [ref=f54e219]'
+        - generic [ref=f54e224] [cursor=pointer]:
+          - 'button "POST /api/evaluations/{evaluation_id}/simulate/{course_id} Simulate Answers" [ref=f54e225]':
+            - generic [ref=f54e226]: POST
+            - generic [ref=f54e227]:
+              - link [ref=f54e229]:
+                - /url: "#/Evaluations/simulate_answers_api_evaluations__evaluation_id__simulate__course_id__post"
+              - generic [ref=f54e231]: Simulate Answers
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e234]
+          - 'button "post /api/evaluations/{evaluation_id}/simulate/{course_id}" [ref=f54e237]'
+    - generic [ref=f54e241]:
+      - heading [level=3] [ref=f54e242] [cursor=pointer]:
+        - link "Results" [ref=f54e243]:
+          - /url: "#/Results"
+        - button "Collapse operation" [expanded] [ref=f54e244]
+      - generic [ref=f54e248]:
+        - generic [ref=f54e251] [cursor=pointer]:
+          - 'button "GET /api/results/evaluation/{evaluation_id} List Results" [ref=f54e252]':
+            - generic [ref=f54e253]: GET
+            - generic [ref=f54e254]:
+              - link [ref=f54e256]:
+                - /url: "#/Results/list_results_api_results_evaluation__evaluation_id__get"
+              - generic [ref=f54e258]: List Results
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e261]
+          - 'button "get /api/results/evaluation/{evaluation_id}" [ref=f54e264]'
+        - generic [ref=f54e269] [cursor=pointer]:
+          - button "GET /api/results/pending-review Get Pending Reviews" [ref=f54e270]:
+            - generic [ref=f54e271]: GET
+            - generic [ref=f54e272]:
+              - link [ref=f54e274]:
+                - /url: "#/Results/get_pending_reviews_api_results_pending_review_get"
+              - generic [ref=f54e276]: Get Pending Reviews
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e279]
+          - button "get /api/results/pending-review" [ref=f54e282]
+        - generic [ref=f54e287] [cursor=pointer]:
+          - 'button "GET /api/results/{result_id} Get Result" [ref=f54e288]':
+            - generic [ref=f54e289]: GET
+            - generic [ref=f54e290]:
+              - link [ref=f54e292]:
+                - /url: "#/Results/get_result_api_results__result_id__get"
+              - generic [ref=f54e294]: Get Result
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e297]
+          - 'button "get /api/results/{result_id}" [ref=f54e300]'
+        - generic [ref=f54e305] [cursor=pointer]:
+          - 'button "POST /api/results/{result_id}/review Review Result" [ref=f54e306]':
+            - generic [ref=f54e307]: POST
+            - generic [ref=f54e308]:
+              - link [ref=f54e310]:
+                - /url: "#/Results/review_result_api_results__result_id__review_post"
+              - generic [ref=f54e312]: Review Result
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e315]
+          - 'button "post /api/results/{result_id}/review" [ref=f54e318]'
+        - generic [ref=f54e323] [cursor=pointer]:
+          - 'button "GET /api/results/{result_id}/report Generate Report" [ref=f54e324]':
+            - generic [ref=f54e325]: GET
+            - generic [ref=f54e326]:
+              - link [ref=f54e328]:
+                - /url: "#/Results/generate_report_api_results__result_id__report_get"
+              - generic [ref=f54e330]: Generate Report
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e333]
+          - 'button "get /api/results/{result_id}/report" [ref=f54e336]'
+    - generic [ref=f54e340]:
+      - heading [level=3] [ref=f54e341] [cursor=pointer]:
+        - link "Dashboard" [ref=f54e342]:
+          - /url: "#/Dashboard"
+        - button "Collapse operation" [expanded] [ref=f54e343]
+      - generic [ref=f54e347]:
+        - generic [ref=f54e350] [cursor=pointer]:
+          - button "GET /api/dashboard/teacher Teacher Dashboard" [ref=f54e351]:
+            - generic [ref=f54e352]: GET
+            - generic [ref=f54e353]:
+              - link [ref=f54e355]:
+                - /url: "#/Dashboard/teacher_dashboard_api_dashboard_teacher_get"
+              - generic [ref=f54e357]: Teacher Dashboard
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e360]
+          - button "get /api/dashboard/teacher" [ref=f54e363]
+        - generic [ref=f54e368] [cursor=pointer]:
+          - button "GET /api/dashboard/executive Executive Dashboard" [ref=f54e369]:
+            - generic [ref=f54e370]: GET
+            - generic [ref=f54e371]:
+              - link [ref=f54e373]:
+                - /url: "#/Dashboard/executive_dashboard_api_dashboard_executive_get"
+              - generic [ref=f54e375]: Executive Dashboard
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e378]
+          - button "get /api/dashboard/executive" [ref=f54e381]
+        - generic [ref=f54e386] [cursor=pointer]:
+          - 'button "GET /api/dashboard/course/{course_id} Course Stats" [ref=f54e387]':
+            - generic [ref=f54e388]: GET
+            - generic [ref=f54e389]:
+              - link [ref=f54e391]:
+                - /url: "#/Dashboard/course_stats_api_dashboard_course__course_id__get"
+              - generic [ref=f54e393]: Course Stats
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e396]
+          - 'button "get /api/dashboard/course/{course_id}" [ref=f54e399]'
+    - generic [ref=f54e403]:
+      - heading [level=3] [ref=f54e404] [cursor=pointer]:
+        - link "Courses" [ref=f54e405]:
+          - /url: "#/Courses"
+        - button "Collapse operation" [expanded] [ref=f54e406]
+      - generic [ref=f54e410]:
+        - generic [ref=f54e413] [cursor=pointer]:
+          - button "GET /api/courses List Courses" [ref=f54e414]:
+            - generic [ref=f54e415]: GET
+            - generic [ref=f54e416]:
+              - link [ref=f54e418]:
+                - /url: "#/Courses/list_courses_api_courses_get"
+              - generic [ref=f54e420]: List Courses
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e423]
+          - button "get /api/courses" [ref=f54e426]
+        - generic [ref=f54e431] [cursor=pointer]:
+          - button "POST /api/courses Create Course" [ref=f54e432]:
+            - generic [ref=f54e433]: POST
+            - generic [ref=f54e434]:
+              - link [ref=f54e436]:
+                - /url: "#/Courses/create_course_api_courses_post"
+              - generic [ref=f54e438]: Create Course
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e441]
+          - button "post /api/courses" [ref=f54e444]
+        - generic [ref=f54e449] [cursor=pointer]:
+          - 'button "GET /api/courses/{course_id} Get Course" [ref=f54e450]':
+            - generic [ref=f54e451]: GET
+            - generic [ref=f54e452]:
+              - link [ref=f54e454]:
+                - /url: "#/Courses/get_course_api_courses__course_id__get"
+              - generic [ref=f54e456]: Get Course
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e459]
+          - 'button "get /api/courses/{course_id}" [ref=f54e462]'
+        - generic [ref=f54e467] [cursor=pointer]:
+          - 'button "DELETE /api/courses/{course_id} Delete Course" [ref=f54e468]':
+            - generic [ref=f54e469]: DELETE
+            - generic [ref=f54e470]:
+              - link [ref=f54e472]:
+                - /url: "#/Courses/delete_course_api_courses__course_id__delete"
+              - generic [ref=f54e474]: Delete Course
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e477]
+          - 'button "delete /api/courses/{course_id}" [ref=f54e480]'
+    - generic [ref=f54e484]:
+      - heading [level=3] [ref=f54e485] [cursor=pointer]:
+        - link "Students" [ref=f54e486]:
+          - /url: "#/Students"
+        - button "Collapse operation" [expanded] [ref=f54e487]
+      - generic [ref=f54e491]:
+        - generic [ref=f54e494] [cursor=pointer]:
+          - 'button "POST /api/students/course/{course_id} Bulk Create Students" [ref=f54e495]':
+            - generic [ref=f54e496]: POST
+            - generic [ref=f54e497]:
+              - link [ref=f54e499]:
+                - /url: "#/Students/bulk_create_students_api_students_course__course_id__post"
+              - generic [ref=f54e501]: Bulk Create Students
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e504]
+          - 'button "post /api/students/course/{course_id}" [ref=f54e507]'
+        - generic [ref=f54e512] [cursor=pointer]:
+          - 'button "GET /api/students/course/{course_id} List Students" [ref=f54e513]':
+            - generic [ref=f54e514]: GET
+            - generic [ref=f54e515]:
+              - link [ref=f54e517]:
+                - /url: "#/Students/list_students_api_students_course__course_id__get"
+              - generic [ref=f54e519]: List Students
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e522]
+          - 'button "get /api/students/course/{course_id}" [ref=f54e525]'
+        - generic [ref=f54e530] [cursor=pointer]:
+          - 'button "DELETE /api/students/{student_id} Delete Student" [ref=f54e531]':
+            - generic [ref=f54e532]: DELETE
+            - generic [ref=f54e533]:
+              - link [ref=f54e535]:
+                - /url: "#/Students/delete_student_api_students__student_id__delete"
+              - generic [ref=f54e537]: Delete Student
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e540]
+          - 'button "delete /api/students/{student_id}" [ref=f54e543]'
+    - generic [ref=f54e547]:
+      - heading [level=3] [ref=f54e548] [cursor=pointer]:
+        - link "Tenants" [ref=f54e549]:
+          - /url: "#/Tenants"
+        - button "Collapse operation" [expanded] [ref=f54e550]
+      - generic [ref=f54e554]:
+        - generic [ref=f54e556]:
+          - generic [ref=f54e557] [cursor=pointer]:
+            - button "GET /api/tenants List Tenants" [expanded] [ref=f54e558]:
+              - generic [ref=f54e559]: GET
+              - generic [ref=f54e560]:
+                - link [ref=f54e562]:
+                  - /url: "#/Tenants/list_tenants_api_tenants_get"
+                - generic [ref=f54e564]: List Tenants
+            - generic "Copy to clipboard"
+            - button "authorization button unlocked" [ref=f54e567]
+            - button "get /api/tenants" [expanded] [ref=f54e570]
+          - generic [ref=f54e949]:
+            - generic [ref=f54e952]:
+              - paragraph [ref=f54e953]: List tenants accessible to the current HOLDER.
+              - paragraph [ref=f54e954]: "SECURITY: Only returns tenants where the HOLDER (or ADMIN) is a member of, enforcing tenant isolation."
+            - generic [ref=f54e955]:
+              - generic [ref=f54e956]:
+                - heading "Parameters" [level=4] [ref=f54e959] [cursor=pointer]
+                - button "Cancel" [ref=f54e1004] [cursor=pointer]
+              - paragraph [ref=f54e964]: No parameters
+            - generic [ref=f54e965]:
+              - button "Execute" [ref=f54e1005] [cursor=pointer]
+              - button "Clear" [ref=f54e1006] [cursor=pointer]
+            - generic [ref=f54e966]:
+              - heading "Responses" [level=4] [ref=f54e968]
+              - generic [ref=f54e969]:
+                - generic [ref=f54e1007]:
+                  - generic [ref=f54e1008]:
+                    - generic [ref=f54e1009]:
+                      - heading "Curl" [level=4] [ref=f54e1010]
+                      - button [ref=f54e1012] [cursor=pointer]
+                      - code [ref=f54e1015]: "curl -X 'GET' \\ 'http://localhost:8000/api/tenants' \\ -H 'accept: application/json'"
+                    - generic [ref=f54e1017]:
+                      - heading "Request URL" [level=4] [ref=f54e1018]
+                      - generic [ref=f54e1019]: http://localhost:8000/api/tenants
+                    - heading "Server response" [level=4] [ref=f54e1020]
+                    - table [ref=f54e1021]:
+                      - rowgroup [ref=f54e1022]:
+                        - row [ref=f54e1023]:
+                          - cell "Code" [ref=f54e1024]
+                          - cell "Details" [ref=f54e1025]
+                      - rowgroup [ref=f54e1026]:
+                        - row [ref=f54e1027]:
+                          - cell "401 Undocumented" [ref=f54e1028]:
+                            - text: "401"
+                            - generic [ref=f54e1029]: Undocumented
+                          - 'cell "Error: Unauthorized Response body Download { \"detail\": \"Not authenticated\" } Response headers content-length: 30 content-type: application/json date: Sun,12 Jul 2026 18:35:27 GMT server: uvicorn www-authenticate: Bearer" [ref=f54e1030]':
+                            - paragraph [ref=f54e1032]: "Error: Unauthorized"
+                            - generic [ref=f54e1033]:
+                              - heading "Response body" [level=5] [ref=f54e1034]
+                              - generic [ref=f54e1035]:
+                                - button [ref=f54e1037] [cursor=pointer]
+                                - button "Download" [ref=f54e1038] [cursor=pointer]
+                                - code [ref=f54e1040]: "{ \"detail\": \"Not authenticated\" }"
+                            - generic [ref=f54e1041]:
+                              - heading "Response headers" [level=5] [ref=f54e1042]
+                              - generic [ref=f54e1043]:
+                                - generic [ref=f54e1044]: "content-length: 30"
+                                - generic [ref=f54e1045]: "content-type: application/json"
+                                - generic [ref=f54e1046]: "date: Sun,12 Jul 2026 18:35:27 GMT"
+                                - generic [ref=f54e1047]: "server: uvicorn"
+                                - generic [ref=f54e1048]: "www-authenticate: Bearer"
+                  - heading "Responses" [level=4] [ref=f54e1049]
+                - region [ref=f54e970]:
+                  - rowgroup [ref=f54e971]:
+                    - row [ref=f54e972]:
+                      - cell "Code" [ref=f54e973]
+                      - cell "Description" [ref=f54e974]
+                      - cell "Links" [ref=f54e975]
+                  - rowgroup [ref=f54e976]:
+                    - row [ref=f54e977]:
+                      - cell "200" [ref=f54e978]
+                      - cell "Successful Response Media type application/json Controls Accept header. Example Value" [ref=f54e979]:
+                        - paragraph [ref=f54e982]: Successful Response
+                        - generic [ref=f54e984]:
+                          - generic [ref=f54e985]: Media type
+                          - combobox "Media Type" [ref=f54e987]:
+                            - option "application/json" [selected]
+                          - generic [ref=f54e988]:
+                            - text: Controls
+                            - code [ref=f54e989]: Accept
+                            - text: header.
+                        - generic [ref=f54e990]:
+                          - tablist [ref=f54e991]:
+                            - tab "Example Value" [selected] [ref=f54e992] [cursor=pointer]
+                            - tab "Schema" [ref=f54e993] [cursor=pointer]
+                          - tabpanel "Example Value" [ref=f54e994]:
+                            - code [ref=f54e998]: "[ { \"id\": \"string\", \"name\": \"string\", \"subdomain\": \"string\", \"brand\": \"string\", \"join_code\": \"string\", \"settings\": {}, \"created_at\": \"2026-07-12T18:36:30.603Z\", \"updated_at\": \"2026-07-12T18:36:30.603Z\" } ]"
+                      - cell "No links" [ref=f54e999]
+        - generic [ref=f54e575] [cursor=pointer]:
+          - button "POST /api/tenants Create Tenant" [ref=f54e576]:
+            - generic [ref=f54e577]: POST
+            - generic [ref=f54e578]:
+              - link [ref=f54e580]:
+                - /url: "#/Tenants/create_tenant_api_tenants_post"
+              - generic [ref=f54e582]: Create Tenant
+          - generic "Copy to clipboard"
+          - button "authorization button unlocked" [ref=f54e585]
+          - button "post /api/tenants" [ref=f54e588]
+        - generic [ref=f54e593] [cursor=pointer]:
+          - button "GET /api/tenants/lookup Lookup Tenant" [ref=f54e594]:
+            - generic [ref=f54e595]: GET
+            - generic [ref=f54e596]:
+              - link [ref=f54e598]:
+                - /url: "#/Tenants/lookup_tenant_api_tenants_lookup_get"
+              - generic [ref=f54e600]: Lookup Tenant
+          - generic "Copy to clipboard"
+          - button "get /api/tenants/lookup" [ref=f54e603]
+    - heading [level=3] [ref=f54e1000] [cursor=pointer]:
+      - link "Users" [ref=f54e609]:
+        - /url: "#/Users"
+      - button "Expand operation" [ref=f54e1001]
+    - generic [ref=f54e652]:
+      - heading [level=3] [ref=f54e653] [cursor=pointer]:
+        - link "default" [ref=f54e654]:
+          - /url: "#/default"
+        - button "Collapse operation" [expanded] [ref=f54e655]
+      - generic [ref=f54e662] [cursor=pointer]:
+        - button "GET /api/health Health" [ref=f54e663]:
+          - generic [ref=f54e664]: GET
+          - generic [ref=f54e665]:
+            - link [ref=f54e667]:
+              - /url: "#/default/health_api_health_get"
+            - generic [ref=f54e669]: Health
+        - generic "Copy to clipboard"
+        - button "get /api/health" [ref=f54e672]
+  - generic [ref=f54e677]:
+    - heading [level=4] [ref=f54e678] [cursor=pointer]:
+      - button "Schemas" [expanded] [ref=f54e679]
+    - generic [ref=f54e683]:
+      - article [ref=f54e684]:
+        - generic [ref=f54e685]:
+          - button "Body_process_scanned_api_evaluations__evaluation_id__process_post" [ref=f54e686] [cursor=pointer]
+          - button "Expand all" [ref=f54e692] [cursor=pointer]
+          - strong [ref=f54e693]: object
+      - article [ref=f54e694]:
+        - generic [ref=f54e695]:
+          - button "BulkCreateStudentsRequest" [ref=f54e696] [cursor=pointer]
+          - button "Expand all" [ref=f54e702] [cursor=pointer]
+          - strong [ref=f54e703]: object
+      - article [ref=f54e704]:
+        - generic [ref=f54e705]:
+          - button "BulkCreateStudentsResponse" [ref=f54e706] [cursor=pointer]
+          - button "Expand all" [ref=f54e712] [cursor=pointer]
+          - strong [ref=f54e713]: object
+      - article [ref=f54e714]:
+        - generic [ref=f54e715]:
+          - button "CourseResponse" [ref=f54e716] [cursor=pointer]
+          - button "Expand all" [ref=f54e722] [cursor=pointer]
+          - strong [ref=f54e723]: object
+      - article [ref=f54e724]:
+        - generic [ref=f54e725]:
+          - button "CreateCourseRequest" [ref=f54e726] [cursor=pointer]
+          - button "Expand all" [ref=f54e732] [cursor=pointer]
+          - strong [ref=f54e733]: object
+      - article [ref=f54e734]:
+        - generic [ref=f54e735]:
+          - button "CreateEvaluationRequest" [ref=f54e736] [cursor=pointer]
+          - button "Expand all" [ref=f54e742] [cursor=pointer]
+          - strong [ref=f54e743]: object
+      - article [ref=f54e744]:
+        - generic [ref=f54e745]:
+          - button "CreateTenantRequest" [ref=f54e746] [cursor=pointer]
+          - button "Expand all" [ref=f54e752] [cursor=pointer]
+          - strong [ref=f54e753]: object
+      - article [ref=f54e754]:
+        - generic [ref=f54e755]:
+          - button "CreateUserRequest" [ref=f54e756] [cursor=pointer]
+          - button "Expand all" [ref=f54e762] [cursor=pointer]
+          - strong [ref=f54e763]: object
+      - article [ref=f54e764]:
+        - generic [ref=f54e765]:
+          - button "DashboardStatsResponse" [ref=f54e766] [cursor=pointer]
+          - button "Expand all" [ref=f54e772] [cursor=pointer]
+          - strong [ref=f54e773]: object
+      - article [ref=f54e774]:
+        - generic [ref=f54e775]:
+          - button "EvaluationResponse" [ref=f54e776] [cursor=pointer]
+          - button "Expand all" [ref=f54e782] [cursor=pointer]
+          - strong [ref=f54e783]: object
+      - article [ref=f54e784]:
+        - generic [ref=f54e785]:
+          - button "HTTPValidationError" [ref=f54e786] [cursor=pointer]
+          - button "Expand all" [ref=f54e792] [cursor=pointer]
+          - strong [ref=f54e793]: object
+      - article [ref=f54e794]:
+        - generic [ref=f54e795]:
+          - button "LoginRequest" [ref=f54e796] [cursor=pointer]
+          - button "Expand all" [ref=f54e802] [cursor=pointer]
+          - strong [ref=f54e803]: object
+      - article [ref=f54e804]:
+        - generic [ref=f54e805]:
+          - button "MacroStatsResponse" [ref=f54e806] [cursor=pointer]
+          - button "Expand all" [ref=f54e812] [cursor=pointer]
+          - strong [ref=f54e813]: object
+      - article [ref=f54e814]:
+        - generic [ref=f54e815]:
+          - button "QuestionTypeEnum" [ref=f54e816] [cursor=pointer]
+          - button "Expand all" [ref=f54e822] [cursor=pointer]
+          - strong [ref=f54e823]: string
+      - article [ref=f54e824]:
+        - generic [ref=f54e825]:
+          - button "RegisterRequest" [ref=f54e826] [cursor=pointer]
+          - button "Expand all" [ref=f54e832] [cursor=pointer]
+          - strong [ref=f54e833]: object
+      - article [ref=f54e834]:
+        - generic [ref=f54e835]:
+          - button "ResultResponse" [ref=f54e836] [cursor=pointer]
+          - button "Expand all" [ref=f54e842] [cursor=pointer]
+          - strong [ref=f54e843]: object
+      - article [ref=f54e844]:
+        - generic [ref=f54e845]:
+          - button "ReviewRequest" [ref=f54e846] [cursor=pointer]
+          - button "Expand all" [ref=f54e852] [cursor=pointer]
+          - strong [ref=f54e853]: object
+      - article [ref=f54e854]:
+        - generic [ref=f54e855]:
+          - button "RoleEnum" [ref=f54e856] [cursor=pointer]
+          - button "Expand all" [ref=f54e862] [cursor=pointer]
+          - strong [ref=f54e863]: string
+      - article [ref=f54e864]:
+        - generic [ref=f54e865]:
+          - button "RubricItem" [ref=f54e866] [cursor=pointer]
+          - button "Expand all" [ref=f54e872] [cursor=pointer]
+          - strong [ref=f54e873]: object
+      - article [ref=f54e874]:
+        - generic [ref=f54e875]:
+          - button "StudentAnswer" [ref=f54e876] [cursor=pointer]
+          - button "Expand all" [ref=f54e882] [cursor=pointer]
+          - strong [ref=f54e883]: object
+      - article [ref=f54e884]:
+        - generic [ref=f54e885]:
+          - button "StudentResponse" [ref=f54e886] [cursor=pointer]
+          - button "Expand all" [ref=f54e892] [cursor=pointer]
+          - strong [ref=f54e893]: object
+      - article [ref=f54e894]:
+        - generic [ref=f54e895]:
+          - button "TenantLookupResponse" [ref=f54e896] [cursor=pointer]
+          - button "Expand all" [ref=f54e902] [cursor=pointer]
+          - strong [ref=f54e903]: object
+      - article [ref=f54e904]:
+        - generic [ref=f54e905]:
+          - button "TenantResponse" [ref=f54e906] [cursor=pointer]
+          - button "Expand all" [ref=f54e912] [cursor=pointer]
+          - strong [ref=f54e913]: object
+      - article [ref=f54e914]:
+        - generic [ref=f54e915]:
+          - button "TokenResponse" [ref=f54e916] [cursor=pointer]
+          - button "Expand all" [ref=f54e922] [cursor=pointer]
+          - strong [ref=f54e923]: object
+      - article [ref=f54e924]:
+        - generic [ref=f54e925]:
+          - button "UserResponse" [ref=f54e926] [cursor=pointer]
+          - button "Expand all" [ref=f54e932] [cursor=pointer]
+          - strong [ref=f54e933]: object
+      - article [ref=f54e934]:
+        - generic [ref=f54e935]:
+          - button "ValidationError" [ref=f54e936] [cursor=pointer]
+          - button "Expand all" [ref=f54e942] [cursor=pointer]
+          - strong [ref=f54e943]: object

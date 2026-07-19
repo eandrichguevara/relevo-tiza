@@ -34,7 +34,7 @@ async def create_course(
 
 @router.get("/subjects")
 async def list_subjects():
-    """Return the list of available subjects (hardcoded: Lenguaje and Matemáticas)."""
+    """Return the list of available subjects (coincide con SUBJECTS del frontend relevo-web)."""
     return {"subjects": [s.value for s in SubjectEnum]}
 
 

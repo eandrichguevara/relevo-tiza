@@ -1,0 +1,46 @@
+- generic [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - complementary [ref=f4e3]:
+      - generic [ref=f4e4]:
+        - link "RELEVO" [ref=f4e5] [cursor=pointer]:
+          - /url: /dashboard
+        - paragraph [ref=f4e12]: Datos que transforman
+      - navigation [ref=f4e13]:
+        - link "Dashboard" [active] [ref=f4e14] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Colegios" [ref=f4e20] [cursor=pointer]:
+          - /url: /dashboard/colegios
+        - link "Anal&iacute;tica" [ref=f4e26] [cursor=pointer]:
+          - /url: /dashboard/analitica
+        - link "Usuarios" [ref=f4e29] [cursor=pointer]:
+          - /url: /dashboard/usuarios
+        - link "Facturaci&oacute;n" [ref=f4e35] [cursor=pointer]:
+          - /url: /dashboard/facturacion
+      - generic [ref=f4e38]:
+        - generic [ref=f4e39]:
+          - generic [ref=f4e40]: J
+          - generic [ref=f4e41]:
+            - paragraph [ref=f4e42]: Juan Pérez
+            - paragraph [ref=f4e43]: director@colegio.cl
+        - button "Cerrar sesión" [ref=f4e44] [cursor=pointer]
+    - main [ref=f4e48]:
+      - generic [ref=f4e238]:
+        - heading "Dashboard ejecutivo" [level=1] [ref=f4e239]
+        - paragraph [ref=f4e240]: Visión general de todos tus colegios
+        - generic [ref=f4e241]:
+          - generic [ref=f4e250]:
+            - paragraph [ref=f4e251]: "5"
+            - paragraph [ref=f4e252]: Colegios activos
+          - generic [ref=f4e261]:
+            - paragraph [ref=f4e262]: "17"
+            - paragraph [ref=f4e263]: Profesores
+          - generic [ref=f4e270]:
+            - paragraph [ref=f4e271]: "28"
+            - paragraph [ref=f4e272]: Evaluaciones
+          - generic [ref=f4e280]:
+            - paragraph [ref=f4e281]: "4.9"
+            - paragraph [ref=f4e282]: Rendimiento promedio
+        - generic [ref=f4e283]:
+          - heading "Tendencia de rendimiento" [level=3] [ref=f4e285]
+          - generic [ref=f4e286]: Gráfico de tendencia — próximamente
+  - alert [ref=f4e55]

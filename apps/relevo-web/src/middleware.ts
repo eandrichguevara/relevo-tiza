@@ -62,6 +62,15 @@ export function middleware(req: NextRequest) {
     return response;
   }
 
+  // Check token expiration — consistent with session route
+  if (payload.exp && Date.now() >= Number(payload.exp) * 1000) {
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete(COOKIE_NAME);
+    return response;
+  }
+
   const userStatus = String(payload.status ?? 'active');
 
   // If user is not active, redirect to /pending

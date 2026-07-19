@@ -7,6 +7,10 @@ from typing import AsyncGenerator, Generator
 # Ensure the API root is on the path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+# Load .env before any app imports (database.py requires DATABASE_URL at import time)
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
 # Disable rate limiting during tests to avoid false positives
 os.environ["RATE_LIMIT_ENABLED"] = "false"
 

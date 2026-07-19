@@ -1,0 +1,19 @@
+- generic [ref=f21e3]:
+  - generic [ref=f21e4]:
+    - heading "RELEVO" [level=1] [ref=f21e5]
+    - paragraph [ref=f21e6]: Datos que transforman
+  - form "Formulario de acceso" [ref=f21e8]:
+    - heading "Acceso RELEVO" [level=2] [ref=f21e9]
+    - generic [ref=f21e10]:
+      - text: Email
+      - textbox "Email" [ref=f21e11]:
+        - /placeholder: director@colegio.cl
+    - generic [ref=f21e12]:
+      - text: Contraseña
+      - textbox "Contraseña" [ref=f21e13]:
+        - /placeholder: ••••••••
+    - button "Ingresar" [ref=f21e14]
+    - paragraph [ref=f21e15]:
+      - text: ¿Primera vez?
+      - link "Solicitar demo" [ref=f21e16] [cursor=pointer]:
+        - /url: /register

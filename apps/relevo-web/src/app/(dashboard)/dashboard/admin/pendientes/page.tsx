@@ -6,64 +6,8 @@ import { Card, Button, Badge, Spinner, EmptyState, ErrorMessage } from '@tiza/ui
 import { CheckCircle, XCircle, Clock, Users, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePendingRegistrations, useApproveUser, useRejectUser } from '@/hooks/useRelevoApi';
+import ConfirmModal from '@/components/ConfirmModal';
 import type { PendingRegistration } from '@tiza/types';
-
-// ─── Modal component ──────────────────────────────────────
-
-interface ConfirmModalProps {
-  title: string;
-  children: React.ReactNode;
-  onConfirm: () => void;
-  onCancel: () => void;
-  confirmLabel: string;
-  confirmVariant?: 'primary' | 'danger';
-  loading?: boolean;
-}
-
-function ConfirmModal({
-  title,
-  children,
-  onConfirm,
-  onCancel,
-  confirmLabel,
-  confirmVariant = 'primary',
-  loading = false,
-}: ConfirmModalProps) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 transition-opacity"
-        onClick={onCancel}
-        aria-hidden="true"
-      />
-      {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 z-10">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">{title}</h3>
-        <div className="text-sm text-gray-600 mb-6">{children}</div>
-        <div className="flex gap-3 justify-end">
-          <Button variant="outline" brand="relevo" onClick={onCancel} disabled={loading}>
-            Cancelar
-          </Button>
-          <Button
-            variant={confirmVariant}
-            brand="relevo"
-            onClick={onConfirm}
-            loading={loading}
-            disabled={loading}
-          >
-            {confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Main page ────────────────────────────────────────────
 
@@ -92,14 +36,15 @@ export default function AdminPendientesPage() {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'ADMIN') {
+  const isAuthorized = user?.role === 'ADMIN' || user?.role === 'HOLDER';
+  if (!isAuthenticated || !isAuthorized) {
     return (
       <Card brand="relevo" className="max-w-lg mx-auto mt-10">
         <div className="text-center py-8">
           <AlertTriangle className="mx-auto h-12 w-12 text-red-400" aria-hidden="true" />
           <h2 className="text-lg font-semibold text-gray-900 mt-4">Acceso restringido</h2>
           <p className="text-gray-500 mt-2 text-sm">
-            Solo administradores pueden acceder a esta sección.
+            Solo administradores y directores pueden acceder a esta sección.
           </p>
           <Button
             brand="relevo"

@@ -1,0 +1,29 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e2]:
+    - complementary [ref=f2e3]:
+      - generic [ref=f2e4]:
+        - link "TIZA" [ref=f2e5] [cursor=pointer]:
+          - /url: /dashboard
+        - paragraph [ref=f2e10]: Tu tiempo, tu enseñanza
+      - navigation [ref=f2e11]:
+        - link "Inicio" [ref=f2e12] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Cursos" [ref=f2e18] [cursor=pointer]:
+          - /url: /dashboard/cursos
+        - link "Evaluaciones" [ref=f2e22] [cursor=pointer]:
+          - /url: /dashboard/evaluaciones
+        - link "Revisar !" [ref=f2e26] [cursor=pointer]:
+          - /url: /dashboard/revisar
+          - text: Revisar
+          - generic [ref=f2e29]: "!"
+        - link "Reportes" [ref=f2e30] [cursor=pointer]:
+          - /url: /dashboard/reportes
+      - generic [ref=f2e33]:
+        - generic [ref=f2e34]:
+          - generic [ref=f2e35]: "N"
+          - generic [ref=f2e36]:
+            - paragraph [ref=f2e37]: Nuevo Profesor Test
+            - paragraph [ref=f2e38]: nuevo.profesor@test.cl
+        - button "Cerrar sesión" [ref=f2e39] [cursor=pointer]
+    - main [ref=f2e43]
+  - alert [ref=f2e50]

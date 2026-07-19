@@ -1,0 +1,32 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]: RELEVO
+        - navigation [ref=e12]:
+          - link "Iniciar sesión" [ref=e13] [cursor=pointer]:
+            - /url: /login
+          - link "Solicitar demo" [ref=e14] [cursor=pointer]:
+            - /url: /register
+    - main [ref=e15]:
+      - generic [ref=e17]:
+        - heading "Datos que transforman la educación" [level=1] [ref=e18]
+        - paragraph [ref=e19]: La plataforma de analítica educativa que convierte evaluaciones en decisiones. Para sostenedores que quieren ver más allá de las notas.
+        - link "Agenda una demo" [ref=e20] [cursor=pointer]:
+          - /url: /register
+      - generic [ref=e21]:
+        - generic [ref=e22]:
+          - heading "KPIs en tiempo real" [level=3] [ref=e25]
+          - paragraph [ref=e26]: Dashboards ejecutivos con datos actualizados al instante.
+        - generic [ref=e27]:
+          - heading "Multi-colegio" [level=3] [ref=e33]
+          - paragraph [ref=e34]: Gestiona todos tus establecimientos desde un solo lugar.
+        - generic [ref=e35]:
+          - heading "Predicción SIMCE" [level=3] [ref=e39]
+          - paragraph [ref=e40]: Anticipa resultados con datos reales de tus evaluaciones.
+        - generic [ref=e41]:
+          - heading "Datos en Chile" [level=3] [ref=e44]
+          - paragraph [ref=e45]: Cumplimiento total Ley 19.628. Tus datos nunca salen del país.
+    - contentinfo [ref=e46]:
+      - paragraph [ref=e47]: RELEVO SpA — © 2026. Santiago, Chile.
+  - alert [ref=e48]

@@ -1,0 +1,27 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]: TIZA
+      - generic [ref=e10]:
+        - link "Iniciar sesión" [ref=e11] [cursor=pointer]:
+          - /url: /login
+        - link "Registrarse gratis" [ref=e12] [cursor=pointer]:
+          - /url: /register
+  - main [ref=e13]:
+    - generic [ref=e14]:
+      - heading "Tu tiempo, tu enseñanza" [level=1] [ref=e15]
+      - paragraph [ref=e16]: "Corrige evaluaciones automáticamente con IA y recupera horas para lo que realmente importa: tus alumnos."
+      - link "Comienza gratis" [ref=e17] [cursor=pointer]:
+        - /url: /register
+    - generic [ref=e18]:
+      - generic [ref=e19]:
+        - heading "Ahorra 15 horas semanales" [level=3] [ref=e23]
+        - paragraph [ref=e24]: Automatiza la corrección de pruebas y dedica tu tiempo a planificar clases.
+      - generic [ref=e25]:
+        - heading "Corrección inteligente" [level=3] [ref=e29]
+        - paragraph [ref=e30]: IA que entiende letra manuscrita y corrige según tu rúbrica personalizada.
+      - generic [ref=e31]:
+        - heading "Reportes detallados" [level=3] [ref=e34]
+        - paragraph [ref=e35]: Visualiza el progreso de cada alumno con reportes pedagógicos automáticos.
+  - contentinfo [ref=e36]:
+    - paragraph [ref=e38]: TIZA — © 2026. Hecho con ❤️ en Chile.

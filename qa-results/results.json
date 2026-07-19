@@ -1,0 +1,1773 @@
+{
+  "timestamp": "2026-07-11T23:34:48.199Z",
+  "verifications": [
+    {
+      "name": "A.1 Login HOLDER",
+      "passed": false,
+      "details": "Redirected to http://localhost:3002/login?",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:01.214Z"
+    },
+    {
+      "name": "A.2 Dashboard stats",
+      "passed": false,
+      "details": "Escuelas: false, Profesores: false, Evaluaciones: false",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:04.417Z"
+    },
+    {
+      "name": "A.3 Three colegios visible",
+      "passed": false,
+      "details": "Andes: false, Sur: false, Central: false",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:07.081Z"
+    },
+    {
+      "name": "A.4 Profesores en colegio",
+      "passed": false,
+      "details": "Found 0 profesor references",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:40.716Z"
+    },
+    {
+      "name": "B.5 Login Profesor",
+      "passed": false,
+      "details": "Redirected to http://localhost:3001/login?",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:53.498Z"
+    },
+    {
+      "name": "B.6 Dashboard Profesor stats",
+      "passed": false,
+      "details": "Cursos: false, Alumnos: false, Evaluaciones: false",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:56.960Z"
+    },
+    {
+      "name": "B.7 Cursos con alumnos",
+      "passed": false,
+      "details": "Has curso names: false, Has \"42\": false",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:35:59.646Z"
+    },
+    {
+      "name": "B.8 Evaluaciones creadas",
+      "passed": false,
+      "details": "Lenguaje: false, Matemática: false",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:02.290Z"
+    },
+    {
+      "name": "B.9 Revisar resultados",
+      "passed": true,
+      "details": "Page loaded, has pending: true",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:04.927Z"
+    },
+    {
+      "name": "B.10 Reportes rendimiento",
+      "passed": false,
+      "details": "Has performance data: false",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:07.584Z"
+    },
+    {
+      "name": "Keyboard nav - Tab order",
+      "passed": true,
+      "details": "First: INPUT#email, Second: INPUT#contraseña",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:15.103Z"
+    },
+    {
+      "name": "Keyboard nav Relevo - Tab order",
+      "passed": true,
+      "details": "First: INPUT#email",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:15.859Z"
+    },
+    {
+      "name": "Invalid email validation",
+      "passed": true,
+      "details": "Shows validation error for invalid email",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:17.725Z"
+    },
+    {
+      "name": "XSS protection",
+      "passed": true,
+      "details": "Script tags are escaped or rejected",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:19.472Z"
+    },
+    {
+      "name": "API OpenAPI spec",
+      "passed": true,
+      "details": "Status: 200",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:20.182Z"
+    },
+    {
+      "name": "API Swagger UI",
+      "passed": true,
+      "details": "Status: 200",
+      "screenshot": null,
+      "timestamp": "2026-07-11T23:36:21.790Z"
+    }
+  ],
+  "bugs": [
+    {
+      "severity": "CRITICAL",
+      "title": "A.1 Login HOLDER failed",
+      "description": "Did not redirect to dashboard. Current URL: http://localhost:3002/login?",
+      "evidence": null,
+      "timestamp": "2026-07-11T23:35:01.214Z"
+    },
+    {
+      "severity": "MAJOR",
+      "title": "A.2 Dashboard missing stats",
+      "description": "Dashboard does not show expected statistics",
+      "evidence": "A2-relevo-dashboard.png",
+      "timestamp": "2026-07-11T23:35:04.417Z"
+    },
+    {
+      "severity": "MAJOR",
+      "title": "A.3 Missing colegios",
+      "description": "Not all 3 colegios are displayed",
+      "evidence": "A3-relevo-colegios.png",
+      "timestamp": "2026-07-11T23:35:07.081Z"
+    },
+    {
+      "severity": "MAJOR",
+      "title": "A.4 Missing profesores",
+      "description": "Expected 4 profesores per colegio, found 0 references",
+      "evidence": "A4-relevo-usuarios.png",
+      "timestamp": "2026-07-11T23:35:40.716Z"
+    },
+    {
+      "severity": "CRITICAL",
+      "title": "B.5 Login Profesor failed",
+      "description": "Did not redirect to dashboard. Current URL: http://localhost:3001/login?",
+      "evidence": null,
+      "timestamp": "2026-07-11T23:35:53.498Z"
+    },
+    {
+      "severity": "MAJOR",
+      "title": "B.6 Dashboard missing stats",
+      "description": "Profesor dashboard missing expected stats",
+      "evidence": "B6-tiza-dashboard.png",
+      "timestamp": "2026-07-11T23:35:56.960Z"
+    },
+    {
+      "severity": "MAJOR",
+      "title": "B.7 Cursos not showing",
+      "description": "Cursos page does not show expected cursos with 42 alumnos",
+      "evidence": "B7-tiza-cursos.png",
+      "timestamp": "2026-07-11T23:35:59.646Z"
+    },
+    {
+      "severity": "MAJOR",
+      "title": "B.8 Missing evaluaciones",
+      "description": "Evaluaciones page does not show both Lenguaje and Matemática",
+      "evidence": "B8-tiza-evaluaciones.png",
+      "timestamp": "2026-07-11T23:36:02.290Z"
+    },
+    {
+      "severity": "MINOR",
+      "title": "B.10 Reportes empty",
+      "description": "Reportes page does not show performance data",
+      "evidence": "B10-tiza-reportes.png",
+      "timestamp": "2026-07-11T23:36:07.584Z"
+    }
+  ],
+  "uxIssues": [],
+  "consoleErrors": [
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812888333",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:48.432Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:48.487Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:48.487Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812888333",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:48.490Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:48.490Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/favicon.ico",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:48.494Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812889160",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:49.234Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:49.258Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812889160",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:49.259Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:49.261Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:49.262Z"
+    },
+    {
+      "type": "warning",
+      "text": "The resource http://localhost:3002/_next/static/media/e4af272ccee01ff0-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+      "location": {
+        "url": "http://localhost:3002/login?",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:34:52.265Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812901795",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:01.880Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812901795",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:01.895Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:01.899Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:01.900Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:01.908Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812904445",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:04.514Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:04.567Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:04.568Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812904445",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:04.569Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:04.571Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812907106",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:07.179Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812907106",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:07.197Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:07.197Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:07.203Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:07.205Z"
+    },
+    {
+      "type": "warning",
+      "text": "The resource http://localhost:3002/_next/static/media/e4af272ccee01ff0-s.p.woff2 was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.",
+      "location": {
+        "url": "http://localhost:3002/login?callbackUrl=%2Fdashboard%2Fusuarios",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:10.205Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:40.851Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812940737",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:40.851Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:40.851Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/favicon.ico",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:40.859Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:41.573Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812941465",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:41.573Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:41.574Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812954326",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:54.446Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:54.447Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:54.447Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:57.131Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:57.131Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812957008",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:57.139Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:59.779Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812959674",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:59.779Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:35:59.780Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:02.414Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812962320",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:02.415Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:02.416Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:05.073Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812964964",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:05.073Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:05.073Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:07.735Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812967636",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:07.735Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:07.736Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812969273",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:09.353Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812969273",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:09.404Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:09.404Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:09.404Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:09.406Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:11.028Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:11.028Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812970939",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:11.028Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812972569",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:12.679Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812972569",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:12.707Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:12.708Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:12.709Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:12.709Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812974237",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:14.354Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:14.359Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:14.360Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812975119",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.202Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812975119",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.234Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.236Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.240Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.246Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.979Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.979Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812975877",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:15.980Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812976670",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:16.819Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:16.822Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:16.822Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812977747",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:17.845Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:17.845Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:17.845Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:18.519Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812978427",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:18.519Z"
+    },
+    {
+      "type": "error",
+      "text": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "location": {
+        "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+        "line": 0,
+        "column": 0,
+        "lineNumber": 0,
+        "columnNumber": 0
+      },
+      "timestamp": "2026-07-11T23:36:18.519Z"
+    }
+  ],
+  "networkErrors": [
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812888333",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:48.431Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:48.487Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:48.487Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812888333",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:48.490Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:48.490Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812889160",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:49.234Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:49.258Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812889160",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:49.259Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:49.261Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:34:49.262Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812901795",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:01.880Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812901795",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:01.895Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:01.898Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:01.900Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:01.907Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812904445",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:04.514Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:04.567Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:04.568Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812904445",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:04.569Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:04.571Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812907106",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:07.179Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812907106",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:07.196Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:07.197Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:07.203Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:07.205Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:40.850Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812940737",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:40.851Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:40.851Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:41.573Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812941465",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:41.573Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:41.574Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812954326",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:54.446Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:54.446Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:54.447Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:57.131Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:57.131Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812957008",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:57.138Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:59.779Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812959674",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:59.779Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:35:59.780Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:02.414Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812962320",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:02.415Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:02.416Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:05.070Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812964964",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:05.073Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:05.073Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:07.731Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812967636",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:07.735Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:07.736Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812969273",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:09.353Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812969273",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:09.404Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:09.404Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:09.404Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:09.406Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:11.026Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:11.028Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812970939",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:11.028Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812972569",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:12.679Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812972569",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:12.707Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:12.708Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:12.709Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:12.709Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812974237",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:14.354Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:14.359Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:14.360Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/css/app/layout.css?v=1783812975119",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.201Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/main-app.js?v=1783812975119",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.234Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.236Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/layout.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.240Z"
+    },
+    {
+      "url": "http://localhost:3002/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.246Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.979Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.979Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812975877",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:15.980Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812976670",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:16.819Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:16.822Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:16.822Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812977747",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:17.845Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:17.845Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:17.845Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app-pages-internals.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:18.519Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/main-app.js?v=1783812978427",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:18.519Z"
+    },
+    {
+      "url": "http://localhost:3001/_next/static/chunks/app/not-found.js",
+      "status": 404,
+      "statusText": "Not Found",
+      "timestamp": "2026-07-11T23:36:18.519Z"
+    }
+  ],
+  "screenshots": [
+    {
+      "name": "A1-relevo-login-success",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/A1-relevo-login-success.png"
+    },
+    {
+      "name": "A2-relevo-dashboard",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/A2-relevo-dashboard.png"
+    },
+    {
+      "name": "A3-relevo-colegios",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/A3-relevo-colegios.png"
+    },
+    {
+      "name": "A4-relevo-usuarios",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/A4-relevo-usuarios.png"
+    },
+    {
+      "name": "B5-tiza-login-success",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/B5-tiza-login-success.png"
+    },
+    {
+      "name": "B6-tiza-dashboard",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/B6-tiza-dashboard.png"
+    },
+    {
+      "name": "B7-tiza-cursos",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/B7-tiza-cursos.png"
+    },
+    {
+      "name": "B8-tiza-evaluaciones",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/B8-tiza-evaluaciones.png"
+    },
+    {
+      "name": "B9-tiza-revisar",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/B9-tiza-revisar.png"
+    },
+    {
+      "name": "B10-tiza-reportes",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/B10-tiza-reportes.png"
+    },
+    {
+      "name": "responsive-tiza-mobile",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/responsive-tiza-mobile.png"
+    },
+    {
+      "name": "responsive-relevo-mobile",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/responsive-relevo-mobile.png"
+    },
+    {
+      "name": "responsive-tiza-tablet",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/responsive-tiza-tablet.png"
+    },
+    {
+      "name": "responsive-relevo-tablet",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/responsive-relevo-tablet.png"
+    },
+    {
+      "name": "invalid-input-test",
+      "filepath": "/home/eandrich/Projects/tiza-project/qa-results/invalid-input-test.png"
+    }
+  ]
+}

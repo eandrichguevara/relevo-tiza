@@ -15,8 +15,6 @@ model Tenant {
   settings    Json?        @db.Json
   createdAt   DateTime?    @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime?    @updatedAt @map("updated_at") @db.Timestamptz(6)
-  courses     Course[]
-  evaluations Evaluation[]
   users       User[]
   members     TenantMember[]
 
@@ -43,7 +41,6 @@ model User {
 
 model Evaluation {
   id        String    @id @default(cuid()) @db.VarChar
-  tenantId  String    @map("tenant_id") @db.VarChar
   title     String    @db.VarChar
   subject   String    @db.VarChar
   grade     String    @db.VarChar
@@ -52,11 +49,9 @@ model Evaluation {
   status    String?   @db.VarChar
   createdAt DateTime? @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   results   Result[]
 
   @@index([status], map: "ix_evaluations_status")
-  @@index([tenantId], map: "ix_evaluations_tenant_id")
   @@map("evaluations")
 }
 
@@ -98,18 +93,16 @@ model AuditLog {
 
 model Course {
   id        String    @id @default(cuid()) @db.VarChar
-  tenantId  String    @map("tenant_id") @db.VarChar
   name      String    @db.VarChar
   grade     String    @db.VarChar
   subject   String    @db.VarChar
   teacherId String    @map("teacher_id") @db.VarChar
   createdAt DateTime? @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  // teacherId is a plain String — no @relation (cross-schema)
   students  Student[]
 
   @@index([teacherId], map: "ix_courses_teacher_id")
-  @@index([tenantId], map: "ix_courses_tenant_id")
   @@map("courses")
 }
 

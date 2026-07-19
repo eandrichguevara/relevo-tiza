@@ -42,9 +42,17 @@ class QuestionTypeEnum(str, Enum):
 
 
 class SubjectEnum(str, Enum):
-    """Asignaturas disponibles en la plataforma (hardcodeadas por ahora)."""
+    """Asignaturas disponibles en la plataforma — coincide con SUBJECTS del frontend relevo-web."""
     LENGUAJE = "Lenguaje"
     MATEMATICAS = "Matemáticas"
+    CIENCIAS_NATURALES = "Ciencias Naturales"
+    HISTORIA = "Historia"
+    INGLES = "Inglés"
+    ARTES = "Artes"
+    EDUCACION_FISICA = "Educación Física"
+    MUSICA = "Música"
+    TECNOLOGIA = "Tecnología"
+    RELIGION = "Religión"
 
 
 # ─── Auth ─────────────────────────────────
@@ -298,8 +306,27 @@ class MacroStatsResponse(BaseModel):
 class CreateCourseRequest(BaseModel):
     name: str
     grade: str
-    subject: SubjectEnum
+    subject: str = Field(
+        ..., max_length=200,
+        description="Asignaturas comma-separated: 'Lenguaje, Matemáticas'"
+    )
     teacher_id: str  # HOLDER/ADMIN assigns a teacher when creating
+
+    @field_validator("subject")
+    @classmethod
+    def validate_subjects(cls, v: str) -> str:
+        parts = [s.strip() for s in v.split(",") if s.strip()]
+        if not parts:
+            raise ValueError("Debe especificar al menos una asignatura")
+        allowed = {s.value for s in SubjectEnum}
+        for part in parts:
+            if part not in allowed:
+                raise ValueError(
+                    f"Asignatura '{part}' no es válida. "
+                    f"Asignaturas disponibles: {', '.join(sorted(allowed))}"
+                )
+        # Deduplicate preserving insertion order (SEC-2)
+        return ", ".join(dict.fromkeys(parts))
 
 class CourseResponse(BaseModel):
     id: str

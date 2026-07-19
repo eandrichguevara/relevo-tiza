@@ -1,25 +1,90 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+const COOKIE_NAME = 'tiza-auth-token';
+
+/**
+ * Decode a JWT payload (base64url → JSON) without verifying the signature.
+ * The backend already validated the token — we just need the user info.
+ * Works in Edge runtime (uses Buffer which is available in Edge).
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const json = Buffer.from(base64, 'base64').toString('utf-8');
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Middleware — protects /dashboard/* routes.
- * Checks for the tiza-auth-token cookie set by the login flow.
- * If missing, redirects to /login.
+ * Checks for the tiza-auth-token cookie and validates user status.
+ *
+ * Public routes (no auth required):
+ *   /, /login, /register, /pending
+ *
+ * Protected routes (require active status):
+ *   /dashboard/*, /dashboard
  */
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get('tiza-auth-token')?.value;
+  const { pathname } = req.nextUrl;
+
+  // Public routes — always allow
+  const publicRoutes = ['/', '/login', '/register', '/pending'];
+  if (publicRoutes.includes(pathname)) {
+    const response = NextResponse.next();
+    response.headers.set('X-Tenant-Brand', 'tiza');
+    return response;
+  }
+
+  // All other routes require a valid token
+  const token = req.cookies.get(COOKIE_NAME)?.value;
 
   if (!token) {
     const loginUrl = new URL('/login', req.url);
-    loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname);
+    loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
+  // Decode JWT to check status
+  const payload = decodeJwtPayload(token);
+
+  if (!payload || !payload.sub) {
+    // Invalid token — redirect to login
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete(COOKIE_NAME);
+    return response;
+  }
+
+  // Check token expiration — consistent with session route
+  if (payload.exp && Date.now() >= Number(payload.exp) * 1000) {
+    const loginUrl = new URL('/login', req.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    const response = NextResponse.redirect(loginUrl);
+    response.cookies.delete(COOKIE_NAME);
+    return response;
+  }
+
+  const userStatus = String(payload.status ?? 'active');
+
+  // If user is not active, redirect to /pending
+  if (userStatus !== 'active') {
+    const pendingUrl = new URL('/pending', req.url);
+    return NextResponse.redirect(pendingUrl);
+  }
+
+  // User is active — allow access
   const response = NextResponse.next();
   response.headers.set('X-Tenant-Brand', 'tiza');
   return response;
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/dashboard'],
+  matcher: ['/dashboard/:path*', '/dashboard', '/pending', '/login', '/register'],
 };

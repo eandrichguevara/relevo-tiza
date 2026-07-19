@@ -42,11 +42,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ user: null, accessToken: null });
   }
 
+  // Validate JWT expiration
+  if (payload.exp && Date.now() >= Number(payload.exp) * 1000) {
+    return NextResponse.json({ user: null, accessToken: null });
+  }
+
   const user = {
     id: String(payload.sub),
     email: String(payload.email ?? ''),
     name: String(payload.name ?? ''),
     role: String(payload.role ?? ''),
+    status: String(payload.status ?? 'active'),
     tenantId: String(payload.tenant_id ?? ''),
   };
 

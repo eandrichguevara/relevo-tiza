@@ -1,0 +1,19 @@
+- generic [ref=f5e3]:
+  - generic [ref=f5e4]:
+    - heading "TIZA" [level=1] [ref=f5e5]
+    - paragraph [ref=f5e6]: Tu tiempo, tu enseñanza
+  - form "Formulario de inicio de sesión" [ref=f5e8]:
+    - heading "Iniciar sesión" [level=2] [ref=f5e9]
+    - generic [ref=f5e10]:
+      - generic [ref=f5e11]: Email
+      - textbox "Email" [ref=f5e12]:
+        - /placeholder: profesor@colegio.cl
+    - generic [ref=f5e13]:
+      - generic [ref=f5e14]: Contraseña
+      - textbox "Contraseña" [ref=f5e15]:
+        - /placeholder: ••••••••
+    - button "Ingresar" [ref=f5e16] [cursor=pointer]
+    - paragraph [ref=f5e17]:
+      - text: ¿No tienes cuenta?
+      - link "Regístrate gratis" [ref=f5e18] [cursor=pointer]:
+        - /url: /register

@@ -1,0 +1,34 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e3]:
+    - generic [ref=f2e4]:
+      - heading "TIZA" [level=1] [ref=f2e5]
+      - paragraph [ref=f2e6]: Tu tiempo, tu enseñanza
+    - form "Formulario de registro" [ref=f2e8]:
+      - heading "Crear cuenta gratis" [level=2] [ref=f2e9]
+      - generic [ref=f2e10]:
+        - generic [ref=f2e11]: Nombre completo
+        - textbox "Nombre completo" [ref=f2e12]:
+          - /placeholder: María González
+      - generic [ref=f2e13]:
+        - generic [ref=f2e14]: Email
+        - textbox "Email" [ref=f2e15]:
+          - /placeholder: profesor@colegio.cl
+      - generic [ref=f2e16]:
+        - generic [ref=f2e17]: Contraseña
+        - textbox "Contraseña" [ref=f2e18]:
+          - /placeholder: Mínimo 6 caracteres
+        - paragraph [ref=f2e19]: Mínimo 6 caracteres
+      - generic [ref=f2e20]:
+        - generic [ref=f2e21]: Confirmar contraseña
+        - textbox "Confirmar contraseña" [ref=f2e22]:
+          - /placeholder: Repite tu contraseña
+      - generic [ref=f2e24]:
+        - generic [ref=f2e25]: Código de tu colegio
+        - textbox "Código de tu colegio" [ref=f2e26]:
+          - /placeholder: "Ej: ABC123"
+      - button "Crear cuenta" [ref=f2e27] [cursor=pointer]
+      - paragraph [ref=f2e28]:
+        - text: ¿Ya tienes cuenta?
+        - link "Inicia sesión" [ref=f2e29] [cursor=pointer]:
+          - /url: /login
+  - alert [ref=f2e30]

@@ -1,10 +1,29 @@
 'use client';
 
-import { useState, useMemo, Suspense } from 'react';
+import { useState, useMemo, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, Button, Input, Badge, Spinner, EmptyState, ErrorMessage } from '@tiza/ui';
-import { Plus, Users, UserPlus, Copy, Check, X, RefreshCw } from 'lucide-react';
-import { useTenants, useUsers, useCreateUser } from '@/hooks/useRelevoApi';
+import {
+  Plus,
+  Users,
+  UserPlus,
+  Copy,
+  Check,
+  CheckCircle,
+  KeyRound,
+  XCircle,
+  X,
+  RefreshCw,
+} from 'lucide-react';
+import {
+  useTenants,
+  useUsers,
+  useCreateUser,
+  useApproveUser,
+  useResetPassword,
+} from '@/hooks/useRelevoApi';
+import { useActiveTenant } from '@/hooks/ActiveTenantContext';
+import ConfirmModal from '@/components/ConfirmModal';
 import type { User } from '@tiza/types';
 
 // ─── Password generator ──────────────────────────────────
@@ -33,7 +52,7 @@ function generatePassword(): string {
 
 // ─── Date formatting ─────────────────────────────────────
 
-function formatDate(dateStr?: string): string {
+function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '—';
   try {
     return new Date(dateStr).toLocaleDateString('es-CL', {
@@ -58,6 +77,22 @@ function getRoleConfig(role: string) {
   return ROLE_CONFIG[role] || { label: role, variant: 'neutral' as const };
 }
 
+// ─── Status badge config ────────────────────────────────
+
+const STATUS_CONFIG: Record<
+  string,
+  { label: string; variant: 'success' | 'warning' | 'error' | 'neutral' }
+> = {
+  active: { label: 'Activo', variant: 'success' },
+  pending: { label: 'Pendiente', variant: 'warning' },
+  rejected: { label: 'Rechazado', variant: 'error' },
+  suspended: { label: 'Suspendido', variant: 'neutral' },
+};
+
+function getStatusConfig(status: string) {
+  return STATUS_CONFIG[status] || { label: status, variant: 'neutral' as const };
+}
+
 // ─── Main content (extracted for Suspense) ───────────────
 
 function UsuariosContent() {
@@ -65,15 +100,24 @@ function UsuariosContent() {
   const searchParams = useSearchParams();
   const preselectedTenantId = searchParams.get('tenant_id');
 
-  const { data: tenants, isLoading: tenantsLoading } = useTenants();
-  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(preselectedTenantId);
+  // ── Global active tenant from sidebar context ──
+  const { activeTenantId: contextTenantId, setActiveTenantId: setContextTenantId } =
+    useActiveTenant();
 
-  // Sync URL param with selection
-  useMemo(() => {
-    if (preselectedTenantId && !selectedTenantId) {
-      setSelectedTenantId(preselectedTenantId);
+  const { data: tenants, isLoading: tenantsLoading } = useTenants();
+
+  // Initialize: URL param > context tenant > manual selection
+  const [selectedTenantId, setSelectedTenantId] = useState<string | null>(
+    preselectedTenantId || contextTenantId
+  );
+
+  // Sync from context on mount/change (if no URL param override)
+  useEffect(() => {
+    if (!preselectedTenantId && contextTenantId && contextTenantId !== selectedTenantId) {
+      setSelectedTenantId(contextTenantId);
     }
-  }, [preselectedTenantId, selectedTenantId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contextTenantId]);
 
   const {
     data: users,
@@ -83,6 +127,8 @@ function UsuariosContent() {
   } = useUsers(selectedTenantId);
 
   const createUser = useCreateUser();
+  const approveUser = useApproveUser();
+  const resetPasswordMutation = useResetPassword();
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ email: '', name: '' });
@@ -91,6 +137,15 @@ function UsuariosContent() {
   const [formSuccess, setFormSuccess] = useState('');
   const [passwordCopied, setPasswordCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [resetCopied, setResetCopied] = useState(false);
+
+  // Approval confirmation state
+  const [approveTarget, setApproveTarget] = useState<User | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Password reset state
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [resetPassword, setResetPassword] = useState<string | null>(null);
 
   const selectedTenant = useMemo(
     () => tenants?.find((t) => t.id === selectedTenantId),
@@ -176,11 +231,57 @@ function UsuariosContent() {
     }
   };
 
+  // ─── Toast helper ──────────────────────────────────
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // ─── Approve handler ───────────────────────────────
+
+  const handleApprove = async () => {
+    if (!approveTarget) return;
+    try {
+      await approveUser.mutateAsync(approveTarget.id);
+      showToast(`Usuario ${approveTarget.name} aprobado correctamente`, 'success');
+      setApproveTarget(null);
+    } catch (err: any) {
+      showToast(
+        err?.translatedMessage || 'Error al aprobar el usuario. Intenta de nuevo.',
+        'error'
+      );
+      setApproveTarget(null);
+    }
+  };
+
+  // ─── Reset password handler ──────────────────────────
+  const handleResetPassword = async () => {
+    if (!resetTarget) return;
+    try {
+      const result = await resetPasswordMutation.mutateAsync(resetTarget.id);
+      setResetPassword(result.temporary_password);
+      showToast(`Contraseña restaurada para ${resetTarget.name}`, 'success');
+    } catch (err: any) {
+      showToast(
+        err?.translatedMessage || 'Error al restaurar la contraseña. Intenta de nuevo.',
+        'error'
+      );
+      setResetTarget(null);
+    }
+  };
+
   // ─── Handle tenant selection ───────────────────────
 
   const handleTenantChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     setSelectedTenantId(value || null);
+
+    // Sync back to sidebar context so the global selector stays in sync
+    if (value) {
+      setContextTenantId(value);
+    }
+
     // Update URL without navigation
     const params = new URLSearchParams(searchParams.toString());
     if (value) {
@@ -196,6 +297,130 @@ function UsuariosContent() {
 
   return (
     <div>
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm font-medium transition-all ${
+            toast.type === 'success'
+              ? 'bg-green-50 text-green-800 border border-green-200'
+              : 'bg-red-50 text-red-800 border border-red-200'
+          }`}
+          role="alert"
+        >
+          {toast.message}
+        </div>
+      )}
+
+      {/* Approve confirmation modal */}
+      {approveTarget && (
+        <ConfirmModal
+          title="Aprobar usuario"
+          onConfirm={handleApprove}
+          onCancel={() => setApproveTarget(null)}
+          confirmLabel="Aprobar"
+          confirmVariant="primary"
+          loading={approveUser.isPending}
+        >
+          <p>
+            ¿Estás seguro de aprobar a <strong>{approveTarget.name}</strong> ({approveTarget.email}
+            )?
+          </p>
+          <p className="mt-2 text-gray-500">El usuario recibirá acceso completo al sistema.</p>
+        </ConfirmModal>
+      )}
+
+      {/* Password reset confirmation modal */}
+      {resetTarget && !resetPassword && (
+        <ConfirmModal
+          title="Restaurar contraseña"
+          onConfirm={handleResetPassword}
+          onCancel={() => setResetTarget(null)}
+          confirmLabel="Restaurar"
+          confirmVariant="primary"
+          loading={resetPasswordMutation.isPending}
+        >
+          <p>
+            Se generará una nueva contraseña temporal para <strong>{resetTarget.name}</strong> (
+            {resetTarget.email}).
+          </p>
+          <p className="mt-2 text-gray-500">
+            La contraseña actual será reemplazada. Asegúrate de compartir la nueva contraseña con el
+            usuario.
+          </p>
+        </ConfirmModal>
+      )}
+
+      {/* Password result modal */}
+      {resetTarget && resetPassword && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Contraseña restaurada"
+        >
+          <div
+            className="absolute inset-0 bg-black/50 transition-opacity"
+            onClick={() => {
+              setResetTarget(null);
+              setResetPassword(null);
+              setResetCopied(false);
+            }}
+            aria-hidden="true"
+          />
+          <div className="relative bg-white rounded-xl shadow-xl max-w-md w-full p-6 z-10">
+            <div className="flex items-center gap-2 mb-4">
+              <KeyRound size={20} className="text-green-600" />
+              <h3 className="text-lg font-semibold text-gray-900">Contraseña restaurada</h3>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Nueva contraseña temporal para <strong>{resetTarget.name}</strong>:
+            </p>
+            <div className="flex items-center gap-2 mb-6">
+              <code className="flex-1 rounded-lg border border-green-300 bg-green-50 px-3 py-3 text-lg font-mono font-bold text-center text-gray-800 select-all">
+                {resetPassword}
+              </code>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(resetPassword);
+                    setResetCopied(true);
+                    setTimeout(() => setResetCopied(false), 2000);
+                  } catch {
+                    // ignore
+                  }
+                }}
+                className="flex-shrink-0 p-2.5 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+                aria-label="Copiar contraseña"
+                title="Copiar contraseña"
+              >
+                {resetCopied ? (
+                  <Check size={16} className="text-green-600" />
+                ) : (
+                  <Copy size={16} className="text-gray-500" />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-4">
+              Copia esta contraseña ahora. No podrás verla nuevamente.
+            </p>
+            <div className="flex justify-end">
+              <Button
+                variant="primary"
+                brand="relevo"
+                onClick={() => {
+                  setResetTarget(null);
+                  setResetPassword(null);
+                  setResetCopied(false);
+                }}
+              >
+                Entendido
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── Header ─────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -316,12 +541,13 @@ function UsuariosContent() {
                   <th className="py-3 px-4 font-medium text-gray-500">Nombre</th>
                   <th className="py-3 px-4 font-medium text-gray-500">Email</th>
                   <th className="py-3 px-4 font-medium text-gray-500">Rol</th>
+                  <th className="py-3 px-4 font-medium text-gray-500">Estado</th>
                   <th className="py-3 px-4 font-medium text-gray-500">Creado</th>
                   <th className="py-3 px-4 font-medium text-gray-500 sr-only">Acciones</th>
                 </tr>
               </thead>
               <tbody>
-                {users.map((u: User & { createdAt?: string }) => (
+                {users.map((u: User) => (
                   <tr
                     key={u.id}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
@@ -333,8 +559,42 @@ function UsuariosContent() {
                         {getRoleConfig(u.role).label}
                       </Badge>
                     </td>
-                    <td className="py-3 px-4 text-gray-500">{formatDate(u.createdAt)}</td>
-                    <td className="py-3 px-4" />
+                    <td className="py-3 px-4">
+                      <Badge variant={getStatusConfig(u.status).variant}>
+                        {getStatusConfig(u.status).label}
+                      </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-gray-500">{formatDate(u.created_at)}</td>
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        {u.status === 'rejected' && (
+                          <Button
+                            variant="primary"
+                            brand="relevo"
+                            size="sm"
+                            onClick={() => setApproveTarget(u)}
+                            disabled={approveTarget !== null || resetTarget !== null}
+                            aria-label={`Aprobar ${u.name}`}
+                          >
+                            <CheckCircle size={14} className="mr-1" />
+                            Aprobar
+                          </Button>
+                        )}
+                        {u.status === 'active' && u.role === 'TEACHER' && (
+                          <Button
+                            variant="outline"
+                            brand="relevo"
+                            size="sm"
+                            onClick={() => setResetTarget(u)}
+                            disabled={approveTarget !== null || resetTarget !== null}
+                            aria-label={`Restaurar clave de ${u.name}`}
+                          >
+                            <KeyRound size={14} className="mr-1" />
+                            Restaurar clave
+                          </Button>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>

@@ -9,6 +9,10 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     exclude: ['node_modules', '.next', 'dist'],
     globals: true,
+    coverage: {
+      include: ['src/**/*.ts', 'src/**/*.tsx'],
+      exclude: ['src/**/*.test.*', 'src/**/__tests__/**', 'src/test/**'],
+    },
   },
   resolve: {
     alias: {

@@ -38,4 +38,15 @@ describe('useAppStore', () => {
     useAppStore.getState().setCurrentEvaluationId(null);
     expect(useAppStore.getState().currentEvaluationId).toBeNull();
   });
+
+  it('setSidebarOpen cambia sidebarOpen a true', () => {
+    useAppStore.getState().setSidebarOpen(true);
+    expect(useAppStore.getState().sidebarOpen).toBe(true);
+  });
+
+  it('setSidebarOpen cambia sidebarOpen a false', () => {
+    useAppStore.getState().setSidebarOpen(true);
+    useAppStore.getState().setSidebarOpen(false);
+    expect(useAppStore.getState().sidebarOpen).toBe(false);
+  });
 });

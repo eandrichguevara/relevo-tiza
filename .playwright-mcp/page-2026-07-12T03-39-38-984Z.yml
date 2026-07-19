@@ -1,0 +1,34 @@
+- generic [active] [ref=f2e1]:
+  - generic [ref=f2e3]:
+    - generic [ref=f2e4]:
+      - heading "RELEVO" [level=1] [ref=f2e5]
+      - paragraph [ref=f2e6]: Datos que transforman
+    - form "Formulario de solicitud de demo" [ref=f2e8]:
+      - heading "Solicitar demo" [level=2] [ref=f2e9]
+      - generic [ref=f2e10]:
+        - generic [ref=f2e11]: Nombre completo
+        - textbox "Nombre completo" [ref=f2e12]:
+          - /placeholder: Juan Pérez
+      - generic [ref=f2e13]:
+        - generic [ref=f2e14]: Nombre del colegio
+        - textbox "Nombre del colegio" [ref=f2e15]:
+          - /placeholder: Colegio San Martín
+      - generic [ref=f2e16]:
+        - generic [ref=f2e17]: Email corporativo
+        - textbox "Email corporativo" [ref=f2e18]:
+          - /placeholder: director@colegio.cl
+      - generic [ref=f2e19]:
+        - generic [ref=f2e20]: Contraseña
+        - textbox "Contraseña" [ref=f2e21]:
+          - /placeholder: Mínimo 6 caracteres
+        - paragraph [ref=f2e22]: Mínimo 6 caracteres
+      - generic [ref=f2e23]:
+        - generic [ref=f2e24]: Confirmar contraseña
+        - textbox "Confirmar contraseña" [ref=f2e25]:
+          - /placeholder: Repite tu contraseña
+      - button "Solicitar acceso" [ref=f2e26] [cursor=pointer]
+      - paragraph [ref=f2e27]:
+        - text: ¿Ya tienes cuenta?
+        - link "Inicia sesión" [ref=f2e28] [cursor=pointer]:
+          - /url: /login
+  - alert [ref=f2e29]

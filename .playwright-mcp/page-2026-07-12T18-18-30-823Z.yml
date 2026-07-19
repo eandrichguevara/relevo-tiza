@@ -1,0 +1,43 @@
+- generic [active] [ref=e1]:
+  - alert [ref=e39]
+  - generic [ref=e41]:
+    - generic [ref=e42]:
+      - heading "TIZA" [level=1] [ref=e43]
+      - paragraph [ref=e44]: Tu tiempo, tu enseñanza
+    - form "Formulario de registro" [ref=e60]:
+      - heading "Crear cuenta gratis" [level=2] [ref=e61]
+      - alert [ref=e82]:
+        - generic [ref=e85]: Código no encontrado. Pídele el código a tu director.
+        - button "Cerrar mensaje" [ref=e86] [cursor=pointer]
+      - generic [ref=e62]:
+        - generic [ref=e63]: Nombre completo
+        - textbox "Nombre completo" [ref=e64]:
+          - /placeholder: María González
+          - text: Raven QA Test
+      - generic [ref=e65]:
+        - generic [ref=e66]: Email
+        - textbox "Email" [ref=e67]:
+          - /placeholder: profesor@colegio.cl
+          - text: ravenqa3@test.cl
+      - generic [ref=e68]:
+        - generic [ref=e69]: Contraseña
+        - textbox "Contraseña" [ref=e70]:
+          - /placeholder: Mínimo 6 caracteres
+          - text: raven123
+        - paragraph [ref=e71]: Mínimo 6 caracteres
+      - generic [ref=e72]:
+        - generic [ref=e73]: Confirmar contraseña
+        - textbox "Confirmar contraseña" [ref=e74]:
+          - /placeholder: Repite tu contraseña
+          - text: raven123
+      - generic [ref=e76]:
+        - generic [ref=e77]: Código de tu colegio
+        - textbox "Código de tu colegio" [ref=e78]:
+          - /placeholder: "Ej: ABC123"
+          - text: ABC123
+        - paragraph [ref=e89]: Código no válido. Verifica e intenta de nuevo.
+      - button "Crear cuenta" [ref=e79] [cursor=pointer]
+      - paragraph [ref=e80]:
+        - text: ¿Ya tienes cuenta?
+        - link "Inicia sesión" [ref=e81] [cursor=pointer]:
+          - /url: /login

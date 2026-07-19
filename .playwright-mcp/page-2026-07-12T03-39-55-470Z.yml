@@ -1,0 +1,67 @@
+- generic [active] [ref=f4e1]:
+  - generic [ref=f4e2]:
+    - complementary [ref=f4e3]:
+      - generic [ref=f4e4]:
+        - link "TIZA" [ref=f4e5] [cursor=pointer]:
+          - /url: /dashboard
+        - paragraph [ref=f4e10]: Tu tiempo, tu enseñanza
+      - navigation [ref=f4e11]:
+        - link "Inicio" [ref=f4e12] [cursor=pointer]:
+          - /url: /dashboard
+        - link "Cursos" [ref=f4e18] [cursor=pointer]:
+          - /url: /dashboard/cursos
+        - link "Evaluaciones" [ref=f4e22] [cursor=pointer]:
+          - /url: /dashboard/evaluaciones
+        - link "Revisar !" [ref=f4e26] [cursor=pointer]:
+          - /url: /dashboard/revisar
+          - text: Revisar
+          - generic [ref=f4e29]: "!"
+        - link "Reportes" [ref=f4e30] [cursor=pointer]:
+          - /url: /dashboard/reportes
+      - generic [ref=f4e33]:
+        - generic [ref=f4e34]:
+          - generic [ref=f4e35]: "N"
+          - generic [ref=f4e36]:
+            - paragraph [ref=f4e37]: Nuevo Profesor Test
+            - paragraph [ref=f4e38]: nuevo.profesor@test.cl
+        - button "Cerrar sesión" [ref=f4e39] [cursor=pointer]
+    - main [ref=f4e43]:
+      - generic [ref=f4e45]:
+        - generic [ref=f4e46]:
+          - generic [ref=f4e47]:
+            - heading "¡Hola, Nuevo Profesor Test!" [level=1] [ref=f4e48]
+            - paragraph [ref=f4e49]: Resumen de tu actividad
+          - link "Nueva evaluación" [ref=f4e50] [cursor=pointer]:
+            - /url: /dashboard/evaluaciones/nueva
+        - generic [ref=f4e52]:
+          - generic [ref=f4e58]:
+            - paragraph [ref=f4e59]: "0"
+            - paragraph [ref=f4e60]: Evaluaciones
+          - generic [ref=f4e67]:
+            - paragraph [ref=f4e68]: "0"
+            - paragraph [ref=f4e69]: Esta semana
+          - generic [ref=f4e75]:
+            - paragraph [ref=f4e76]: "0"
+            - paragraph [ref=f4e77]: Por revisar
+          - generic [ref=f4e83]:
+            - paragraph [ref=f4e84]: "0"
+            - paragraph [ref=f4e85]: Alumnos
+          - generic [ref=f4e92]:
+            - paragraph [ref=f4e93]: "0.0"
+            - paragraph [ref=f4e94]: Promedio
+        - generic [ref=f4e95]:
+          - heading "Acciones rápidas" [level=3] [ref=f4e97]
+          - generic [ref=f4e99]:
+            - link [ref=f4e100] [cursor=pointer]:
+              - /url: /dashboard/evaluaciones/nueva
+              - paragraph [ref=f4e102]: Nueva evaluación
+              - paragraph [ref=f4e103]: Crea y configura una prueba
+            - link [ref=f4e104] [cursor=pointer]:
+              - /url: /dashboard/revisar
+              - paragraph [ref=f4e107]: Revisar pendientes
+              - paragraph [ref=f4e108]: 0 pruebas esperando
+            - link [ref=f4e109] [cursor=pointer]:
+              - /url: /dashboard/evaluaciones
+              - paragraph [ref=f4e113]: Ver evaluaciones
+              - paragraph [ref=f4e114]: Historial completo
+  - alert [ref=f4e115]

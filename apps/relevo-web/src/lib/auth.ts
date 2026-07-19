@@ -153,6 +153,12 @@ export async function registerUser(data: {
 }
 
 export async function clearAuth(): Promise<void> {
-  await clearTokenCookie();
-  clearStoredUser();
+  try {
+    await clearTokenCookie();
+  } catch {
+    // Cookie clear failed, but we still clean up localStorage
+    console.error('[clearAuth] Failed to clear token cookie');
+  } finally {
+    clearStoredUser();
+  }
 }

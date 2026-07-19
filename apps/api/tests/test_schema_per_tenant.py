@@ -72,7 +72,7 @@ class TestSetTenantSearchPath:
         mock_session.execute.assert_called_once()
         call_sql = str(mock_session.execute.call_args[0][0])
         assert "SEARCH_PATH" in call_sql.upper() or "search_path" in call_sql
-        assert "tenant_550e8400-e29b-41d4-a716-446655440000" in call_sql
+        assert '"tenant_550e8400-e29b-41d4-a716-446655440000"' in call_sql
         assert "public" in call_sql
 
     @patch("database._is_postgres", return_value=True)
