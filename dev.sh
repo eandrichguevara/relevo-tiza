@@ -80,8 +80,8 @@ echo -e "${YELLOW}[3/5] Levantando API (FastAPI :8000)...${NC}"
 if lsof -ti:8000 >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} API ya está corriendo en puerto 8000"
 else
-    nohup "${ROOT_DIR}/apps/api/.venv/bin/uvicorn" main:app \
-        --host 0.0.0.0 --port 8000 --reload \
+    nohup bash -c "cd '${ROOT_DIR}/apps/api' && '${ROOT_DIR}/apps/api/.venv/bin/uvicorn' main:app \
+        --host 0.0.0.0 --port 8000 --reload" \
         > "${LOG_DIR}/api.log" 2>&1 &
     echo $! > "${PID_DIR}/api.pid"
     echo -e "  ${GREEN}✓${NC} API iniciada (PID: $(cat "${PID_DIR}/api.pid"))"
@@ -93,7 +93,7 @@ echo -e "${YELLOW}[4/5] Levantando tiza-web (Next.js :3001)...${NC}"
 if lsof -ti:3001 >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} tiza-web ya está corriendo en puerto 3001"
 else
-    nohup npx next dev -p 3001 \
+    nohup bash -c "cd '${ROOT_DIR}/apps/tiza-web' && npx next dev -p 3001" \
         > "${LOG_DIR}/tiza-web.log" 2>&1 &
     echo $! > "${PID_DIR}/tiza-web.pid"
     echo -e "  ${GREEN}✓${NC} tiza-web iniciado (PID: $(cat "${PID_DIR}/tiza-web.pid"))"
@@ -105,7 +105,7 @@ echo -e "${YELLOW}[5/5] Levantando relevo-web (Next.js :3002)...${NC}"
 if lsof -ti:3002 >/dev/null 2>&1; then
     echo -e "  ${GREEN}✓${NC} relevo-web ya está corriendo en puerto 3002"
 else
-    nohup npx next dev -p 3002 \
+    nohup bash -c "cd '${ROOT_DIR}/apps/relevo-web' && npx next dev -p 3002" \
         > "${LOG_DIR}/relevo-web.log" 2>&1 &
     echo $! > "${PID_DIR}/relevo-web.pid"
     echo -e "  ${GREEN}✓${NC} relevo-web iniciado (PID: $(cat "${PID_DIR}/relevo-web.pid"))"
@@ -117,9 +117,9 @@ echo -e "${YELLOW}⏳ Esperando que todos los servicios respondan...${NC}"
 sleep 3
 
 check_http() {
-    local port=$1 name=$2
+    local port=$1 name=$2 path=${3:-/}
     for i in $(seq 1 20); do
-        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}" 2>/dev/null | grep -q "200\|302\|301\|304\|307"; then
+        if curl -s -o /dev/null -w "%{http_code}" "http://localhost:${port}${path}" 2>/dev/null | grep -q "200\|302\|301\|304\|307"; then
             echo -e "  ${GREEN}✓${NC} ${name} → http://localhost:${port}"
             return 0
         fi
@@ -129,7 +129,7 @@ check_http() {
     return 1
 }
 
-check_http 8000 "API (FastAPI)"
+check_http 8000 "API (FastAPI)" "/api/health"
 check_http 3001 "tiza-web (Profesores)"
 check_http 3002 "relevo-web (Sostenedores)"
 

@@ -1,7 +1,7 @@
 # 📋 BACKLOG — RELEVO + TIZA
 
-**Última actualización:** 2026-07-18
-**Fuentes:** `RAVEN_QA_REPORT.md`, `RAVEN_QA_REPORT_DUPLICATE_TENANTS.md`, `qa-results/REPORT.md`, `INQUISITOR_AUDIT_ITER4.md`, `REQUISITOS_APROBACION_REGISTRO.md`
+**Última actualización:** 2026-07-19
+**Fuentes:** `RAVEN_QA_REPORT.md`, `RAVEN_QA_REPORT_DUPLICATE_TENANTS.md`, `qa-results/REPORT.md`, `INQUISITOR_AUDIT_ITER4.md`, `REQUISITOS_APROBACION_REGISTRO.md`, verificación directa de tests y cobertura
 
 ---
 
@@ -30,7 +30,7 @@
 | B-M04 | Formularios sin loading state (spinner, botón disabled, prevención double-submit)    | @aria + @nexus | ✅ Corregido |
 | B-M05 | Dashboards sin datos: stats, colegios, profesores, cursos, evaluaciones              | @aria + @forge | ✅ Corregido |
 | B-M06 | Validación client-side ausente en formularios de login                               | @nexus         | ✅ Corregido |
-| B-M07 | `GET /api/tenants` sin paginación; admin ahora puede listar todos                    | @forge         | ✅ Corregido |
+| B-M07 | `GET /api/tenants` sin paginación; admin ahora puede listar todos                    | @forge         | ❌ Pendiente |
 
 ---
 
@@ -79,37 +79,80 @@
 
 ## 🧪 TESTS Y COBERTURA PENDIENTE
 
-| ID   | Descripción                                                                                                            | Responsable    | Meta      | Estado          |
-| ---- | ---------------------------------------------------------------------------------------------------------------------- | -------------- | --------- | --------------- |
-| T-01 | **TIZA-WEB**: subir cobertura a ≥80% statements (actual 28.6% — módulos core ≥95%, faltan hooks)                       | @echo + @nexus | ≥80%      | ⚠️ Parcial      |
-| T-02 | **RELEVO-WEB**: suite de tests implementada (204 tests) pero cobertura actual 47.31% — falta alcanzar ≥80%             | @echo + @nexus | ≥80%      | ⚠️ Parcial      |
-| T-03 | **E2E**: al menos 1 flujo completo login → dashboard → crear recurso (Playwright)                                      | @echo          | 1 flujo   | ❌ Pendiente    |
-| T-04 | Tests de concurrencia: simular 10 requests paralelos con mismo tenant name → 1×201 + 9×409, cero 500                   | @echo          | 1 test    | ✅ Implementado |
-| T-05 | **@echo debe entregar reporte formal** de QA automatizado con: tests ejecutados, cobertura, gaps, acciones correctivas | @echo          | 1 reporte | ✅ Entregado    |
+| ID   | Descripción                                                                                                            | Responsable    | Meta      | Estado                                                                                |
+| ---- | ---------------------------------------------------------------------------------------------------------------------- | -------------- | --------- | ------------------------------------------------------------------------------------- |
+| T-01 | **TIZA-WEB**: subir cobertura a ≥80% statements (actual 42.41% — hooks useApi/useAuth ahora con tests, lib ≥95%)       | @echo + @nexus | ≥80%      | ⚠️ Parcial                                                                            |
+| T-02 | **RELEVO-WEB**: suite de tests implementada (278 tests) cobertura 56.98% — useRelevoApi al 16.66%, falta alcanzar ≥80% | @echo + @nexus | ≥80%      | ⚠️ Parcial                                                                            |
+| T-03 | **E2E**: al menos 1 flujo completo login → dashboard → crear recurso (Playwright)                                      | @echo          | 1 flujo   | ❌ Pendiente                                                                          |
+| T-04 | Tests de concurrencia: simular 10 requests paralelos con mismo tenant name → 1×201 + 9×409, cero 500                   | @echo          | 1 test    | ❌ Pendiente (el test ContextVar isolation existente no es test de concurrencia real) |
+| T-05 | **@echo debe entregar reporte formal** de QA automatizado con: tests ejecutados, cobertura, gaps, acciones correctivas | @echo          | 1 reporte | ✅ Entregado                                                                          |
+
+---
+
+## 🔍 OBJECIONES INQUISITOR ITERACIÓN 4 — PENDIENTES
+
+Objeciones del audit que siguen sin resolverse (post-correcciones de hooks TIZA y tests RELEVO):
+
+| #       | Objeción                                                                                        | Severidad  | Estado                                                 |
+| ------- | ----------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------ |
+| **#1**  | **Raven no ha ejecutado QA manual** — sin verificación visual de N-01 a N-08, UX, mobile, a11y  | 🔴 CRÍTICA | ❌ Pendiente                                           |
+| **#4**  | Backend: tests negativos N-01 (TEACHER→403 create course), N-07 (non-member→403 evaluation)     | 🟠 ALTA    | ❌ Pendiente (N-06 resuelto con test_course_schema.py) |
+| **#5**  | Backend: soft delete tenants (N-05) sin tests para `DELETE /api/tenants/{id}`                   | 🟠 ALTA    | ❌ Pendiente                                           |
+| **#6**  | Backend: email notifications (F-04) — `services/email.py` sin tests                             | 🟠 ALTA    | ❌ Pendiente                                           |
+| **#8**  | Backend: cobertura general 67%, módulos <50% (evaluations 28%, students 30%, pdf 13%, brand 0%) | 🟡 MEDIA   | ❌ Pendiente                                           |
+| **#9**  | Sin E2E (T-03) ni concurrencia real (T-04)                                                      | 🟡 MEDIA   | ❌ Pendiente                                           |
+| **#10** | B-M07: paginación tenants no implementada                                                       | 🟡 MEDIA   | ❌ Pendiente                                           |
+
+### Objeciones YA RESUELTAS (post-audit):
+
+| #      | Objeción                               | Commit                                            |
+| ------ | -------------------------------------- | ------------------------------------------------- |
+| **#2** | TIZA: useApi.ts + useAuth.tsx al 0%    | `b775bf6` — tests agregados, hooks al 100%        |
+| **#3** | RELEVO: Course creation page sin tests | `c8341ef`, `39b393b` — 278 tests, 92.7% cobertura |
+| **#7** | BACKLOG desactualizado                 | Este mismo commit                                 |
 
 ---
 
 ## 📊 RESUMEN
 
-| Categoría        | Total  | Pendiente/Parcial | Corregido/Implementado |
-| ---------------- | ------ | ----------------- | ---------------------- |
-| 🔴 Críticos      | 8      | 0                 | 8                      |
-| 🟠 Mayores       | 7      | 1                 | 6                      |
-| 🟡 Menores / UX  | 10     | 0                 | 10                     |
-| 🆕 Nuevas tareas | 8      | 0                 | 8                      |
-| 🚀 Features      | 4      | 0                 | 4                      |
-| 🧪 Tests         | 5      | 3                 | 2                      |
-| **TOTAL**        | **42** | **4**             | **38**                 |
+| Categoría        | Total  | Pendiente/Parcial    | Corregido/Implementado      |
+| ---------------- | ------ | -------------------- | --------------------------- |
+| 🔴 Críticos      | 8      | 0                    | 8                           |
+| 🟠 Mayores       | 7      | 1 (B-M07)            | 6                           |
+| 🟡 Menores / UX  | 10     | 0                    | 10                          |
+| 🆕 Nuevas tareas | 8      | 0                    | 8                           |
+| 🚀 Features      | 4      | 0                    | 4                           |
+| 🧪 Tests         | 5      | 3 (T-01, T-02, T-03) | 2 (T-04 pendiente, T-05 ✅) |
+| 🔍 Inquisitor    | 7      | 7                    | 0                           |
+| **TOTAL**        | **49** | **11**               | **38**                      |
+
+### Detalle de tests actual (2026-07-19):
+
+| Suite           | Tests  | Cobertura | Meta |
+| --------------- | ------ | --------- | ---- |
+| Backend API     | 146 ✅ | ~67%      | ≥80% |
+| TIZA Frontend   | 156 ✅ | 42.41%    | ≥80% |
+| RELEVO Frontend | 278 ✅ | 56.98%    | ≥80% |
 
 ---
 
 ## 🗂️ Estado de los QA Gates
 
-| Gate                       | Estado              | Detalle                                                                                          |
-| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------ |
-| ⛔ QA Gate (@raven)        | **INCOMPLETO** ⚠️   | Raven no ejecutó (prevención de timeout multimodal). Datos de verificación recopilados por Titan |
-| 🔍 QA Audit (@inquisitor)  | **INSUFICIENTE** ⛔ | Iteración 4: objeciones pendientes — tests hooks TIZA, tests course RELEVO, reporte Raven        |
-| 🛡️ Security Gate (@warden) | **FAIL** ❌         | SEC-1 y SEC-2 pendientes de corrección                                                           |
+| Gate                       | Estado              | Detalle                                                                                       |
+| -------------------------- | ------------------- | --------------------------------------------------------------------------------------------- |
+| ⛔ QA Gate (@raven)        | **INCOMPLETO** ⚠️   | Raven no ejecutó QA manual. 3 objeciones CRÍTICAS Inquisitor pendientes de resolver           |
+| 🔍 QA Audit (@inquisitor)  | **INSUFICIENTE** ⛔ | Iteración 4: 3 objeciones resueltas (hooks TIZA, tests RELEVO, backlog), 7 pendientes         |
+| 🛡️ Security Gate (@warden) | **PASS** ✅         | SEC-1 y SEC-2 corregidos y verificados. Issues medios SEC-3 a SEC-9 documentados, no bloquean |
+
+---
+
+### Próximos pasos inmediatos (para desbloquear QA Gate):
+
+1. **@raven**: Ejecutar QA manual completo de Iteración 4 (N-01 a N-08, bugs corregidos, UX, accesibilidad)
+2. **@echo**: Tests negativos backend (N-01 TEACHER→403, N-07 non-member→403, N-05 delete tenant, F-04 email)
+3. **@echo**: E2E Playwright (T-03) + test concurrencia real (T-04)
+4. **@echo**: Mejorar cobertura TIZA (api.ts branches), RELEVO (useRelevoApi.ts)
+5. **🔍 @inquisitor**: Re-auditar una vez que @raven y @echo entreguen nuevos reportes
 
 ---
 

@@ -854,6 +854,23 @@ class TestCoursesIntegration:
         )
         assert resp.status_code == 401
 
+    async def test_teacher_cannot_create_course(self, client: AsyncClient, teacher_context: dict):
+        """N-01: TEACHER cannot create courses — only HOLDER/ADMIN can."""
+        ctx = teacher_context
+        resp = await client.post(
+            "/api/courses",
+            json={
+                "name": COURSE_NAME,
+                "grade": COURSE_GRADE,
+                "subject": COURSE_SUBJECT,
+                "teacher_id": ctx["teacher_id"],
+            },
+            headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
+        )
+        assert resp.status_code == 403, (
+            f"Expected 403 for TEACHER creating course, got {resp.status_code}: {resp.text}"
+        )
+
 
 # ═════════════════════════════════════════════
 #  4. STUDENTS  (bulk create under course)
@@ -1104,6 +1121,56 @@ class TestEvaluationsIntegration:
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         assert resp2.status_code == 404
+
+    async def test_non_teacher_cannot_create_evaluation_in_other_course(
+        self, client: AsyncClient, fastapi_app
+    ):
+        """N-07: TEACHER from different tenant cannot create evaluation in another's course."""
+        # ── Set up tenant A with HOLDER A + TEACHER A + Course A ──
+        holder_a = await _setup_holder(fastapi_app)
+        teacher_a = await _setup_teacher(fastapi_app, holder_a["tenant_id"])
+
+        c_resp = await client.post("/api/courses", json={
+            "name": "Course A for N-07", "grade": "1°",
+            "subject": "Matemáticas", "teacher_id": teacher_a["teacher_id"],
+        }, headers={"Authorization": f"Bearer {holder_a['token']}"})
+        assert c_resp.status_code == 201, f"Course creation failed: {c_resp.text}"
+        course_a_id = c_resp.json()["id"]
+
+        # ── Set up tenant B with TEACHER B ──
+        holder_b = await _setup_holder_custom(
+            fastapi_app, "holder-b-n07@test.com", "HolderBN07!", with_member=True
+        )
+
+        import database as db_module
+        from models.db_models import User
+        from utils.security import hash_password
+        async with db_module.async_session() as session:
+            teacher_b = User(
+                email="teacher-b-n07@test.com",
+                name="Teacher B N07",
+                password=hash_password("TeacherBN07!"),
+                status="active",
+                role="TEACHER",
+                tenant_id=holder_b["tenant_id"],
+            )
+            session.add(teacher_b)
+            await session.commit()
+
+        teacher_b_token = await _login(fastapi_app, "teacher-b-n07@test.com", "TeacherBN07!")
+
+        # ── TEACHER B tries to create evaluation for Course A → 403 ──
+        resp = await client.post("/api/evaluations", json={
+            "title": "Should Fail N-07",
+            "subject": "Matemáticas",
+            "grade": "1°",
+            "rubric": self.RUBRIC,
+            "course_id": course_a_id,
+        }, headers={"Authorization": f"Bearer {teacher_b_token}"})
+        assert resp.status_code == 403, (
+            f"Expected 403 for TEACHER creating eval on another's course, "
+            f"got {resp.status_code}: {resp.text}"
+        )
 
 
 # ═════════════════════════════════════════════

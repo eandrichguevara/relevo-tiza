@@ -469,3 +469,114 @@ describe('apiFetch — edge cases', () => {
     });
   });
 });
+
+describe('apiFetch — uncovered branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa errorBody.message cuando detail no está presente (line 131)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Server error occurred' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 500,
+      detail: 'Server error occurred',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error no tiene .message (line 183)', async () => {
+    mockFetch.mockRejectedValueOnce({});
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión. Verifica tu internet.',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error.message es null (line 183)', async () => {
+    mockFetch.mockRejectedValueOnce({ message: null });
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión. Verifica tu internet.',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error.message es string vacío (line 183)', async () => {
+    mockFetch.mockRejectedValueOnce({ message: '' });
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión. Verifica tu internet.',
+    });
+  });
+});
+
+describe('apiUpload — uncovered branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa errorBody.message cuando detail no está presente (line 221)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Upload failed' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 400,
+      detail: 'Upload failed',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error de red no tiene .message (line 252)', async () => {
+    mockFetch.mockRejectedValueOnce({});
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión.',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error.message es null (line 252)', async () => {
+    mockFetch.mockRejectedValueOnce({ message: null });
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión.',
+    });
+  });
+
+  it('traduce error 500 con cuerpo no-JSON (res.json falla en error handling)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Internal Server Error', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    );
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 500,
+      detail: expect.stringContaining('servidor'),
+    });
+  });
+});
