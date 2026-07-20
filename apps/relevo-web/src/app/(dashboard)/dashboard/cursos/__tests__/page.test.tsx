@@ -30,12 +30,14 @@ const mockUseTenants = vi.fn();
 const mockUseCourses = vi.fn();
 const mockUseCreateCourse = vi.fn();
 const mockUseDeleteCourse = vi.fn();
+const mockUseUsers = vi.fn();
 
 vi.mock('@/hooks/useRelevoApi', () => ({
   useTenants: (...args: any[]) => mockUseTenants(...args),
   useCourses: (...args: any[]) => mockUseCourses(...args),
   useCreateCourse: (...args: any[]) => mockUseCreateCourse(...args),
   useDeleteCourse: (...args: any[]) => mockUseDeleteCourse(...args),
+  useUsers: (...args: any[]) => mockUseUsers(...args),
 }));
 
 vi.mock('@tiza/ui', () => ({
@@ -184,6 +186,36 @@ const MOCK_COURSES = [
   },
 ];
 
+const MOCK_USERS = [
+  {
+    id: 'u1',
+    name: 'Carolina Llona de Cuevas',
+    email: 'carolina@test.cl',
+    role: 'TEACHER',
+    status: 'active',
+    tenantId: 't1',
+    created_at: '2025-01-01',
+  },
+  {
+    id: 'u2',
+    name: 'Pedro Pérez',
+    email: 'pedro@test.cl',
+    role: 'TEACHER',
+    status: 'active',
+    tenantId: 't1',
+    created_at: '2025-01-01',
+  },
+  {
+    id: 'u3',
+    name: 'Juan Admin',
+    email: 'admin@test.cl',
+    role: 'HOLDER',
+    status: 'active',
+    tenantId: 't1',
+    created_at: '2025-01-01',
+  },
+];
+
 const DEFAULT_AUTH = {
   accessToken: 'mock-token',
   isAuthenticated: true,
@@ -241,6 +273,11 @@ describe('CursosPage', () => {
     mockUseDeleteCourse.mockReturnValue({
       mutateAsync: mutateAsyncDelete,
       isPending: false,
+    });
+
+    mockUseUsers.mockReturnValue({
+      data: MOCK_USERS,
+      isLoading: false,
     });
 
     mockSearchParamsGet.mockReturnValue(null);
@@ -635,21 +672,24 @@ describe('CursosPage', () => {
 
     it('toggle de asignatura funciona', async () => {
       // Desmarcar Lenguaje
-      const lenguajeCheckbox = screen.getByLabelText('Lenguaje') as HTMLInputElement;
+      const lenguajeCheckbox = screen.getByRole('checkbox', { name: 'Lenguaje' }) as HTMLInputElement;
       await userEvent.click(lenguajeCheckbox);
       expect(lenguajeCheckbox.checked).toBe(false);
       expect(screen.getByText(/1 asignatura seleccionada/)).toBeInTheDocument();
     });
 
     it('asignatura marcada tiene estilo visual diferente (border-brand-primary)', async () => {
-      const lenguajeLabel = screen.getByText('Lenguaje').closest('label')!;
+      const lenguajeLabel = screen.getByRole('checkbox', { name: 'Lenguaje' }).closest('label')!;
       expect(lenguajeLabel.className).toContain('border-brand-primary');
     });
 
-    it('asignatura no marcada tiene estilo gris', async () => {
-      // Inglés no está preseleccionada
-      const inglesLabel = screen.getByText('Inglés').closest('label')!;
-      expect(inglesLabel.className).toContain('border-gray-200');
+    it('asignatura desmarcada tiene estilo gris', async () => {
+      // Desmarcar Matemáticas para verificar estilo gris
+      const matesCheckbox = screen.getByRole('checkbox', { name: 'Matemáticas' }) as HTMLInputElement;
+      await userEvent.click(matesCheckbox);
+      expect(matesCheckbox.checked).toBe(false);
+      const matesLabel = screen.getByRole('checkbox', { name: 'Matemáticas' }).closest('label')!;
+      expect(matesLabel.className).toContain('border-gray-200');
     });
   });
 
@@ -691,6 +731,8 @@ describe('CursosPage', () => {
       // Escribir nombre
       await userEvent.type(screen.getByLabelText('Nombre del curso'), '4° básico A');
 
+      // Nota: los selects de profesor no se renderizan si no hay asignaturas
+
       // Submit
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
@@ -705,9 +747,28 @@ describe('CursosPage', () => {
       // Solo espacios en blanco
       await userEvent.type(screen.getByLabelText('Nombre del curso'), '   ');
 
-      await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
+      // Usamos fireEvent.submit para evitar HTML5 validation de required fields
+      const form = document.querySelector('form')!;
+      fireEvent.submit(form);
 
       expect(screen.getByText('El nombre del curso es obligatorio.')).toBeInTheDocument();
+    });
+
+    it('muestra error si no se selecciona profesor', async () => {
+      await renderPage();
+      await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
+
+      await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso sin profesor');
+      // No seleccionar profesor — dejar el select vacío
+
+      // Usamos fireEvent.submit para evitar HTML5 validation de required fields
+      const form = document.querySelector('form')!;
+      fireEvent.submit(form);
+
+      expect(
+        screen.getByText('Selecciona un profesor para: Lenguaje, Matemáticas.')
+      ).toBeInTheDocument();
+      expect(mutateAsyncCreate).not.toHaveBeenCalled();
     });
   });
 
@@ -725,6 +786,16 @@ describe('CursosPage', () => {
       const gradeSelect = screen.getByLabelText('Seleccionar nivel');
       await userEvent.selectOptions(gradeSelect, '4° básico');
 
+      // Seleccionar profesores por asignatura
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u2'
+      );
+
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -732,6 +803,7 @@ describe('CursosPage', () => {
           name: '4° básico A',
           grade: '4° básico',
           subject: 'Lenguaje, Matemáticas',
+          teachers: { Lenguaje: 'u1', Matemáticas: 'u2' },
           tenant_id: 't1',
         });
       });
@@ -744,6 +816,14 @@ describe('CursosPage', () => {
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Nuevo curso test');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -757,6 +837,14 @@ describe('CursosPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Test Course');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -769,18 +857,23 @@ describe('CursosPage', () => {
       await renderPage();
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso con extras');
+      await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso con asignaturas');
 
-      // Agregar Historia e Inglés a las preseleccionadas
-      await userEvent.click(screen.getByLabelText('Historia'));
-      await userEvent.click(screen.getByLabelText('Inglés'));
-
+      // Las 2 asignaturas vienen preseleccionadas por defecto
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
         expect(mutateAsyncCreate).toHaveBeenCalledWith(
           expect.objectContaining({
-            subject: 'Lenguaje, Matemáticas, Historia, Inglés',
+            subject: 'Lenguaje, Matemáticas',
           })
         );
       });
@@ -798,6 +891,14 @@ describe('CursosPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso duplicado');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -813,6 +914,14 @@ describe('CursosPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso fallido');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -826,6 +935,14 @@ describe('CursosPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso fallido');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -841,6 +958,14 @@ describe('CursosPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso fallido');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -858,6 +983,14 @@ describe('CursosPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
 
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso fallido');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -1008,6 +1141,14 @@ describe('CursosPage', () => {
       await renderPage();
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso test');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {
@@ -1026,6 +1167,14 @@ describe('CursosPage', () => {
       await renderPage();
       await userEvent.click(screen.getByRole('button', { name: /nuevo curso/i }));
       await userEvent.type(screen.getByLabelText('Nombre del curso'), 'Curso test');
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u1'
+      );
       await userEvent.click(screen.getByRole('button', { name: /crear curso/i }));
 
       await waitFor(() => {

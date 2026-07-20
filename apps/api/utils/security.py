@@ -63,6 +63,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 async def get_current_user(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -105,6 +106,23 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Tu cuenta ha sido suspendida. Contacta al administrador.",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    # Force password change for provisional passwords
+    if user.must_change_password:
+        path = request.url.path if request else ""
+        allowed_paths = {
+            "/api/auth/change-password",
+            "/api/auth/change-password/",
+            "/api/auth/session",
+            "/api/auth/session/",
+            "/api/auth/me",
+            "/api/auth/me/",
+        }
+        if path not in allowed_paths:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Debes cambiar tu contraseña provisoria antes de acceder a la plataforma.",
             )
 
     return user

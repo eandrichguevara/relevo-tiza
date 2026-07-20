@@ -60,6 +60,7 @@ describe('GET /api/auth/session', () => {
         name: 'Profesor Test',
         role: 'teacher',
         status: 'active',
+        mustChangePassword: false,
         tenantId: 'tenant-1',
       },
       accessToken: expect.any(String),
@@ -117,6 +118,7 @@ describe('GET /api/auth/session', () => {
       name: '',
       role: '',
       status: 'active',
+      mustChangePassword: false,
       tenantId: '',
     });
     expect(body.accessToken).toBeTruthy();

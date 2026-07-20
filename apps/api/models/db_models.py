@@ -2,7 +2,7 @@
 import secrets
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Float, Boolean, DateTime, ForeignKey, JSON, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, JSON, Index, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 
@@ -59,6 +59,7 @@ class User(Base):
     approved_by = Column(String, nullable=True)
     role = Column(String, default="TEACHER")
     tenant_id = Column(String, ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False)
+    must_change_password = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -131,7 +132,6 @@ class AuditLog(Base):
 class Course(Base):
     __tablename__ = "courses"
     __table_args__ = (
-        Index("ix_courses_teacher_id", "teacher_id"),
         Index("ix_courses_deleted_at", "deleted_at"),
     )
 
@@ -139,12 +139,32 @@ class Course(Base):
     name = Column(String, nullable=False)
     grade = Column(String, nullable=False)
     subject = Column(String, nullable=False)
-    teacher_id = Column(String, nullable=False)
     deleted_at = Column(DateTime(timezone=True), nullable=True, default=None)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     students = relationship("Student", back_populates="course", cascade="all, delete-orphan")
+    teachers = relationship("CourseTeacher", back_populates="course", cascade="all, delete-orphan")
+
+
+class CourseTeacher(Base):
+    """Per-subject teacher assignment for a course.
+
+    A course like "1ro medio A" can have a different teacher for each
+    subject (e.g., Lenguaje → Teacher A, Matemáticas → Teacher B).
+    """
+    __tablename__ = "course_teachers"
+    __table_args__ = (
+        UniqueConstraint("course_id", "subject", name="uq_course_teacher_subject"),
+        Index("ix_course_teachers_teacher_id", "teacher_id"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    course_id = Column(String, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    subject = Column(String, nullable=False)
+    teacher_id = Column(String, nullable=False)
+
+    course = relationship("Course", back_populates="teachers")
 
 
 class Student(Base):

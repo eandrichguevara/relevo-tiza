@@ -53,6 +53,7 @@ const FIELD_LABELS: Record<string, string> = {
   tenant_id: 'Colegio',
   tenantId: 'Colegio',
   join_code: 'Código de colegio',
+  teacher_id: 'Profesor',
 };
 
 /**

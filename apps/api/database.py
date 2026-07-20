@@ -115,10 +115,17 @@ async def create_tenant_schema(tenant_id: str):
                 name VARCHAR NOT NULL,
                 grade VARCHAR NOT NULL,
                 subject VARCHAR NOT NULL,
-                teacher_id VARCHAR NOT NULL,
                 deleted_at TIMESTAMPTZ,
                 created_at TIMESTAMPTZ DEFAULT NOW(),
                 updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+        await conn.execute(text(f"""
+            CREATE TABLE IF NOT EXISTS {schema}.course_teachers (
+                course_id VARCHAR NOT NULL REFERENCES {schema}.courses(id) ON DELETE CASCADE,
+                subject VARCHAR NOT NULL,
+                teacher_id VARCHAR NOT NULL,
+                UNIQUE(course_id, subject)
             )
         """))
         await conn.execute(text(f"""
@@ -158,8 +165,8 @@ async def create_tenant_schema(tenant_id: str):
             ON {schema}.evaluations (status)
         """))
         await conn.execute(text(f"""
-            CREATE INDEX IF NOT EXISTS "{idx_prefix}_courses_teacher_id"
-            ON {schema}.courses (teacher_id)
+            CREATE INDEX IF NOT EXISTS "{idx_prefix}_course_teachers_teacher_id"
+            ON {schema}.course_teachers (teacher_id)
         """))
         await conn.execute(text(f"""
             CREATE INDEX IF NOT EXISTS "{idx_prefix}_results_evaluation_id"

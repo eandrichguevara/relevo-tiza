@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 from typing import List, Optional
 
 from database import get_db, current_tenant_id
-from models.db_models import Evaluation, User, Course, Student
+from models.db_models import Evaluation, User, Course, CourseTeacher, Student
 from models.schemas import CreateEvaluationRequest, EvaluationResponse
 from utils.security import verify_tenant_access
 from services.gemini import GeminiService
@@ -73,12 +73,20 @@ async def create_evaluation(
     if not course:
         raise HTTPException(status_code=404, detail="Curso no encontrado")
 
-    # TEACHERs can only create evaluations for courses they teach
-    if current_user.role == "TEACHER" and str(course.teacher_id) != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No puedes crear evaluaciones para un curso que no te pertenece",
+    # TEACHERs can only create evaluations for subjects they teach in this course
+    if current_user.role == "TEACHER":
+        ct_result = await db.execute(
+            select(CourseTeacher).where(
+                CourseTeacher.course_id == body.course_id,
+                CourseTeacher.subject == body.subject,
+                CourseTeacher.teacher_id == current_user.id,
+            )
         )
+        if not ct_result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="No tienes permiso para esta materia en este curso",
+            )
 
     evaluation = Evaluation(
         title=body.title,

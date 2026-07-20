@@ -77,6 +77,7 @@ async def create_user(
         status="pending",
         role=resolved_role,
         tenant_id=body.tenant_id,
+        must_change_password=True,
     )
     db.add(user)
     await db.flush()
@@ -201,6 +202,7 @@ async def reset_password(
     # Generate secure random password and hash it
     temp_password = _generate_temp_password()
     user.password = hash_password(temp_password)
+    user.must_change_password = True
 
     await db.flush()
     await db.commit()

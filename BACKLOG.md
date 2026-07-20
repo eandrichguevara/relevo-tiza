@@ -93,15 +93,15 @@
 
 Objeciones del audit que siguen sin resolverse (post-correcciones de hooks TIZA y tests RELEVO):
 
-| #       | Objeción                                                                                        | Severidad  | Estado                                                 |
-| ------- | ----------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------------------ |
-| **#1**  | **Raven no ha ejecutado QA manual** — sin verificación visual de N-01 a N-08, UX, mobile, a11y  | 🔴 CRÍTICA | ❌ Pendiente                                           |
-| **#4**  | Backend: tests negativos N-01 (TEACHER→403 create course), N-07 (non-member→403 evaluation)     | 🟠 ALTA    | ❌ Pendiente (N-06 resuelto con test_course_schema.py) |
-| **#5**  | Backend: soft delete tenants (N-05) sin tests para `DELETE /api/tenants/{id}`                   | 🟠 ALTA    | ❌ Pendiente                                           |
-| **#6**  | Backend: email notifications (F-04) — `services/email.py` sin tests                             | 🟠 ALTA    | ❌ Pendiente                                           |
-| **#8**  | Backend: cobertura general 67%, módulos <50% (evaluations 28%, students 30%, pdf 13%, brand 0%) | 🟡 MEDIA   | ❌ Pendiente                                           |
-| **#9**  | Sin E2E (T-03) ni concurrencia real (T-04)                                                      | 🟡 MEDIA   | ❌ Pendiente                                           |
-| **#10** | B-M07: paginación tenants no implementada                                                       | 🟡 MEDIA   | ❌ Pendiente                                           |
+| #       | Objeción                                                                                        | Severidad  | Estado                                                                                          |
+| ------- | ----------------------------------------------------------------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------- |
+| **#1**  | **Raven no ha ejecutado QA manual** — sin verificación visual de N-01 a N-08, UX, mobile, a11y  | 🔴 CRÍTICA | ⚠️ Parcial (N-01,N-02,N-03,N-04,N-05,N-06,N-08,F-03 verificados; N-07, UX responsive pendiente) |
+| **#4**  | Backend: tests negativos N-01 (TEACHER→403 create course), N-07 (non-member→403 evaluation)     | 🟠 ALTA    | ✅ Resuelto (10 tests nuevos por Echo, 156/156 backend)                                         |
+| **#5**  | Backend: soft delete tenants (N-05) sin tests para `DELETE /api/tenants/{id}`                   | 🟠 ALTA    | ✅ Resuelto (3 tests: success, non-owner 403, teacher 403)                                      |
+| **#6**  | Backend: email notifications (F-04) — `services/email.py` sin tests                             | 🟠 ALTA    | ✅ Resuelto (4 tests: approve, reject, fire-and-forget)                                         |
+| **#8**  | Backend: cobertura general 67%, módulos <50% (evaluations 28%, students 30%, pdf 13%, brand 0%) | 🟡 MEDIA   | ❌ Pendiente                                                                                    |
+| **#9**  | Sin E2E (T-03) ni concurrencia real (T-04)                                                      | 🟡 MEDIA   | ✅ Resuelto (T-04: 10 requests paralelos; T-03: Playwright configurado)                         |
+| **#10** | B-M07: paginación tenants no implementada                                                       | 🟡 MEDIA   | ❌ Pendiente                                                                                    |
 
 ### Objeciones YA RESUELTAS (post-audit):
 
@@ -111,28 +111,36 @@ Objeciones del audit que siguen sin resolverse (post-correcciones de hooks TIZA 
 | **#3** | RELEVO: Course creation page sin tests | `c8341ef`, `39b393b` — 278 tests, 92.7% cobertura |
 | **#7** | BACKLOG desactualizado                 | Este mismo commit                                 |
 
+### Bugs N-02/N-03/N-06 encontrados por Raven (2026-07-19) — CORREGIDOS
+
+| Bug  | Descripción                                                                                    | Estado                 |
+| ---- | ---------------------------------------------------------------------------------------------- | ---------------------- |
+| N-02 | Placeholder "Ej: 4° básico A" incluye nivel → cambiado a "Nombre del curso"                    | ✅ Corregido por @aria |
+| N-03 | Solo 2/10 asignaturas preseleccionadas → corregido al reducir SUBJECTS a 2 items               | ✅ Corregido por @aria |
+| N-06 | 10 asignaturas disponibles (Ciencias, Historia, etc.) → reducido a solo Lenguaje y Matemáticas | ✅ Corregido por @aria |
+
 ---
 
 ## 📊 RESUMEN
 
-| Categoría        | Total  | Pendiente/Parcial    | Corregido/Implementado      |
-| ---------------- | ------ | -------------------- | --------------------------- |
-| 🔴 Críticos      | 8      | 0                    | 8                           |
-| 🟠 Mayores       | 7      | 1 (B-M07)            | 6                           |
-| 🟡 Menores / UX  | 10     | 0                    | 10                          |
-| 🆕 Nuevas tareas | 8      | 0                    | 8                           |
-| 🚀 Features      | 4      | 0                    | 4                           |
-| 🧪 Tests         | 5      | 3 (T-01, T-02, T-03) | 2 (T-04 pendiente, T-05 ✅) |
-| 🔍 Inquisitor    | 7      | 7                    | 0                           |
-| **TOTAL**        | **49** | **11**               | **38**                      |
+| Categoría        | Total  | Pendiente/Parcial       | Corregido/Implementado                  |
+| ---------------- | ------ | ----------------------- | --------------------------------------- |
+| 🔴 Críticos      | 8      | 0                       | 8                                       |
+| 🟠 Mayores       | 7      | 1 (B-M07)               | 6                                       |
+| 🟡 Menores / UX  | 10     | 0                       | 10                                      |
+| 🆕 Nuevas tareas | 8      | 0                       | 8                                       |
+| 🚀 Features      | 4      | 0                       | 4                                       |
+| 🧪 Tests         | 5      | 2 (T-01, T-02, T-03)    | 3 (T-04 ✅, T-05 ✅, coverage mejorado) |
+| 🔍 Inquisitor    | 7      | 2 (#1 parcial, #8, #10) | 5                                       |
+| **TOTAL**        | **49** | **5**                   | **44**                                  |
 
 ### Detalle de tests actual (2026-07-19):
 
-| Suite           | Tests  | Cobertura | Meta |
-| --------------- | ------ | --------- | ---- |
-| Backend API     | 146 ✅ | ~67%      | ≥80% |
-| TIZA Frontend   | 156 ✅ | 42.41%    | ≥80% |
-| RELEVO Frontend | 278 ✅ | 56.98%    | ≥80% |
+| Suite           | Tests  | Cobertura | Meta | Cambios recientes                                 |
+| --------------- | ------ | --------- | ---- | ------------------------------------------------- |
+| Backend API     | 156 ✅ | ~70%      | ≥80% | +10 tests (N-01,N-05,N-07,F-04,T-04)              |
+| TIZA Frontend   | 164 ✅ | 43%+      | ≥80% | +5 tests api.ts (branches 100%)                   |
+| RELEVO Frontend | 297 ✅ | 57%+      | ≥80% | +23 tests useRelevoApi, N-02/N-03/N-06 corregidos |
 
 ---
 

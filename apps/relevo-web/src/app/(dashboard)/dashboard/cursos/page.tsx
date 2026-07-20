@@ -19,6 +19,7 @@ import {
   useCourses,
   useCreateCourse,
   useDeleteCourse,
+  useUsers,
   type Course,
 } from '@/hooks/useRelevoApi';
 import { useActiveTenant } from '@/hooks/ActiveTenantContext';
@@ -43,18 +44,7 @@ const GRADES = [
 
 // ─── Asignaturas disponibles ──────────────────────────────
 
-const SUBJECTS = [
-  'Lenguaje',
-  'Matemáticas',
-  'Ciencias Naturales',
-  'Historia',
-  'Inglés',
-  'Artes',
-  'Educación Física',
-  'Música',
-  'Tecnología',
-  'Religión',
-];
+const SUBJECTS = ['Lenguaje', 'Matemáticas'];
 
 // ─── Format date ──────────────────────────────────────────
 
@@ -104,10 +94,16 @@ function CursosContent() {
 
   const createCourse = useCreateCourse();
   const deleteCourse = useDeleteCourse();
+  const { data: users } = useUsers(selectedTenantId);
+  const teachers = useMemo(
+    () => (users || []).filter((u: any) => u.role === 'TEACHER' && u.status === 'active'),
+    [users]
+  );
 
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', grade: GRADES[0] });
   const [subjects, setSubjects] = useState<string[]>(['Lenguaje', 'Matemáticas']);
+  const [selectedTeachers, setSelectedTeachers] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
@@ -130,6 +126,7 @@ function CursosContent() {
   const handleOpenModal = () => {
     setForm({ name: '', grade: GRADES[0] });
     setSubjects(['Lenguaje', 'Matemáticas']);
+    setSelectedTeachers({});
     setFormError(null);
     setShowModal(true);
   };
@@ -137,6 +134,7 @@ function CursosContent() {
   const handleCloseModal = () => {
     setShowModal(false);
     setFormError(null);
+    setSelectedTeachers({});
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -155,6 +153,13 @@ function CursosContent() {
       return;
     }
 
+    // Validate each selected subject has a teacher assigned
+    const missingTeachers = subjects.filter((s) => !selectedTeachers[s]);
+    if (missingTeachers.length > 0) {
+      setFormError(`Selecciona un profesor para: ${missingTeachers.join(', ')}.`);
+      return;
+    }
+
     if (!selectedTenantId) {
       setFormError('Selecciona un colegio primero.');
       return;
@@ -165,6 +170,10 @@ function CursosContent() {
         name,
         grade: form.grade,
         subject: subjects.join(', '),
+        teachers: subjects.reduce(
+          (acc, s) => ({ ...acc, [s]: selectedTeachers[s] }),
+          {} as Record<string, string>
+        ),
         tenant_id: selectedTenantId,
       });
       handleCloseModal();
@@ -429,10 +438,55 @@ function CursosContent() {
                   </div>
                 )}
 
+                {/* Teacher per subject */}
+                {subjects.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="block text-sm font-medium text-gray-700">
+                      Profesores por asignatura
+                    </span>
+                    {subjects.map((subject) => (
+                      <div key={subject}>
+                        <label
+                          htmlFor={`course-teacher-${subject}`}
+                          className="block text-xs font-medium text-gray-500 mb-1"
+                        >
+                          {subject}
+                        </label>
+                        {teachers && teachers.length > 0 ? (
+                          <select
+                            id={`course-teacher-${subject}`}
+                            value={selectedTeachers[subject] || ''}
+                            onChange={(e) =>
+                              setSelectedTeachers((prev) => ({
+                                ...prev,
+                                [subject]: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900
+                              focus:outline-none focus:ring-2 focus:ring-[#1A3A5C] focus:ring-offset-1 bg-white"
+                            aria-label={`Seleccionar profesor para ${subject}`}
+                          >
+                            <option value="">— Selecciona profesor —</option>
+                            {teachers.map((t: any) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                            No hay profesores disponibles en este colegio.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Course name */}
                 <Input
                   label="Nombre del curso"
-                  placeholder="Ej: 4° básico A"
+                  placeholder="Nombre del curso"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required

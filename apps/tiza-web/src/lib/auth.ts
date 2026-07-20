@@ -23,6 +23,7 @@ export interface AuthUser {
   role: string;
   status: string;
   rejectionReason?: string;
+  mustChangePassword?: boolean;
   tenantId: string;
 }
 
@@ -143,7 +144,6 @@ export async function loginUser(
     body: JSON.stringify({ email, password }),
   });
 
-  // 2. Get user profile with the fresh token
   const userData = await apiFetch<{
     id: string;
     email: string;
@@ -151,6 +151,7 @@ export async function loginUser(
     role: string;
     status: string;
     rejection_reason?: string;
+    must_change_password: boolean;
     tenant_id: string;
   }>('/api/auth/me', {
     token: loginRes.access_token,
@@ -163,6 +164,7 @@ export async function loginUser(
     role: userData.role,
     status: userData.status,
     rejectionReason: userData.rejection_reason,
+    mustChangePassword: userData.must_change_password,
     tenantId: userData.tenant_id,
   };
 
@@ -197,4 +199,46 @@ export async function clearAuth(): Promise<void> {
     clearStoredUser();
     setTokenJwt(null);
   }
+}
+
+export async function changePasswordUser(
+  currentPass: string,
+  newPass: string,
+  currentToken: string
+): Promise<{ user: AuthUser; token: string }> {
+  const changeRes = await apiFetch<TokenResponse>('/api/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPass, new_password: newPass }),
+    token: currentToken,
+  });
+
+  const userData = await apiFetch<{
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    status: string;
+    rejection_reason?: string;
+    must_change_password: boolean;
+    tenant_id: string;
+  }>('/api/auth/me', {
+    token: changeRes.access_token,
+  });
+
+  const user: AuthUser = {
+    id: userData.id,
+    email: userData.email,
+    name: userData.name,
+    role: userData.role,
+    status: userData.status,
+    rejectionReason: userData.rejection_reason,
+    mustChangePassword: userData.must_change_password,
+    tenantId: userData.tenant_id,
+  };
+
+  await setTokenCookie(changeRes.access_token);
+  storeUser(user);
+  setTokenJwt(changeRes.access_token);
+
+  return { user, token: changeRes.access_token };
 }

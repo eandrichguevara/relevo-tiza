@@ -238,6 +238,34 @@ describe('getTranslatedError', () => {
     const fn = await getTranslatedErrorFn();
     expect(fn(999, 'custom')).toBe('custom');
   });
+
+  it('retorna string vacío cuando first.msg es null (line 70)', async () => {
+    const fn = await getTranslatedErrorFn();
+    const detail = [{ loc: ['body', 'email'], msg: null, type: 'value_error' }];
+    const result = fn(422, detail);
+    expect(result).toBe('Email: ');
+  });
+
+  it('retorna msg sin prefijo de campo cuando loc es undefined (line 75)', async () => {
+    const fn = await getTranslatedErrorFn();
+    const detail = [{ msg: 'Field required', type: 'value_error' }];
+    const result = fn(422, detail);
+    expect(result).toBe('Este campo es obligatorio.');
+  });
+
+  it('retorna msg sin prefijo de campo cuando loc es array vacío (line 75)', async () => {
+    const fn = await getTranslatedErrorFn();
+    const detail = [{ loc: [], msg: 'Field required', type: 'value_error' }];
+    const result = fn(422, detail);
+    expect(result).toBe('Este campo es obligatorio.');
+  });
+
+  it('retorna fallback para array de objetos sin msg con status no mapeado (line 86)', async () => {
+    const fn = await getTranslatedErrorFn();
+    const detail = [{ code: 'UNKNOWN', description: 'Something' }];
+    const result = fn(999, detail);
+    expect(result).toBe('Error inesperado (999). Intenta de nuevo.');
+  });
 });
 
 describe('apiUpload', () => {

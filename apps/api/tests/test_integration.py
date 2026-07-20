@@ -399,7 +399,7 @@ class TestTenantsIntegration:
         from sqlalchemy import text
         async with db_module.async_session() as session:
             await session.execute(
-                text("UPDATE users SET status = 'active', approved_at = CURRENT_TIMESTAMP, approved_by = 'test_admin' WHERE email = :email"),
+                text("UPDATE users SET status = 'active', must_change_password = false, approved_at = CURRENT_TIMESTAMP, approved_by = 'test_admin' WHERE email = :email"),
                 {"email": "teacher-no-tenant@test.com"},
             )
             await session.commit()
@@ -756,7 +756,7 @@ class TestCoursesIntegration:
                 "name": COURSE_NAME,
                 "grade": COURSE_GRADE,
                 "subject": COURSE_SUBJECT,
-                "teacher_id": ctx["teacher_id"],
+                "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
@@ -777,7 +777,7 @@ class TestCoursesIntegration:
             "/api/courses",
             json={
                 "name": COURSE_NAME, "grade": COURSE_GRADE,
-                "subject": COURSE_SUBJECT, "teacher_id": ctx["teacher_id"],
+                "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
@@ -798,7 +798,7 @@ class TestCoursesIntegration:
             "/api/courses",
             json={
                 "name": COURSE_NAME, "grade": COURSE_GRADE,
-                "subject": COURSE_SUBJECT, "teacher_id": ctx["teacher_id"],
+                "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
@@ -827,7 +827,7 @@ class TestCoursesIntegration:
             "/api/courses",
             json={
                 "name": "Curso a eliminar", "grade": "1°",
-                "subject": "Matemáticas", "teacher_id": ctx["teacher_id"],
+                "subject": "Matemáticas", "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {ctx['holder_token']}"},
         )
@@ -850,7 +850,7 @@ class TestCoursesIntegration:
         """Courses endpoints require auth."""
         resp = await client.post(
             "/api/courses",
-            json={"name": "X", "grade": "1°", "subject": "Matemáticas", "teacher_id": "x"},
+            json={"name": "X", "grade": "1°", "subject": "Matemáticas", "teachers": {"Matemáticas": "x"}},
         )
         assert resp.status_code == 401
 
@@ -863,13 +863,109 @@ class TestCoursesIntegration:
                 "name": COURSE_NAME,
                 "grade": COURSE_GRADE,
                 "subject": COURSE_SUBJECT,
-                "teacher_id": ctx["teacher_id"],
+                "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {ctx['teacher_token']}"},
         )
         assert resp.status_code == 403, (
             f"Expected 403 for TEACHER creating course, got {resp.status_code}: {resp.text}"
         )
+
+    # ─────────────────────────────────────────────
+    #  EDGE CASES — per-subject teacher validation
+    # ─────────────────────────────────────────────
+
+    async def test_create_course_nonexistent_teacher_returns_404(self, client, teacher_context):
+        """When teacher_id doesn't exist in DB → 404."""
+        ctx = teacher_context
+        resp = await client.post(
+            "/api/courses",
+            json={
+                "name": "Curso Fantasma",
+                "grade": "1° básico",
+                "subject": "Matemáticas",
+                "teachers": {"Matemáticas": "00000000-0000-0000-0000-000000000000"},
+            },
+            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+        )
+        assert resp.status_code == 404
+        assert "profesor" in resp.text.lower()
+
+    async def test_create_course_teacher_wrong_tenant_returns_404(self, client, fastapi_app):
+        """Teacher from tenant B cannot be assigned to course in tenant A."""
+        import database as db_module
+        from models.db_models import User
+        from utils.security import hash_password
+
+        # Create two holders in different tenants
+        holder_a = await _setup_holder(fastapi_app)
+        holder_b = await _setup_holder_custom(
+            fastapi_app, "holder-wt@test.com", "HolderWT99!", with_member=True
+        )
+
+        # Create teacher in tenant B (active)
+        async with db_module.async_session() as session:
+            teacher_b = User(
+                email="teacher-wrong-tenant@test.com",
+                name="Teacher Wrong Tenant",
+                password=hash_password("TeacherWT99!"),
+                status="active",
+                role="TEACHER",
+                tenant_id=holder_b["tenant_id"],
+            )
+            session.add(teacher_b)
+            await session.commit()
+            teacher_b_id = teacher_b.id
+
+        # Try creating course with holder_a's token but teacher from tenant_b
+        resp = await client.post(
+            "/api/courses",
+            json={
+                "name": "Curso Cross-Tenant",
+                "grade": "1° básico",
+                "subject": "Matemáticas",
+                "teachers": {"Matemáticas": teacher_b_id},
+            },
+            headers={"Authorization": f"Bearer {holder_a['token']}"},
+        )
+        assert resp.status_code == 404
+
+    async def test_create_course_inactive_teacher_returns_404(self, client, teacher_context):
+        """Inactive (pending) teacher → 404 because status != 'active'."""
+        ctx = teacher_context
+        import database as db_module
+        from models.db_models import User
+        from utils.security import hash_password
+
+        # Create a pending teacher directly in DB (same tenant)
+        async with db_module.async_session() as session:
+            pending_teacher = User(
+                email="pending-teacher@test.com",
+                name="Pending Teacher",
+                password=hash_password("TeacherPend99!"),
+                status="pending",
+                role="TEACHER",
+                tenant_id=ctx["tenant_id"],
+            )
+            session.add(pending_teacher)
+            await session.commit()
+            pending_teacher_id = pending_teacher.id
+
+        # Verify status is pending
+        assert pending_teacher.status == "pending"
+
+        # Try creating course with pending teacher
+        resp = await client.post(
+            "/api/courses",
+            json={
+                "name": "Curso con Pendiente",
+                "grade": "1° básico",
+                "subject": "Matemáticas",
+                "teachers": {"Matemáticas": pending_teacher_id},
+            },
+            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+        )
+        assert resp.status_code == 404
 
 
 # ═════════════════════════════════════════════
@@ -890,7 +986,7 @@ class TestStudentsIntegration:
             "/api/courses",
             json={
                 "name": COURSE_NAME, "grade": COURSE_GRADE,
-                "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+                "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": teacher["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {holder['token']}"},
         )
@@ -998,11 +1094,14 @@ class TestEvaluationsIntegration:
         teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
 
         # Create a course first (needed for evaluations — N-07)
+        # Assign the teacher for both Matemáticas and Lenguaje since the eval
+        # tests create evaluations in both subjects.
         course_resp = await client.post(
             "/api/courses",
             json={
                 "name": "Eval Course", "grade": COURSE_GRADE,
-                "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+                "subject": COURSE_SUBJECT,
+                "teachers": {"Matemáticas": teacher["teacher_id"], "Lenguaje": teacher["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {holder['token']}"},
         )
@@ -1132,7 +1231,7 @@ class TestEvaluationsIntegration:
 
         c_resp = await client.post("/api/courses", json={
             "name": "Course A for N-07", "grade": "1°",
-            "subject": "Matemáticas", "teacher_id": teacher_a["teacher_id"],
+            "subject": "Matemáticas", "teachers": {"Matemáticas": teacher_a["teacher_id"]},
         }, headers={"Authorization": f"Bearer {holder_a['token']}"})
         assert c_resp.status_code == 201, f"Course creation failed: {c_resp.text}"
         course_a_id = c_resp.json()["id"]
@@ -1194,7 +1293,7 @@ class TestResultsIntegration:
         # Course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": COURSE_NAME, "grade": COURSE_GRADE,
-            "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+            "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": teacher["teacher_id"]},
         }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
@@ -1316,7 +1415,7 @@ class TestResultsIntegration:
         from sqlalchemy import text
         async with db_module.async_session() as session:
             await session.execute(
-                text("UPDATE users SET status = 'active', approved_at = CURRENT_TIMESTAMP, approved_by = 'test_admin' WHERE email = :email"),
+                text("UPDATE users SET status = 'active', must_change_password = false, approved_at = CURRENT_TIMESTAMP, approved_by = 'test_admin' WHERE email = :email"),
                 {"email": "teacher-nostudents@test.com"},
             )
             await session.commit()
@@ -1326,7 +1425,7 @@ class TestResultsIntegration:
         # Create course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": "Empty Course", "grade": "1°", "subject": "Matemáticas",
-            "teacher_id": teacher_id,
+            "teachers": {"Matemáticas": teacher_id},
         }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
@@ -1365,7 +1464,7 @@ class TestDashboardIntegration:
         # Course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": COURSE_NAME, "grade": COURSE_GRADE,
-            "subject": COURSE_SUBJECT, "teacher_id": teacher["teacher_id"],
+            "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": teacher["teacher_id"]},
         }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 
@@ -1612,7 +1711,7 @@ class TestResultReviewIntegration:
         # Create course (HOLDER action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": "Review Course", "grade": "1°", "subject": "Matemáticas",
-            "teacher_id": teacher["teacher_id"],
+            "teachers": {"Matemáticas": teacher["teacher_id"]},
         }, headers={"Authorization": f"Bearer {holder['token']}"})
         course_id = c_resp.json()["id"]
 

@@ -78,6 +78,11 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
 class UserResponse(BaseModel):
     id: str
     email: str
@@ -85,6 +90,7 @@ class UserResponse(BaseModel):
     role: RoleEnum
     status: UserStatusEnum = UserStatusEnum.active
     tenant_id: str
+    must_change_password: bool = False
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
@@ -310,7 +316,9 @@ class CreateCourseRequest(BaseModel):
         ..., max_length=200,
         description="Asignaturas comma-separated: 'Lenguaje, Matemáticas'"
     )
-    teacher_id: str  # HOLDER/ADMIN assigns a teacher when creating
+    teachers: dict[str, str] = Field(
+        ..., description='Mapping of subject to teacher_id, e.g. {"Lenguaje": "uuid1", "Matemáticas": "uuid2"}'
+    )
 
     @field_validator("subject")
     @classmethod
@@ -328,12 +336,28 @@ class CreateCourseRequest(BaseModel):
         # Deduplicate preserving insertion order (SEC-2)
         return ", ".join(dict.fromkeys(parts))
 
+    @field_validator("teachers")
+    @classmethod
+    def validate_teachers(cls, v: dict[str, str]) -> dict[str, str]:
+        if not v:
+            raise ValueError("Debe asignar al menos un profesor")
+        allowed = {s.value for s in SubjectEnum}
+        for subject, teacher_id in v.items():
+            if subject not in allowed:
+                raise ValueError(
+                    f"La asignatura '{subject}' no es válida. "
+                    f"Asignaturas disponibles: {', '.join(sorted(allowed))}"
+                )
+            if not teacher_id or not teacher_id.strip():
+                raise ValueError(f"El teacher_id para '{subject}' no puede estar vacío")
+        return v
+
 class CourseResponse(BaseModel):
     id: str
     name: str
     grade: str
     subject: str
-    teacher_id: str
+    teachers: dict[str, str]
     student_count: int = 0
     created_at: datetime
     updated_at: datetime

@@ -24,7 +24,7 @@ def test_single_subject():
         name="1° Básico A",
         grade="1° Básico",
         subject="Lenguaje",
-        teacher_id="some-teacher-uuid",
+        teachers={"Lenguaje": "some-teacher-uuid"},
     )
     assert req.subject == "Lenguaje"
 
@@ -35,7 +35,7 @@ def test_two_subjects_comma_separated():
         name="1° Básico A",
         grade="1° Básico",
         subject="Lenguaje, Matemáticas",
-        teacher_id="some-teacher-uuid",
+        teachers={"Lenguaje": "some-teacher-uuid", "Matemáticas": "some-teacher-uuid"},
     )
     assert req.subject == "Lenguaje, Matemáticas"
 
@@ -46,7 +46,7 @@ def test_subject_with_accent_and_enum_value():
         name="3° Medio",
         grade="3° Medio",
         subject="Música",
-        teacher_id="t-id",
+        teachers={"Música": "t-id"},
     )
     assert req.subject == "Música"
 
@@ -57,7 +57,7 @@ def test_multiple_subjects_including_music():
         name="5° Básico",
         grade="5° Básico",
         subject="Lenguaje, Música",
-        teacher_id="t-id",
+        teachers={"Lenguaje": "t-id", "Música": "t-id"},
     )
     assert req.subject == "Lenguaje, Música"
 
@@ -71,7 +71,7 @@ def test_subject_with_extra_spaces():
         name="1° A",
         grade="1°",
         subject="  Lenguaje ,  Matemáticas  ",
-        teacher_id="t-id",
+        teachers={"Lenguaje": "t-id", "Matemáticas": "t-id"},
     )
     # Validator cleans up whitespace but preserves valid subjects
     assert req.subject == "Lenguaje, Matemáticas"
@@ -83,7 +83,7 @@ def test_subject_ciencias_naturales():
         name="6° Básico",
         grade="6° Básico",
         subject="Ciencias Naturales",
-        teacher_id="t-id",
+        teachers={"Ciencias Naturales": "t-id"},
     )
     assert req.subject == "Ciencias Naturales"
 
@@ -94,7 +94,7 @@ def test_subject_educacion_fisica():
         name="8° Básico",
         grade="8° Básico",
         subject="Educación Física",
-        teacher_id="t-id",
+        teachers={"Educación Física": "t-id"},
     )
     assert req.subject == "Educación Física"
 
@@ -106,7 +106,7 @@ def test_all_subject_enum_values():
             name="Test Course",
             grade="1°",
             subject=subject.value,
-            teacher_id="t-id",
+            teachers={subject.value: "t-id"},
         )
         assert req.subject == subject.value, f"Failed for subject: {subject.value}"
 
@@ -118,7 +118,7 @@ def test_all_subject_enum_values_combined():
         name="Full Course",
         grade="1°",
         subject=all_subjects,
-        teacher_id="t-id",
+        teachers={s.value: "t-id" for s in SubjectEnum},
     )
     assert req.subject == all_subjects
 
@@ -132,7 +132,7 @@ def test_invalid_single_subject():
             name="1° Básico A",
             grade="1° Básico",
             subject="Astronomía",
-            teacher_id="some-teacher-uuid",
+            teachers={"Lenguaje": "some-teacher-uuid"},
         )
     assert "Astronomía" in str(excinfo.value)
 
@@ -144,7 +144,7 @@ def test_partially_invalid_subjects():
             name="1° Básico A",
             grade="1° Básico",
             subject="Lenguaje, Astronomía",
-            teacher_id="some-teacher-uuid",
+            teachers={"Lenguaje": "some-teacher-uuid"},
         )
     error_msg = str(excinfo.value)
     assert "Astronomía" in error_msg
@@ -157,7 +157,7 @@ def test_empty_subject():
             name="1° Básico A",
             grade="1° Básico",
             subject="",
-            teacher_id="some-teacher-uuid",
+            teachers={"Lenguaje": "some-teacher-uuid"},
         )
     assert "al menos una asignatura" in str(excinfo.value).lower()
 
@@ -169,7 +169,7 @@ def test_subject_with_only_commas():
             name="1° Básico A",
             grade="1° Básico",
             subject=", , , ",
-            teacher_id="some-teacher-uuid",
+            teachers={"Lenguaje": "some-teacher-uuid"},
         )
     assert "al menos una asignatura" in str(excinfo.value).lower()
 
@@ -181,7 +181,7 @@ def test_subject_numeric_value():
             name="1° A",
             grade="1°",
             subject="12345",
-            teacher_id="t-id",
+            teachers={"Lenguaje": "t-id"},
         )
     assert "12345" in str(excinfo.value)
 
@@ -193,7 +193,7 @@ def test_subject_unknown_value():
             name="1° A",
             grade="1°",
             subject="NotASubjectAtAll",
-            teacher_id="t-id",
+            teachers={"Lenguaje": "t-id"},
         )
     assert "NotASubjectAtAll" in str(excinfo.value)
 
@@ -205,7 +205,7 @@ def test_subject_case_sensitivity():
             name="1° A",
             grade="1°",
             subject="lenguaje",
-            teacher_id="t-id",
+            teachers={"Lenguaje": "t-id"},
         )
     assert "lenguaje" in str(excinfo.value)
 
@@ -218,6 +218,38 @@ def test_existing_integration_constant():
         name="1° Básico A",
         grade="1° Básico",
         subject="Matemáticas",
-        teacher_id="t-id",
+        teachers={"Matemáticas": "t-id"},
     )
     assert req.subject == "Matemáticas"
+
+
+# ─── Teacher validators — edge cases ───────
+
+def test_empty_teachers_dict():
+    """Empty teachers dict should be rejected."""
+    with pytest.raises(ValueError) as excinfo:
+        CreateCourseRequest(
+            name="Test", grade="1°", subject="Lenguaje",
+            teachers={},
+        )
+    assert "al menos un profesor" in str(excinfo.value).lower()
+
+
+def test_teachers_with_invalid_subject_key():
+    """Subject key not in SubjectEnum should be rejected."""
+    with pytest.raises(ValueError) as excinfo:
+        CreateCourseRequest(
+            name="Test", grade="1°", subject="Lenguaje",
+            teachers={"InvalidSubject": "t-id"},
+        )
+    assert "no es válida" in str(excinfo.value).lower()
+
+
+def test_teachers_with_empty_teacher_id():
+    """Empty teacher_id value should be rejected."""
+    with pytest.raises(ValueError) as excinfo:
+        CreateCourseRequest(
+            name="Test", grade="1°", subject="Lenguaje",
+            teachers={"Lenguaje": ""},
+        )
+    assert "no puede estar vacío" in str(excinfo.value).lower()

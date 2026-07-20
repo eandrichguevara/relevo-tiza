@@ -7,7 +7,7 @@ from sqlalchemy.exc import IntegrityError
 
 from database import get_db, create_tenant_schema
 from models.db_models import User, Tenant, TenantMember, generate_join_code as _raw_join_code
-from models.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from models.schemas import LoginRequest, RegisterRequest, TokenResponse, UserResponse, ChangePasswordRequest
 from utils.security import verify_password, hash_password, create_access_token, get_current_user
 
 MAX_JOIN_CODE_ATTEMPTS = 10
@@ -203,7 +203,41 @@ async def login(
             )
 
     token = create_access_token(
-        data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id, "status": user.status}
+        data={"sub": user.id, "role": user.role, "tenant_id": user.tenant_id, "status": user.status, "must_change_password": user.must_change_password}
+    )
+    return TokenResponse(access_token=token)
+
+
+@router.post("/change-password", response_model=TokenResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Change the authenticated user's password."""
+    # Verify current password
+    if not verify_password(body.current_password, current_user.password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual es incorrecta",
+        )
+
+    # SEC-3: Check that new password is not the same as current password (prevent bypass/eluding)
+    if body.current_password == body.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña no puede ser igual a la contraseña actual.",
+        )
+
+    # Hash and save new password
+    current_user.password = hash_password(body.new_password)
+    current_user.must_change_password = False
+
+    await db.flush()
+    await db.commit()
+
+    token = create_access_token(
+        data={"sub": current_user.id, "role": current_user.role, "tenant_id": current_user.tenant_id, "status": current_user.status, "must_change_password": False}
     )
     return TokenResponse(access_token=token)
 
@@ -227,5 +261,6 @@ async def get_session(current_user: User = Depends(get_current_user)):
         "name": current_user.name,
         "role": current_user.role,
         "tenant_id": current_user.tenant_id,
+        "must_change_password": current_user.must_change_password,
         "authenticated": True,
     }

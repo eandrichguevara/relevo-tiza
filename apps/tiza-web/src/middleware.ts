@@ -79,6 +79,20 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(pendingUrl);
   }
 
+  const mustChangePassword = Boolean(payload.must_change_password ?? false);
+
+  if (mustChangePassword) {
+    if (pathname !== '/change-password') {
+      const changePasswordUrl = new URL('/change-password', req.url);
+      return NextResponse.redirect(changePasswordUrl);
+    }
+  } else {
+    if (pathname === '/change-password') {
+      const dashboardUrl = new URL('/dashboard', req.url);
+      return NextResponse.redirect(dashboardUrl);
+    }
+  }
+
   // User is active — allow access
   const response = NextResponse.next();
   response.headers.set('X-Tenant-Brand', 'tiza');
@@ -86,5 +100,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/dashboard', '/pending', '/login', '/register'],
+  matcher: ['/dashboard/:path*', '/dashboard', '/pending', '/login', '/register', '/change-password'],
 };

@@ -8,35 +8,63 @@ datasource db {
 }
 
 model Tenant {
-  id          String       @id @default(cuid()) @db.VarChar
-  subdomain   String       @unique @db.VarChar
-  name        String       @db.VarChar
-  brand       String?      @db.VarChar
-  settings    Json?        @db.Json
-  createdAt   DateTime?    @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime?    @updatedAt @map("updated_at") @db.Timestamptz(6)
-  users       User[]
-  members     TenantMember[]
+  id              String       @id @default(cuid()) @db.VarChar
+  subdomain       String       @unique @db.VarChar
+  name            String       @unique @db.VarChar
+  brand           String?      @db.VarChar
+  status          String       @default("active") @db.VarChar
+  rejectionReason String?      @map("rejection_reason") @db.VarChar
+  approvedAt      DateTime?    @map("approved_at") @db.Timestamptz(6)
+  rejectedAt      DateTime?    @map("rejected_at") @db.Timestamptz(6)
+  approvedBy      String?      @map("approved_by") @db.VarChar
+  joinCode        String       @unique @map("join_code") @db.VarChar
+  settings        Json?        @db.Json
+  createdAt       DateTime?    @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime?    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  users           User[]
+  members         TenantMember[]
 
   @@map("tenants")
 }
 
 model User {
-  id        String    @id @default(cuid()) @db.VarChar
-  email     String    @unique @db.VarChar
-  name      String    @db.VarChar
-  password  String    @db.VarChar
-  role      String?   @db.VarChar
-  tenantId  String    @map("tenant_id") @db.VarChar
-  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenant            Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  id              String    @id @default(cuid()) @db.VarChar
+  email           String    @unique @db.VarChar
+  name            String    @db.VarChar
+  password        String    @db.VarChar
+  role            String?   @db.VarChar
+  status          String    @default("active") @db.VarChar
+  rejectionReason String?   @map("rejection_reason") @db.VarChar
+  approvedAt      DateTime? @map("approved_at") @db.Timestamptz(6)
+  rejectedAt      DateTime? @map("rejected_at") @db.Timestamptz(6)
+  approvedBy      String?   @map("approved_by") @db.VarChar
+  tenantId        String    @map("tenant_id") @db.VarChar
+  mustChangePassword Boolean @default(false) @map("must_change_password")
+  createdAt       DateTime? @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   tenantMemberships TenantMember[]
 
   @@index([email], map: "ix_users_email")
   @@index([tenantId], map: "ix_users_tenant_id")
   @@index([tenantId, role], map: "ix_users_tenant_role")
   @@map("users")
+}
+
+model UserAuthIndex {
+  email        String    @id @db.VarChar
+  userId       String    @map("user_id") @db.VarChar
+  schemaName   String    @map("schema_name") @db.VarChar
+  passwordHash String    @map("password_hash") @db.VarChar
+  name         String    @default("") @db.VarChar
+  role         String?   @db.VarChar
+  status       String?   @default("active") @db.VarChar(20)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@index([schemaName], map: "ix_user_auth_schema")
+  @@index([userId], map: "ix_user_auth_user_id")
+  @@map("user_auth_index")
 }
 
 model Evaluation {
@@ -92,18 +120,27 @@ model AuditLog {
 }
 
 model Course {
-  id        String    @id @default(cuid()) @db.VarChar
-  name      String    @db.VarChar
-  grade     String    @db.VarChar
-  subject   String    @db.VarChar
-  teacherId String    @map("teacher_id") @db.VarChar
-  createdAt DateTime? @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
-  // teacherId is a plain String — no @relation (cross-schema)
+  id        String          @id @default(cuid()) @db.VarChar
+  name      String          @db.VarChar
+  grade     String          @db.VarChar
+  subject   String          @db.VarChar
+  createdAt DateTime?       @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime?       @updatedAt @map("updated_at") @db.Timestamptz(6)
   students  Student[]
+  teachers  CourseTeacher[]
 
-  @@index([teacherId], map: "ix_courses_teacher_id")
   @@map("courses")
+}
+
+model CourseTeacher {
+  courseId  String   @map("course_id") @db.VarChar
+  subject   String   @db.VarChar
+  teacherId String   @map("teacher_id") @db.VarChar
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([courseId, subject])
+  @@index([teacherId], map: "ix_course_teachers_teacher_id")
+  @@map("course_teachers")
 }
 
 model Student {

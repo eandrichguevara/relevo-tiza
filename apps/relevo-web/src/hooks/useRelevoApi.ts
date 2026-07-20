@@ -64,7 +64,13 @@ export function useCreateCourse() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name: string; grade: string; subject: string; tenant_id: string }) =>
+    mutationFn: (data: {
+      name: string;
+      grade: string;
+      subject: string;
+      teachers: Record<string, string>;
+      tenant_id: string;
+    }) =>
       apiFetch<Course>('/api/courses', {
         method: 'POST',
         token: accessToken,
