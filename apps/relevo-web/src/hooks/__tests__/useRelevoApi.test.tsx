@@ -107,7 +107,7 @@ beforeEach(() => {
 
 describe('useRelevoApi — Tenants', () => {
   it('useTenants fetches tenant list when authenticated', async () => {
-    mockApiFetch.mockResolvedValueOnce(mockTenants);
+    mockApiFetch.mockResolvedValueOnce({ items: mockTenants, total: 2, skip: 0, limit: 100 });
 
     const { useTenants } = await import('../useRelevoApi');
     const { result } = renderHook(() => useTenants(), { wrapper: createWrapper() });
@@ -423,6 +423,456 @@ describe('useRelevoApi — Admin Actions', () => {
     await waitFor(() => expect(result.current.isPending).toBe(true));
 
     resolvePromise({ success: true, message: 'Ok' });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ─── Course mutations ─────────────────────────────────---
+
+describe('useRelevoApi — Course Mutations', () => {
+  const createCoursePayload = {
+    name: '3° C',
+    grade: '3°',
+    subject: 'Ciencias',
+    teachers: { teacher1: 'u1' },
+    tenant_id: 't1',
+  };
+  const createdCourse = {
+    id: 'c3',
+    name: '3° C',
+    grade: '3°',
+    subject: 'Ciencias',
+    student_count: 0,
+    created_at: '2024-01-03',
+  };
+
+  it('useCreateCourse sends POST and invalidates courses cache', async () => {
+    mockApiFetch.mockResolvedValueOnce(createdCourse);
+
+    const { useCreateCourse } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useCreateCourse(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(createCoursePayload);
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/courses', {
+      method: 'POST',
+      token: 'mock-access-token',
+      body: JSON.stringify(createCoursePayload),
+    });
+    expect(result.current.data).toEqual(createdCourse);
+  });
+
+  it('useCreateCourse handles mutation error', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 400,
+      detail: 'Datos inválidos',
+      translatedMessage: 'Datos inválidos',
+    });
+
+    const { useCreateCourse } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useCreateCourse(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(createCoursePayload);
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('useCreateCourse mantiene isPending durante la mutación', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useCreateCourse } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useCreateCourse(), { wrapper: createWrapper() });
+
+    result.current.mutate(createCoursePayload);
+
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    resolvePromise(createdCourse);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
+  it('useDeleteCourse sends DELETE and invalidates courses cache', async () => {
+    mockApiFetch.mockResolvedValueOnce({ success: true });
+
+    const { useDeleteCourse } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useDeleteCourse(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate('c1');
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/courses/c1', {
+      method: 'DELETE',
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual({ success: true });
+  });
+
+  it('useDeleteCourse handles mutation error', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 404,
+      detail: 'Curso no encontrado',
+      translatedMessage: 'Curso no encontrado',
+    });
+
+    const { useDeleteCourse } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useDeleteCourse(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate('c1');
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('useDeleteCourse mantiene isPending durante la mutación', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useDeleteCourse } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useDeleteCourse(), { wrapper: createWrapper() });
+
+    result.current.mutate('c1');
+
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    resolvePromise({ success: true });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ─── User mutations ──────────────────────────────────────
+
+describe('useRelevoApi — User Mutations', () => {
+  const createUserPayload = {
+    email: 'teacher3@test.com',
+    name: 'Profesor 3',
+    password: 'SecurePass123!',
+    tenant_id: 't1',
+    role: 'TEACHER',
+  };
+  const createdUser = {
+    id: 'u3',
+    email: 'teacher3@test.com',
+    name: 'Profesor 3',
+    role: 'TEACHER' as const,
+    status: 'pending' as const,
+    created_at: '2024-01-03',
+    tenantId: 't1',
+  };
+
+  it('useCreateUser sends POST and invalidates users cache', async () => {
+    mockApiFetch.mockResolvedValueOnce(createdUser);
+
+    const { useCreateUser } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useCreateUser(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(createUserPayload);
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/users', {
+      method: 'POST',
+      token: 'mock-access-token',
+      body: JSON.stringify(createUserPayload),
+    });
+    expect(result.current.data).toEqual(createdUser);
+  });
+
+  it('useCreateUser handles mutation error', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 409,
+      detail: 'El email ya está registrado',
+      translatedMessage: 'El email ya está registrado',
+    });
+
+    const { useCreateUser } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useCreateUser(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(createUserPayload);
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('useCreateUser mantiene isPending durante la mutación', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useCreateUser } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useCreateUser(), { wrapper: createWrapper() });
+
+    result.current.mutate(createUserPayload);
+
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    resolvePromise(createdUser);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+
+  it('useResetPassword sends POST and invalidates users cache', async () => {
+    const resetResponse = {
+      success: true,
+      message: 'Contraseña restablecida',
+      temporary_password: 'Temp123!',
+    };
+    mockApiFetch.mockResolvedValueOnce(resetResponse);
+
+    const { useResetPassword } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useResetPassword(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate('u1');
+    });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/users/u1/reset-password', {
+      method: 'POST',
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual(resetResponse);
+  });
+
+  it('useResetPassword handles mutation error', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 404,
+      detail: 'Usuario no encontrado',
+      translatedMessage: 'Usuario no encontrado',
+    });
+
+    const { useResetPassword } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useResetPassword(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate('u1');
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('useResetPassword mantiene isPending durante la mutación', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useResetPassword } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useResetPassword(), { wrapper: createWrapper() });
+
+    result.current.mutate('u1');
+
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    resolvePromise({ success: true, message: 'Ok', temporary_password: 'Temp123!' });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ─── Dashboard stats ─────────────────────────────────────
+
+const mockExecutiveStats = {
+  total_schools: 10,
+  total_teachers: 150,
+  total_students: 3000,
+  active_evaluations: 45,
+  completed_evaluations: 120,
+};
+
+describe('useRelevoApi — Dashboard', () => {
+  it('useExecutiveStats fetches stats when authenticated', async () => {
+    mockApiFetch.mockResolvedValueOnce(mockExecutiveStats);
+
+    const { useExecutiveStats } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useExecutiveStats(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/dashboard/executive', {
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual(mockExecutiveStats);
+  });
+
+  it('useExecutiveStats is not enabled when isAuthenticated is false', async () => {
+    setAuthenticated({ accessToken: null, isAuthenticated: false });
+
+    const { useExecutiveStats } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useExecutiveStats(), { wrapper: createWrapper() });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('useExecutiveStats handles error state', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 500,
+      detail: 'Error del servidor',
+      translatedMessage: 'Error del servidor',
+    });
+
+    const { useExecutiveStats } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useExecutiveStats(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('useExecutiveStats muestra loading durante la carga', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useExecutiveStats } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useExecutiveStats(), { wrapper: createWrapper() });
+
+    expect(result.current.isLoading).toBe(true);
+
+    resolvePromise(mockExecutiveStats);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ─── Pending Registrations (Admin) ────────────────────────
+
+const mockPendingRegistrations = {
+  items: [
+    {
+      id: 'p1',
+      name: 'Usuario Pendiente',
+      email: 'pending@test.com',
+      role: 'TEACHER',
+      tenant_id: 't1',
+      tenant_name: 'Colegio 1',
+      brand: 'relevo',
+      created_at: '2024-01-01',
+    },
+    {
+      id: 'p2',
+      name: 'Otro Pendiente',
+      email: 'other@test.com',
+      role: 'TEACHER',
+      tenant_id: 't2',
+      tenant_name: 'Colegio 2',
+      brand: 'relevo',
+      created_at: '2024-01-02',
+    },
+  ],
+  total: 2,
+  page: 1,
+  page_size: 20,
+};
+
+describe('useRelevoApi — Pending Registrations', () => {
+  it('usePendingRegistrations fetches pending registrations for ADMIN role', async () => {
+    setAuthenticated({ user: { id: 'u1', role: 'ADMIN' } });
+    mockApiFetch.mockResolvedValueOnce(mockPendingRegistrations);
+
+    const { usePendingRegistrations } = await import('../useRelevoApi');
+    const { result } = renderHook(() => usePendingRegistrations(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/admin/pending-registrations', {
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual(mockPendingRegistrations);
+  });
+
+  it('usePendingRegistrations fetches for HOLDER role', async () => {
+    setAuthenticated({ user: { id: 'u1', role: 'HOLDER' } });
+    mockApiFetch.mockResolvedValueOnce(mockPendingRegistrations);
+
+    const { usePendingRegistrations } = await import('../useRelevoApi');
+    const { result } = renderHook(() => usePendingRegistrations(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/admin/pending-registrations', {
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual(mockPendingRegistrations);
+  });
+
+  it('usePendingRegistrations is not enabled when role is TEACHER', async () => {
+    setAuthenticated({ user: { id: 'u1', role: 'TEACHER' } });
+
+    const { usePendingRegistrations } = await import('../useRelevoApi');
+    const { result } = renderHook(() => usePendingRegistrations(), { wrapper: createWrapper() });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('usePendingRegistrations is not enabled when accessToken is null', async () => {
+    setAuthenticated({
+      accessToken: null,
+      isAuthenticated: false,
+      user: { id: 'u1', role: 'ADMIN' },
+    });
+
+    const { usePendingRegistrations } = await import('../useRelevoApi');
+    const { result } = renderHook(() => usePendingRegistrations(), { wrapper: createWrapper() });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('usePendingRegistrations handles error state', async () => {
+    setAuthenticated({ user: { id: 'u1', role: 'ADMIN' } });
+    mockApiFetch.mockRejectedValueOnce({
+      status: 403,
+      detail: 'Acceso denegado',
+      translatedMessage: 'Acceso denegado',
+    });
+
+    const { usePendingRegistrations } = await import('../useRelevoApi');
+    const { result } = renderHook(() => usePendingRegistrations(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('usePendingRegistrations muestra loading durante la carga', async () => {
+    setAuthenticated({ user: { id: 'u1', role: 'ADMIN' } });
+
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { usePendingRegistrations } = await import('../useRelevoApi');
+    const { result } = renderHook(() => usePendingRegistrations(), { wrapper: createWrapper() });
+
+    expect(result.current.isLoading).toBe(true);
+
+    resolvePromise(mockPendingRegistrations);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 });

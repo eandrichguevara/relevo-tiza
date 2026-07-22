@@ -13,7 +13,15 @@ export function useTenants() {
 
   return useQuery<Tenant[]>({
     queryKey: ['tenants'],
-    queryFn: () => apiFetch('/api/tenants', { token: accessToken }),
+    queryFn: async () => {
+      const response = await apiFetch<{
+        items: Tenant[];
+        total: number;
+        skip: number;
+        limit: number;
+      }>('/api/tenants', { token: accessToken });
+      return response.items;
+    },
     enabled: isAuthenticated,
   });
 }

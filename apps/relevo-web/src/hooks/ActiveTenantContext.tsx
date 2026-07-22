@@ -30,7 +30,7 @@ export function ActiveTenantProvider({ children }: { children: ReactNode }) {
   const [activeTenantId, setActiveTenantIdState] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
-  const tenantList = tenants ?? [];
+  const tenantList = Array.isArray(tenants) ? tenants : [];
 
   // Initialize from localStorage (first priority) or default to first tenant
   useEffect(() => {

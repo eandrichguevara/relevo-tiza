@@ -54,7 +54,7 @@ describe('ActiveTenantProvider + useActiveTenant', () => {
 
   it('carga tenants desde la API y selecciona el primero por defecto', async () => {
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(mockTenants), {
+      new Response(JSON.stringify({ items: mockTenants, total: 3, skip: 0, limit: 100 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -79,7 +79,7 @@ describe('ActiveTenantProvider + useActiveTenant', () => {
   it('restaura tenant desde localStorage si es válido', async () => {
     localStorage.setItem('relevo-active-tenant', 't2');
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(mockTenants), {
+      new Response(JSON.stringify({ items: mockTenants, total: 3, skip: 0, limit: 100 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -103,7 +103,7 @@ describe('ActiveTenantProvider + useActiveTenant', () => {
   it('ignora tenant inválido de localStorage y usa el primero', async () => {
     localStorage.setItem('relevo-active-tenant', 'non-existent-id');
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(mockTenants), {
+      new Response(JSON.stringify({ items: mockTenants, total: 3, skip: 0, limit: 100 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -125,7 +125,7 @@ describe('ActiveTenantProvider + useActiveTenant', () => {
 
   it('setActiveTenantId cambia el tenant activo y persiste en localStorage', async () => {
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify(mockTenants), {
+      new Response(JSON.stringify({ items: mockTenants, total: 3, skip: 0, limit: 100 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
@@ -154,7 +154,7 @@ describe('ActiveTenantProvider + useActiveTenant', () => {
 
   it('activeTenant es null cuando no hay tenants', async () => {
     mockFetch.mockResolvedValue(
-      new Response(JSON.stringify([]), {
+      new Response(JSON.stringify({ items: [], total: 0, skip: 0, limit: 100 }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       })
