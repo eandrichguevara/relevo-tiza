@@ -143,6 +143,36 @@ describe('useRelevoApi — Tenants', () => {
     expect(result.current.error).toBeDefined();
   });
 
+  it('useTenants handles apiFetch returning undefined (204/empty body)', async () => {
+    mockApiFetch.mockResolvedValueOnce(undefined);
+
+    const { useTenants } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useTenants(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([]);
+  });
+
+  it('useTenants handles response without items field', async () => {
+    mockApiFetch.mockResolvedValueOnce({ data: [] }); // no items field
+
+    const { useTenants } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useTenants(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([]);
+  });
+
+  it('useTenants handles response.items being null', async () => {
+    mockApiFetch.mockResolvedValueOnce({ items: null, total: 0, skip: 0, limit: 100 });
+
+    const { useTenants } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useTenants(), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data).toEqual([]);
+  });
+
   it('useCreateTenant sends POST and invalidates tenants cache', async () => {
     const newTenant = {
       id: 't3',

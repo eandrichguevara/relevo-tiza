@@ -20,7 +20,7 @@ export function useTenants() {
         skip: number;
         limit: number;
       }>('/api/tenants', { token: accessToken });
-      return response.items;
+      return response?.items ?? [];
     },
     enabled: isAuthenticated,
   });
