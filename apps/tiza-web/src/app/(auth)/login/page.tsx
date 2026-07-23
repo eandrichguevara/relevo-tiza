@@ -53,20 +53,34 @@ function LoginForm() {
       // Login successful — redirect to dashboard
       window.location.href = '/dashboard';
     } catch (err: unknown) {
-      // Structured error logging — avoids `{}` in monitoring tools
+      // Structured error logging — always shows status/detail even for empty errors
       const apiErr = err as ApiError;
       const isApiErr = typeof apiErr?.status === 'number' && apiErr.status > 0;
+      const errStatus = apiErr?.status ?? (err instanceof Error ? 'native_error' : 'unknown');
+      const errDetail = apiErr?.detail ?? (err instanceof Error ? err.message : undefined);
       console.error('[Login Error]', {
+        status: errStatus,
+        detail: errDetail || '(no detail)',
         isApiError: isApiErr,
-        status: isApiErr ? apiErr.status : undefined,
-        detail: isApiErr ? apiErr.detail : undefined,
-        message: err instanceof Error ? err.message : undefined,
         raw: err,
       });
       if (isApiErr && apiErr.status === 401) {
         setGeneralError('Email o contraseña incorrectos. Verifica tus credenciales.');
+      } else if (isApiErr && apiErr.status === 403) {
+        const detailLower = (apiErr.detail || '').toLowerCase();
+        if (detailLower.includes('pendiente') || detailLower.includes('pending')) {
+          setGeneralError(
+            'Tu cuenta está pendiente de aprobación. Te notificaremos por correo cuando sea aprobada.'
+          );
+        } else if (detailLower.includes('rechaz') || detailLower.includes('rejected')) {
+          setGeneralError('Tu solicitud fue rechazada. Contacta al administrador.');
+        } else {
+          setGeneralError('Acceso denegado. No tienes permisos para acceder.');
+        }
       } else if (isApiErr && apiErr.translatedMessage) {
         setGeneralError(apiErr.translatedMessage);
+      } else if (errStatus === 0) {
+        setGeneralError('Error de conexión. Verifica tu internet e intenta de nuevo.');
       } else if (err instanceof Error) {
         setGeneralError(err.message || 'Error de conexión. Intenta de nuevo.');
       } else {
