@@ -21,6 +21,8 @@ const ERROR_TRANSLATIONS: Record<number, string> = {
  */
 const DETAIL_TRANSLATIONS: Record<string, string> = {
   'Invalid authentication credentials': 'Credenciales incorrectas o sesión expirada.',
+  'Teachers must be assigned to an existing tenant. Provide a tenant_id or ask your school director to create an account.':
+    'Los profesores deben estar asignados a un colegio existente. Proporciona un código de acceso o pide a tu director(a) que cree una cuenta.',
 };
 
 export interface ApiError {
@@ -163,7 +165,7 @@ export async function apiFetch<T = any>(endpoint: string, options: FetchOptions 
     clearTimeout(timeoutId);
 
     // Already an ApiError — re-throw
-    if (err?.status && err?.translatedMessage) {
+    if (err?.status !== undefined && err?.translatedMessage) {
       throw err;
     }
 
@@ -237,7 +239,7 @@ export async function apiUpload<T = any>(
   } catch (err: any) {
     clearTimeout(timeoutId);
 
-    if (err?.status && err?.translatedMessage) throw err;
+    if (err?.status !== undefined && err?.translatedMessage) throw err;
 
     if (err?.name === 'AbortError') {
       throw {
