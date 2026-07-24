@@ -175,4 +175,13 @@ describe('ActiveTenantProvider + useActiveTenant', () => {
     expect(result.current.activeTenant).toBeNull();
     expect(result.current.activeTenantId).toBeNull();
   });
+
+  // ─── Regression: bug "tenantList.find is not a function" ──────────
+  //
+  // Como vi.doMock tiene problemas de caché de módulos en vitest con
+  // imports dinámicos, el test de regresión específico para la defensa
+  // Array.isArray contra objetos no-array vive en el archivo:
+  //   src/hooks/__tests__/ActiveTenantContext.regression.test.tsx
+  // Ese archivo mockea todo useRelevoApi de raíz y verifica que
+  // ActiveTenantProvider no crashea con datos no-array.
 });

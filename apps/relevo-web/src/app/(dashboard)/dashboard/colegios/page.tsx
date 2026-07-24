@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Spinner, EmptyState, ErrorMessage } from '@tiza/ui';
 import { School, Plus, Building2, ExternalLink, X, Copy, Check } from 'lucide-react';
 import { useTenants, useCreateTenant } from '@/hooks/useRelevoApi';
+import { formatTenantDomain, getDomainHint } from '@/lib/domain';
 
 export default function ColegiosPage() {
   const router = useRouter();
@@ -123,7 +124,7 @@ export default function ColegiosPage() {
                   </div>
                   <div className="min-w-0">
                     <h3 className="font-semibold text-gray-900 truncate">{tenant.name}</h3>
-                    <p className="text-sm text-gray-500 truncate">{tenant.subdomain}.relevo.cl</p>
+                    <p className="text-sm text-gray-500 truncate">{formatTenantDomain(tenant)}</p>
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <span className="text-xs text-gray-400">Código:</span>
                       <span className="font-mono text-sm font-medium tracking-wider bg-gray-100 rounded-md px-2 py-0.5 text-gray-600 select-all">
@@ -201,7 +202,7 @@ export default function ColegiosPage() {
                 <Input
                   label="Subdominio"
                   placeholder="Ej: san-martin"
-                  hint="Se usará como san-martin.relevo.cl — solo minúsculas, números y guiones"
+                  hint={`Se usará como san-martin${getDomainHint()} — solo minúsculas, números y guiones`}
                   value={form.subdomain}
                   onChange={(e) => setForm({ ...form, subdomain: e.target.value.toLowerCase() })}
                   required

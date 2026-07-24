@@ -156,6 +156,17 @@ describe('getStoredUser / storeUser / clearStoredUser', () => {
     const result = getStoredUser();
     expect(result).toBeNull();
   });
+
+  it('getStoredUser retorna null en SSR (window undefined)', async () => {
+    const origWindow = globalThis.window;
+    (globalThis as any).window = undefined;
+    // Re-import to trigger SSR guard
+    vi.resetModules();
+    const mod = await import('@/lib/auth');
+    const result = mod.getStoredUser();
+    expect(result).toBeNull();
+    (globalThis as any).window = origWindow;
+  });
 });
 
 describe('loginUser', () => {
@@ -167,17 +178,14 @@ describe('loginUser', () => {
   it('llama a apiFetch para login y /api/auth/me con el token', async () => {
     const { loginUser } = await import('@/lib/auth');
 
-    // Mock apiFetch for login
     const apiModule = await import('@/lib/api');
     const mockApiFetch = vi.mocked(apiModule.apiFetch);
 
     mockApiFetch
-      // First call: login returns access_token
       .mockResolvedValueOnce({
         access_token: 'jwt-token-123',
         token_type: 'bearer',
       })
-      // Second call: /api/auth/me returns user profile
       .mockResolvedValueOnce({
         id: 'user-1',
         email: 'test@test.com',
@@ -196,18 +204,15 @@ describe('loginUser', () => {
 
     const result = await loginUser('test@test.com', 'password123');
 
-    // Verify login call
     expect(mockApiFetch).toHaveBeenNthCalledWith(1, '/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email: 'test@test.com', password: 'password123' }),
     });
 
-    // Verify /api/auth/me call with token
     expect(mockApiFetch).toHaveBeenNthCalledWith(2, '/api/auth/me', {
       token: 'jwt-token-123',
     });
 
-    // Verify result
     expect(result.user).toEqual({
       id: 'user-1',
       email: 'test@test.com',
@@ -218,6 +223,69 @@ describe('loginUser', () => {
       tenantId: 't1',
     });
     expect(result.token).toBe('jwt-token-123');
+  });
+
+  it('incluye rejectionReason cuando está presente', async () => {
+    const { loginUser } = await import('@/lib/auth');
+    const apiModule = await import('@/lib/api');
+    const mockApiFetch = vi.mocked(apiModule.apiFetch);
+
+    mockApiFetch
+      .mockResolvedValueOnce({
+        access_token: 'jwt-token',
+        token_type: 'bearer',
+      })
+      .mockResolvedValueOnce({
+        id: 'user-2',
+        email: 'rejected@test.com',
+        name: 'Rejected User',
+        role: 'HOLDER',
+        status: 'rejected',
+        rejection_reason: 'Documentación incompleta',
+        tenant_id: 't2',
+      });
+
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await loginUser('rejected@test.com', 'password123');
+
+    expect(result.user.status).toBe('rejected');
+    expect(result.user.rejectionReason).toBe('Documentación incompleta');
+  });
+
+  it('login usa brand default "relevo" cuando no se especifica', async () => {
+    const { loginUser } = await import('@/lib/auth');
+    const apiModule = await import('@/lib/api');
+    const mockApiFetch = vi.mocked(apiModule.apiFetch);
+
+    mockApiFetch
+      .mockResolvedValueOnce({
+        access_token: 'jwt-token',
+        token_type: 'bearer',
+      })
+      .mockResolvedValueOnce({
+        id: 'user-4',
+        email: 'brand@test.com',
+        name: 'Brand Test',
+        role: 'HOLDER',
+        status: 'active',
+        tenant_id: 't4',
+      });
+
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const result = await loginUser('brand@test.com', 'password123');
+    expect(result.token).toBe('jwt-token');
   });
 });
 

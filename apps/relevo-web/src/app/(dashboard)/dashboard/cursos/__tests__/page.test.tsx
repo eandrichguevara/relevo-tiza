@@ -133,6 +133,14 @@ vi.mock('@/components/ConfirmModal', () => ({
   ),
 }));
 
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...props }: any) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
 // ─── Module under test ─────────────────────────────────────
 
 async function getModule() {
@@ -672,7 +680,9 @@ describe('CursosPage', () => {
 
     it('toggle de asignatura funciona', async () => {
       // Desmarcar Lenguaje
-      const lenguajeCheckbox = screen.getByRole('checkbox', { name: 'Lenguaje' }) as HTMLInputElement;
+      const lenguajeCheckbox = screen.getByRole('checkbox', {
+        name: 'Lenguaje',
+      }) as HTMLInputElement;
       await userEvent.click(lenguajeCheckbox);
       expect(lenguajeCheckbox.checked).toBe(false);
       expect(screen.getByText(/1 asignatura seleccionada/)).toBeInTheDocument();
@@ -685,7 +695,9 @@ describe('CursosPage', () => {
 
     it('asignatura desmarcada tiene estilo gris', async () => {
       // Desmarcar Matemáticas para verificar estilo gris
-      const matesCheckbox = screen.getByRole('checkbox', { name: 'Matemáticas' }) as HTMLInputElement;
+      const matesCheckbox = screen.getByRole('checkbox', {
+        name: 'Matemáticas',
+      }) as HTMLInputElement;
       await userEvent.click(matesCheckbox);
       expect(matesCheckbox.checked).toBe(false);
       const matesLabel = screen.getByRole('checkbox', { name: 'Matemáticas' }).closest('label')!;
@@ -1314,6 +1326,29 @@ describe('CursosPage', () => {
 
       await renderPage();
       expect(screen.getByRole('button', { name: /nuevo curso/i })).toBeDisabled();
+    });
+  });
+
+  // ─── Alumnos links ─────────────────────────────────────
+
+  describe('Enlace "Alumnos" en tarjetas de curso', () => {
+    it('cada curso tiene botón "Alumnos" con aria-label', async () => {
+      await renderPage();
+
+      const alumnosButtons = screen.getAllByRole('button', { name: /gestionar alumnos de/i });
+      expect(alumnosButtons).toHaveLength(MOCK_COURSES.length);
+    });
+
+    it('cada botón "Alumnos" está envuelto en un link con href correcto', async () => {
+      await renderPage();
+
+      MOCK_COURSES.forEach((course) => {
+        const btn = screen.getByRole('button', {
+          name: `Gestionar alumnos de ${course.name}`,
+        });
+        const link = btn.closest('a');
+        expect(link).toHaveAttribute('href', `/dashboard/cursos/${course.id}/alumnos`);
+      });
     });
   });
 });

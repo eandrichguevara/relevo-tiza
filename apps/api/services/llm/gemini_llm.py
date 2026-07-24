@@ -14,7 +14,7 @@ from __future__ import annotations
 import json
 import math
 import re
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from config import settings
 from services.llm.provider import LLMProvider, GradingInput, GradingOutput
@@ -117,10 +117,71 @@ class GeminiLLMProvider(LLMProvider):
 
     def _build_prompt(self, inputs: List[GradingInput], rubric_context: str) -> str:
         """Construct the full prompt with rubric and student answers."""
+        def _format_criteria(criteria: Any) -> str:
+            """Render criteria block for the LLM prompt.
+
+            Supports:
+            - Legacy: string criteria ("Criterio: ...")
+            - Legacy: list of {description, score} dicts
+            - New: list of {name, levels: [{points, description}]} dicts (multi-level rubric)
+            """
+            if not criteria:
+                return ""
+
+            # --- Single string criterion (legacy) ---
+            if isinstance(criteria, str):
+                return f"Criterio: {criteria}\n"
+
+            # --- List of criteria ---
+            if isinstance(criteria, list):
+                if not criteria:
+                    return ""
+
+                # Detect new multi-level format: {name, levels}
+                first = criteria[0] if isinstance(criteria[0], dict) else {}
+                if "name" in first and "levels" in first:
+                    parts = ["Criterios:"]
+                    for c in criteria:
+                        name = c.get("name", "Criterio")
+                        parts.append(f"\n{name}:")
+                        for level in c.get("levels", []):
+                            pts = level.get("points", 0)
+                            desc = level.get("description", "")
+                            parts.append(f"  {pts} pts — {desc}")
+                        levels = c.get("levels", [])
+                        if levels:
+                            max_pts = max(l.get("points", 0) for l in levels)
+                            parts.append(f"  (Máximo: {max_pts} pts)")
+                    return "\n".join(parts) + "\n"
+
+                # Legacy format: list of {description, score}
+                lines = ["Criterios:"]
+                for c in criteria:
+                    desc = c.get("description", "")
+                    score = c.get("score", 0)
+                    lines.append(f"  - {desc}: {score} pts")
+                return "\n".join(lines) + "\n"
+
+            # --- Single criterion dict ---
+            if isinstance(criteria, dict):
+                if "name" in criteria and "levels" in criteria:
+                    name = criteria.get("name", "Criterio")
+                    parts = [f"Criterio — {name}:"]
+                    for level in criteria.get("levels", []):
+                        pts = level.get("points", 0)
+                        desc = level.get("description", "")
+                        parts.append(f"  {pts} pts — {desc}")
+                    return "\n".join(parts) + "\n"
+                desc = criteria.get("description", "")
+                score = criteria.get("score", 0)
+                return f"Criterio: {desc} ({score} pts)\n"
+
+            return ""
+
         answers_section = "\n".join(
             f"Pregunta {i.question_number} (tipo: {i.question_type}, puntaje máximo: {i.max_score}):\n"
             f"Texto del estudiante: \"{i.student_text}\"\n"
-            + (f"Criterio: {i.criteria}\n" if i.criteria else "")
+            + _format_criteria(i.criteria)
             for i in inputs
         )
 

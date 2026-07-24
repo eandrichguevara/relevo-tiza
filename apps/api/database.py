@@ -122,6 +122,7 @@ async def create_tenant_schema(tenant_id: str):
         """))
         await conn.execute(text(f"""
             CREATE TABLE IF NOT EXISTS {schema}.course_teachers (
+                id SERIAL PRIMARY KEY,
                 course_id VARCHAR NOT NULL REFERENCES {schema}.courses(id) ON DELETE CASCADE,
                 subject VARCHAR NOT NULL,
                 teacher_id VARCHAR NOT NULL,

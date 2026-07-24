@@ -366,7 +366,7 @@ class TestTenantsIntegration:
             headers={"Authorization": f"Bearer {token}"},
         )
         assert resp.status_code == 200
-        data = resp.json()
+        data = resp.json()["items"]
         assert len(data) >= 2
         names = [t["name"] for t in data]
         assert "Colegio A" in names
@@ -1083,8 +1083,8 @@ class TestEvaluationsIntegration:
     """CRUD for evaluations with rubric."""
 
     RUBRIC = [
-        {"question_number": 1, "type": "written", "max_score": 4.0, "criteria": "Resolución correcta", "correct_answer": "42"},
-        {"question_number": 2, "type": "written", "max_score": 3.0, "criteria": "Procedimiento adecuado", "correct_answer": "x = 5"},
+        {"question_number": 1, "type": "written", "max_score": 4.0, "criteria": [{"description": "Resolución correcta", "score": 4.0}], "correct_answer": "42"},
+        {"question_number": 2, "type": "written", "max_score": 3.0, "criteria": [{"description": "Procedimiento adecuado", "score": 3.0}], "correct_answer": "x = 5"},
     ]
 
     @pytest.fixture
@@ -1100,7 +1100,7 @@ class TestEvaluationsIntegration:
             "/api/courses",
             json={
                 "name": "Eval Course", "grade": COURSE_GRADE,
-                "subject": COURSE_SUBJECT,
+                "subject": "Matemáticas, Lenguaje",
                 "teachers": {"Matemáticas": teacher["teacher_id"], "Lenguaje": teacher["teacher_id"]},
             },
             headers={"Authorization": f"Bearer {holder['token']}"},
@@ -1280,8 +1280,8 @@ class TestResultsIntegration:
     """Simulate answers and retrieve results."""
 
     RUBRIC = [
-        {"question_number": 1, "type": "written", "max_score": 4.0, "criteria": "Respuesta correcta"},
-        {"question_number": 2, "type": "written", "max_score": 3.0, "criteria": "Argumentación"},
+        {"question_number": 1, "type": "written", "max_score": 4.0, "criteria": [{"description": "Respuesta correcta", "score": 4.0}]},
+        {"question_number": 2, "type": "written", "max_score": 3.0, "criteria": [{"description": "Argumentación", "score": 3.0}]},
     ]
 
     @pytest.fixture

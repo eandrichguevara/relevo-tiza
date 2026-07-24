@@ -106,6 +106,16 @@ export function useDeleteCourse() {
   });
 }
 
+export function useCourse(courseId: string | null) {
+  const { accessToken, isAuthenticated } = useAuth();
+
+  return useQuery<Course>({
+    queryKey: ['course', courseId],
+    queryFn: () => apiFetch<Course>(`/api/courses/${courseId}`, { token: accessToken }),
+    enabled: isAuthenticated && !!courseId,
+  });
+}
+
 // ─── Users ────────────────────────────────────────────────
 
 export function useUsers(tenantId: string | null) {
@@ -224,6 +234,68 @@ export function useRejectUser() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-registrations'] });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+// ─── Students ──────────────────────────────────────────────
+
+export interface Student {
+  id: string;
+  course_id: string;
+  full_name: string;
+  student_code: string;
+  rut?: string | null;
+  created_at: string;
+}
+
+export interface BulkCreateResponse {
+  count: number;
+  students: Student[];
+}
+
+export function useStudents(courseId: string | null) {
+  const { accessToken, isAuthenticated } = useAuth();
+
+  return useQuery<Student[]>({
+    queryKey: ['students', courseId],
+    queryFn: () => apiFetch<Student[]>(`/api/students/course/${courseId}`, { token: accessToken }),
+    enabled: isAuthenticated && !!courseId,
+  });
+}
+
+export function useBulkCreateStudents() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ courseId, names }: { courseId: string; names: string[] }) =>
+      apiFetch<BulkCreateResponse>(`/api/students/course/${courseId}`, {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify({ names }),
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['students', variables.courseId] });
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+    },
+  });
+}
+
+export function useDeleteStudent() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ studentId, courseId }: { studentId: string; courseId: string }) =>
+      apiFetch<{ message: string }>(`/api/students/${studentId}`, {
+        method: 'DELETE',
+        token: accessToken,
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['students', variables.courseId] });
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
     },
   });
 }

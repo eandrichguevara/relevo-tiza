@@ -153,6 +153,14 @@ export interface Course {
   created_at: string;
 }
 
+export interface TeacherClass {
+  course_id: string;
+  course_name: string;
+  subject: string;
+  grade: string;
+  student_count: number;
+}
+
 export function useCourses() {
   const { accessToken, isAuthenticated } = useAuth();
 
@@ -163,12 +171,27 @@ export function useCourses() {
   });
 }
 
+export function useMyClasses() {
+  const { accessToken, isAuthenticated } = useAuth();
+
+  return useQuery<TeacherClass[]>({
+    queryKey: ['my-classes'],
+    queryFn: () => apiFetch<TeacherClass[]>('/api/courses/my-classes', { token: accessToken }),
+    enabled: isAuthenticated,
+  });
+}
+
 export function useCreateCourse() {
   const { accessToken } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: { name: string; grade: string; subject: string }) =>
+    mutationFn: (data: {
+      name: string;
+      grade: string;
+      subject: string;
+      teachers: Record<string, string>;
+    }) =>
       apiFetch<Course>('/api/courses', {
         method: 'POST',
         token: accessToken,

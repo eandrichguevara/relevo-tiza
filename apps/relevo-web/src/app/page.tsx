@@ -33,7 +33,7 @@ export default function RelevoHome() {
             <h1 className="text-5xl font-bold mb-6">Datos que transforman la educación</h1>
             <p className="text-xl text-blue-100 max-w-3xl mx-auto mb-10">
               La plataforma de analítica educativa que convierte evaluaciones en decisiones. Para
-              sostenedores que quieren ver más allá de las notas.
+              equipos de gestión que quieren ver más allá de las notas.
             </p>
             <Link
               href="/register"

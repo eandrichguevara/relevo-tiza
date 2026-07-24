@@ -121,7 +121,7 @@ class TestTenantDelete:
             headers={"Authorization": f"Bearer {holder['token']}"},
         )
         assert list_resp.status_code == 200
-        tenants = list_resp.json()
+        tenants = list_resp.json()["items"]
         for t in tenants:
             if t["id"] == tid:
                 assert t["status"] == "inactive", (

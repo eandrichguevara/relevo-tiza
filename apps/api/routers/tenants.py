@@ -1,18 +1,60 @@
 """Tenants router — multi-tenant management for HOLDERs."""
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from sqlalchemy.exc import IntegrityError
 
 from database import get_db, create_tenant_schema
 from models.db_models import Tenant, TenantMember, User, generate_join_code
-from models.schemas import CreateTenantRequest, TenantResponse, TenantLookupResponse, DeleteTenantResponse
+from models.schemas import (
+    CreateTenantRequest,
+    TenantResponse,
+    TenantListResponse,
+    TenantLookupResponse,
+    DeleteTenantResponse,
+)
 from utils.security import require_role, require_super_admin
 
 router = APIRouter()
 
 MAX_JOIN_CODE_ATTEMPTS = 10
+
+# ── Brand/subdomain resolution ──────────────────────────────
+
+# Known production domains mapped to their brands.
+_BRAND_DOMAIN_MAP: dict[str, str] = {
+    "tiza.cl": "tiza",
+    "relevo.cl": "relevo",
+}
+
+
+def derive_brand_from_subdomain(subdomain: str) -> str:
+    """Derive the brand from a school subdomain.
+
+    - ``colegio.tiza.cl`` → ``"tiza"``
+    - ``colegio.relevo.cl`` → ``"relevo"``
+    - Anything else → ``"tiza"`` (safe default)
+    """
+    lowered = subdomain.strip().lower()
+    for domain, brand in _BRAND_DOMAIN_MAP.items():
+        if lowered.endswith(f".{domain}"):
+            return brand
+    return "tiza"
+
+
+def derive_brand_from_host(host: str) -> str:
+    """Derive brand from an HTTP Host header (e.g. ``colegio.tiza.cl``).
+
+    If the host itself *is* a known root domain (e.g. ``tiza.cl`` or
+    ``relevo.cl``), it returns that brand.  Falls back to ``"tiza"``.
+    """
+    lowered = host.strip().lower()
+    # Direct match for root domains
+    if lowered in _BRAND_DOMAIN_MAP:
+        return _BRAND_DOMAIN_MAP[lowered]
+    # Subdomain match
+    return derive_brand_from_subdomain(lowered)
 
 
 async def _generate_unique_join_code(db: AsyncSession) -> str:
@@ -33,12 +75,12 @@ async def _generate_unique_join_code(db: AsyncSession) -> str:
 @router.post("", response_model=TenantResponse, status_code=201)
 async def create_tenant(
     body: CreateTenantRequest,
-    current_user: User = Depends(require_role("HOLDER")),
+    current_user: User = Depends(require_super_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new school (tenant). Only HOLDERs can create tenants.
+    """Create a new school (tenant). Only ADMINs can create tenants.
 
-    The HOLDER is automatically added as an ``owner`` member of the new tenant.
+    The ADMIN is automatically added as an ``owner`` member of the new tenant.
     """
     # Check name uniqueness
     existing_name = await db.execute(
@@ -65,7 +107,7 @@ async def create_tenant(
     tenant = Tenant(
         name=body.name,
         subdomain=body.subdomain,
-        brand="tiza",
+        brand=body.brand.value,  # BrandEnum → str
         join_code=join_code,
     )
     db.add(tenant)
@@ -102,24 +144,39 @@ async def create_tenant(
     return tenant
 
 
-@router.get("", response_model=list[TenantResponse])
+@router.get("", response_model=TenantListResponse)
 async def list_tenants(
     request: Request,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(100, ge=1, le=100, description="Max records to return"),
     current_user: User = Depends(require_role("HOLDER")),
     db: AsyncSession = Depends(get_db),
 ):
-    """List tenants.
+    """List tenants with pagination.
 
     - ADMIN: sees ALL tenants across the system.
     - HOLDER: only sees tenants where they are a member (tenant isolation).
     """
     # ADMIN can see all tenants
     if current_user.role == "ADMIN":
+        count_result = await db.execute(
+            select(func.count(Tenant.id))
+        )
+        total = count_result.scalar() or 0
+
         result = await db.execute(
-            select(Tenant).order_by(Tenant.created_at.desc())
+            select(Tenant)
+            .order_by(Tenant.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
         tenants = result.scalars().all()
-        return tenants
+        return TenantListResponse(
+            items=[TenantResponse.model_validate(t) for t in tenants],
+            total=total,
+            skip=skip,
+            limit=limit,
+        )
 
     # HOLDER: get IDs of all tenants where they are a member
     member_result = await db.execute(
@@ -129,28 +186,56 @@ async def list_tenants(
 
     if member_tenant_ids:
         # Modern path: filter by membership (tenant isolation)
+        count_result = await db.execute(
+            select(func.count(Tenant.id))
+            .where(Tenant.id.in_(member_tenant_ids))
+        )
+        total = count_result.scalar() or 0
+
         result = await db.execute(
             select(Tenant)
             .where(Tenant.id.in_(member_tenant_ids))
             .order_by(Tenant.created_at.desc())
+            .offset(skip)
+            .limit(limit)
         )
-    else:
-        # Safe fallback: only return the user's own tenant.
-        # HOLDERs without TenantMember entries should still only see
-        # the tenant they're directly assigned to.
-        # Use current_user.tenant_id (DB value, not manipulable)
-        # instead of get_tenant_id() which reads headers — Consistent
-        # with executive_dashboard() fallback, defense against IDOR.
-        if not current_user.tenant_id:
-            return []
-        result = await db.execute(
-            select(Tenant)
-            .where(Tenant.id == current_user.tenant_id)
-            .order_by(Tenant.created_at.desc())
+        tenants = result.scalars().all()
+        return TenantListResponse(
+            items=[TenantResponse.model_validate(t) for t in tenants],
+            total=total,
+            skip=skip,
+            limit=limit,
         )
 
+    # Safe fallback: only return the user's own tenant.
+    # HOLDERs without TenantMember entries should still only see
+    # the tenant they're directly assigned to.
+    # Use current_user.tenant_id (DB value, not manipulable)
+    # instead of get_tenant_id() which reads headers — Consistent
+    # with executive_dashboard() fallback, defense against IDOR.
+    if not current_user.tenant_id:
+        return TenantListResponse(items=[], total=0, skip=skip, limit=limit)
+
+    count_result = await db.execute(
+        select(func.count(Tenant.id))
+        .where(Tenant.id == current_user.tenant_id)
+    )
+    total = count_result.scalar() or 0
+
+    result = await db.execute(
+        select(Tenant)
+        .where(Tenant.id == current_user.tenant_id)
+        .order_by(Tenant.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     tenants = result.scalars().all()
-    return tenants
+    return TenantListResponse(
+        items=[TenantResponse.model_validate(t) for t in tenants],
+        total=total,
+        skip=skip,
+        limit=limit,
+    )
 
 
 @router.delete("/{tenant_id}", response_model=DeleteTenantResponse)

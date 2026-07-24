@@ -255,7 +255,7 @@ describe('DashboardLayout', () => {
       expect(mockPush).not.toHaveBeenCalledWith('/login');
       // ADMIN should see the dashboard (like HOLDER) + admin-only nav items
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      expect(screen.getByText('Pendientes')).toBeInTheDocument();
+      // 'Pendientes' page was removed — anchor assertion was removed accordingly
     });
 
     it('redirige a tiza-web para rol SUPERVISOR (también !== HOLDER)', () => {

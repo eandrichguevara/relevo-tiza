@@ -29,10 +29,9 @@ FALLBACK_CODE = "TIZA0001"
 
 async def backfill() -> None:
     """Generate join_codes for all tenants that have NULL."""
-    database_url = os.getenv(
-        "DATABASE_URL",
-        "postgresql+asyncpg://tiza_user:tiza_password@localhost:5432/tiza_dev",
-    )
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise RuntimeError("DATABASE_URL must be set")
     engine = create_async_engine(database_url, echo=False)
 
     async with async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)() as db:

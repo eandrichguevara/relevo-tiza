@@ -906,3 +906,209 @@ describe('useRelevoApi — Pending Registrations', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
   });
 });
+
+// ─── Students hooks ────────────────────────────────────
+
+const mockStudents = [
+  {
+    id: 's1',
+    course_id: 'course-1',
+    full_name: 'Ana Martínez',
+    student_code: 'STU-001',
+    created_at: '2026-01-15T12:00:00Z',
+  },
+  {
+    id: 's2',
+    course_id: 'course-1',
+    full_name: 'Benjamín Soto',
+    student_code: 'STU-002',
+    created_at: '2026-01-15T12:00:00Z',
+  },
+];
+
+// ─── Students hooks ────────────────────────────────────
+// These tests rely on the global beforeEach (line 101) which calls
+// vi.clearAllMocks() + setAuthenticated() before each test.
+
+describe('useRelevoApi — useStudents', () => {
+  it('fetches students cuando se proporciona courseId', async () => {
+    mockApiFetch.mockResolvedValueOnce(mockStudents);
+
+    const { useStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useStudents('course-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/students/course/course-1', {
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual(mockStudents);
+  });
+
+  it('is not enabled when courseId is null', async () => {
+    const { useStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useStudents(null), { wrapper: createWrapper() });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('is not enabled when isAuthenticated is false', async () => {
+    setAuthenticated({ accessToken: null, isAuthenticated: false });
+
+    const { useStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useStudents('course-1'), { wrapper: createWrapper() });
+
+    await new Promise((r) => setTimeout(r, 50));
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(result.current.fetchStatus).toBe('idle');
+  });
+
+  it('handles error state', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 500,
+      detail: 'Error del servidor',
+    });
+
+    const { useStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useStudents('course-1'), { wrapper: createWrapper() });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('muestra loading durante la carga', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useStudents('course-1'), { wrapper: createWrapper() });
+
+    expect(result.current.isLoading).toBe(true);
+
+    resolvePromise(mockStudents);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ─── useBulkCreateStudents ─────────────────────────
+
+describe('useRelevoApi — useBulkCreateStudents', () => {
+  const bulkPayload = { courseId: 'course-1', names: ['Ana', 'Ben'] };
+  const bulkResponse = { count: 2, students: mockStudents };
+
+  it('sends POST with names and invalidates caches', async () => {
+    mockApiFetch.mockResolvedValueOnce(bulkResponse);
+
+    const { useBulkCreateStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useBulkCreateStudents(), { wrapper: createWrapper() });
+
+    // Follow exact pattern from existing mutation tests: mutate + waitFor isSuccess
+    await act(async () => {
+      result.current.mutate(bulkPayload);
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/students/course/course-1', {
+      method: 'POST',
+      token: 'mock-access-token',
+      body: JSON.stringify({ names: ['Ana', 'Ben'] }),
+    });
+    expect(result.current.data).toEqual(bulkResponse);
+  });
+
+  it('handles mutation error', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 400,
+      detail: 'Error al crear alumnos',
+      translatedMessage: 'Error al crear alumnos.',
+    });
+
+    const { useBulkCreateStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useBulkCreateStudents(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(bulkPayload);
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('mantiene isPending durante la mutación', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useBulkCreateStudents } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useBulkCreateStudents(), { wrapper: createWrapper() });
+
+    result.current.mutate(bulkPayload);
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    resolvePromise(bulkResponse);
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});
+
+// ─── useDeleteStudent ─────────────────────────────
+
+describe('useRelevoApi — useDeleteStudent', () => {
+  const deletePayload = { studentId: 's1', courseId: 'course-1' };
+
+  it('sends DELETE and invalidates caches', async () => {
+    mockApiFetch.mockResolvedValueOnce({ message: 'Alumno eliminado' });
+
+    const { useDeleteStudent } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useDeleteStudent(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(deletePayload);
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/students/s1', {
+      method: 'DELETE',
+      token: 'mock-access-token',
+    });
+    expect(result.current.data).toEqual({ message: 'Alumno eliminado' });
+  });
+
+  it('handles mutation error', async () => {
+    mockApiFetch.mockRejectedValueOnce({
+      status: 404,
+      detail: 'Alumno no encontrado',
+      translatedMessage: 'Alumno no encontrado.',
+    });
+
+    const { useDeleteStudent } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useDeleteStudent(), { wrapper: createWrapper() });
+
+    await act(async () => {
+      result.current.mutate(deletePayload);
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it('mantiene isPending durante la mutación', async () => {
+    let resolvePromise!: (data: any) => void;
+    const pendingPromise = new Promise((resolve) => {
+      resolvePromise = resolve;
+    });
+    mockApiFetch.mockReturnValueOnce(pendingPromise);
+
+    const { useDeleteStudent } = await import('../useRelevoApi');
+    const { result } = renderHook(() => useDeleteStudent(), { wrapper: createWrapper() });
+
+    result.current.mutate(deletePayload);
+    await waitFor(() => expect(result.current.isPending).toBe(true));
+
+    resolvePromise({ message: 'Ok' });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+  });
+});

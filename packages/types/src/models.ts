@@ -43,12 +43,22 @@ export interface User {
   tenantMemberships?: TenantMember[];
 }
 
+export interface CriterionLevel {
+  points: number;
+  description: string;
+}
+
+export interface CriterionItem {
+  name: string;
+  levels: CriterionLevel[];
+}
+
 export interface RubricItem {
   questionNumber: number;
   type: QuestionType;
-  maxScore: number;
+  maxScore?: number;
   correctAnswer?: string;
-  criteria?: string;
+  criteria?: CriterionItem[];
 }
 
 export interface Evaluation {
@@ -56,6 +66,7 @@ export interface Evaluation {
   title: string;
   subject: string;
   grade: string;
+  course_id?: string;
   rubric: RubricItem[];
   pdfUrl?: string;
   status: ProcessingStatus;

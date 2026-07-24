@@ -350,4 +350,189 @@ describe('apiUpload', () => {
       detail: 'Failed to fetch',
     });
   });
+
+  it('incluye Authorization header en apiUpload cuando se proporciona token', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await apiUpload('/api/upload', formData, 'upload-jwt-token');
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer upload-jwt-token',
+        }),
+      })
+    );
+  });
+});
+
+describe('apiFetch — edge cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('retorna blob para respuesta PDF', async () => {
+    const pdfBlob = new Blob(['%PDF-1.4 fake content'], { type: 'application/pdf' });
+    mockFetch.mockResolvedValueOnce(
+      new Response(pdfBlob, {
+        status: 200,
+        headers: { 'Content-Type': 'application/pdf' },
+      })
+    );
+
+    const apiFetch = await getApiFetch();
+    const result = await apiFetch('/api/report');
+
+    expect(result).toBeInstanceOf(Blob);
+    expect(result.type).toBe('application/pdf');
+  });
+
+  it('retorna undefined para respuesta 204 No Content', async () => {
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const apiFetch = await getApiFetch();
+    const result = await apiFetch('/api/delete');
+
+    expect(result).toBeUndefined();
+  });
+
+  it('retorna undefined para respuesta 201 con body vacío', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('', { status: 201, headers: { 'Content-Type': 'application/json' } })
+    );
+
+    const apiFetch = await getApiFetch();
+    const result = await apiFetch('/api/create');
+
+    expect(result).toBeUndefined();
+  });
+
+  it('lanza ApiError con status 0 en timeout (AbortError)', async () => {
+    const abortError = new Error('The operation was aborted.');
+    abortError.name = 'AbortError';
+    mockFetch.mockRejectedValueOnce(abortError);
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'La solicitud tardó demasiado. Intenta de nuevo.',
+    });
+  });
+
+  it('lanza ApiError con status 0 en error de red (TypeError)', async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Failed to fetch',
+    });
+  });
+
+  it('maneja error response con body no-JSON (parseo falla)', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Internal Server Error', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    );
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 500,
+      detail: expect.stringContaining('servidor'),
+    });
+  });
+
+  it('usa errorBody.message cuando detail no está presente', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Server error occurred' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 500,
+      detail: 'Server error occurred',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error no tiene .message', async () => {
+    mockFetch.mockRejectedValueOnce({});
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión. Verifica tu internet.',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error.message es null', async () => {
+    mockFetch.mockRejectedValueOnce({ message: null });
+
+    const apiFetch = await getApiFetch();
+    await expect(apiFetch('/api/test')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión. Verifica tu internet.',
+    });
+  });
+});
+
+describe('apiUpload — edge cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('usa errorBody.message cuando detail no está presente', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: 'Upload failed' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 400,
+      detail: 'Upload failed',
+    });
+  });
+
+  it('lanza mensaje por defecto cuando error de red no tiene .message', async () => {
+    mockFetch.mockRejectedValueOnce({});
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 0,
+      detail: 'Error de conexión.',
+    });
+  });
+
+  it('traduce error 500 con cuerpo no-JSON', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response('Internal Server Error', {
+        status: 500,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    );
+
+    const apiUpload = await getApiUpload();
+    const formData = new FormData();
+    await expect(apiUpload('/api/upload', formData)).rejects.toMatchObject({
+      status: 500,
+      detail: expect.stringContaining('servidor'),
+    });
+  });
 });

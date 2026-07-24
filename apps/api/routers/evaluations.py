@@ -65,6 +65,28 @@ async def create_evaluation(
     
     The user must be a member of the course (teacher of the course, admin, or holder).
     """
+    # ─── Validar alternativas para preguntas multiple_choice ───
+    for item in body.rubric:
+        if item.type == "multiple_choice":
+            alts = item.alternatives
+            if not alts or len(alts) < 2:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Pregunta {item.question_number}: las preguntas de tipo "
+                        f"'multiple_choice' deben tener al menos 2 alternativas."
+                    ),
+                )
+            correct_count = sum(1 for a in alts if a.is_correct)
+            if correct_count != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Pregunta {item.question_number}: las preguntas de tipo "
+                        f"'multiple_choice' deben tener exactamente 1 alternativa "
+                        f"correcta (se encontraron {correct_count})."
+                    ),
+                )
     # N-07: Verify user is a member of the course
     course_result = await db.execute(
         select(Course).where(Course.id == body.course_id, Course.deleted_at.is_(None))

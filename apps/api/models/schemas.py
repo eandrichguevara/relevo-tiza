@@ -3,7 +3,7 @@ from typing import Any, Dict, List, Optional, Annotated
 from datetime import datetime
 from enum import Enum
 import re
-from pydantic import BaseModel, Field, field_validator, BeforeValidator
+from pydantic import BaseModel, Field, field_validator, model_validator, BeforeValidator
 
 # Basic email regex — same as frontend. Allows .local / .test domains for dev.
 _EMAIL_RE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
@@ -150,6 +150,7 @@ class CreateTenantRequest(BaseModel):
         max_length=63,
         pattern=r'^[a-z0-9]([a-z0-9-]*[a-z0-9])?$',
     )
+    brand: BrandEnum = BrandEnum.tiza  # default "tiza" for backward compat
 
     @field_validator("name")
     @classmethod
@@ -196,6 +197,14 @@ class TenantLookupResponse(BaseModel):
     name: str
 
 
+class TenantListResponse(BaseModel):
+    """Paginated list of tenants."""
+    items: List[TenantResponse]
+    total: int
+    skip: int
+    limit: int
+
+
 class DeleteTenantResponse(BaseModel):
     success: bool
     message: str
@@ -222,12 +231,94 @@ class ResetPasswordResponse(BaseModel):
 # ─── Rubric ───────────────────────────────
 
 
+class AlternativeItem(BaseModel):
+    """Una alternativa para preguntas de tipo multiple_choice.
+
+    label: identificador de la alternativa (e.g. "A", "B", "C", "D")
+    text:  texto de la alternativa
+    is_correct: si esta alternativa es la correcta
+    """
+    label: str = Field(..., description="Identificador de la alternativa: A, B, C, D")
+    text: str = Field(..., description="Texto de la alternativa")
+    is_correct: bool = False
+
+
+class CriterionLevel(BaseModel):
+    """Un nivel de desempeño dentro de un criterio.
+    
+    Ejemplo: "5 puntos — Presenta máximo 2 faltas ortográficas"
+    """
+    points: float = Field(..., ge=0, description="Puntaje de este nivel (ej: 5.0)")
+    description: str = Field(..., min_length=1, description="Descripción del nivel de desempeño")
+
+
+class CriterionItem(BaseModel):
+    """Un criterio de evaluación con múltiples niveles de desempeño.
+    
+    Ejemplo:
+      name: "Ortografía"
+      levels: [
+        {points: 5, description: "Máximo 2 faltas ortográficas"},
+        {points: 3, description: "No más de 4 faltas ortográficas"},
+        {points: 1, description: "No más de 6 faltas ortográficas"},
+      ]
+    """
+    name: str = Field(..., min_length=1, description="Nombre del criterio (ej: 'Ortografía', 'Claridad')")
+    levels: List[CriterionLevel] = Field(..., min_length=1, description="Niveles de desempeño (al menos 1)")
+
+
 class RubricItem(BaseModel):
     question_number: int
+    statement: Optional[str] = Field(None, description="Enunciado o texto de la pregunta")
     type: QuestionTypeEnum
-    max_score: float
+    max_score: Optional[float] = Field(None, description="Puntaje máximo. Para written se calcula automáticamente de los criterios.")
     correct_answer: Optional[str] = None
-    criteria: Optional[str] = None
+    criteria: Optional[List[CriterionItem]] = Field(
+        None,
+        description="Criterios de evaluación (solo para preguntas escritas). Cada criterio tiene múltiples niveles.",
+    )
+    alternatives: Optional[List[AlternativeItem]] = Field(
+        None,
+        description="Lista de alternativas (obligatorio si type=multiple_choice, debe tener ≥2 opciones y exactamente 1 correcta)",
+    )
+
+    @model_validator(mode='after')
+    def compute_max_score_from_criteria(self) -> 'RubricItem':
+        """Auto-computa max_score desde los niveles de criterios para preguntas escritas.
+        
+        El puntaje máximo de una pregunta escrita es la suma del puntaje más alto
+        de cada criterio. Ej: si hay 2 criterios con niveles máximos de 5 y 3 pts,
+        max_score = 8.
+        """
+        if self.type == QuestionTypeEnum.written:
+            if self.criteria and len(self.criteria) > 0:
+                total = sum(
+                    max(level.points for level in criterion.levels)
+                    for criterion in self.criteria
+                )
+                self.max_score = total
+            elif self.max_score is None:
+                # Backward compat: si no hay criteria y no hay max_score, default 0
+                self.max_score = 0.0
+        return self
+
+    @model_validator(mode='after')
+    def validate_criteria_levels(self) -> 'RubricItem':
+        """Validaciones adicionales para los criterios."""
+        if self.criteria:
+            for i, criterion in enumerate(self.criteria):
+                if len(criterion.levels) == 0:
+                    raise ValueError(
+                        f"Criterio {i+1} ('{criterion.name}'): debe tener al menos un nivel de desempeño."
+                    )
+                # Verificar que los puntos sean decrecientes (el nivel más alto primero)
+                points = [level.points for level in criterion.levels]
+                if points != sorted(points, reverse=True):
+                    raise ValueError(
+                        f"Criterio {i+1} ('{criterion.name}'): los niveles deben estar ordenados "
+                        f"de mayor a menor puntaje (ej: 5pts, 3pts, 1pt)."
+                    )
+        return self
 
 
 # ─── Evaluations ──────────────────────────
@@ -384,3 +475,12 @@ class BulkCreateStudentsRequest(BaseModel):
 class BulkCreateStudentsResponse(BaseModel):
     count: int
     students: List[StudentResponse]
+
+
+class TeacherClassResponse(BaseModel):
+    """A course-subject pair where a teacher is assigned."""
+    course_id: str
+    course_name: str
+    subject: str
+    grade: str
+    student_count: int = 0

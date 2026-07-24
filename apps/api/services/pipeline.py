@@ -186,11 +186,21 @@ class EvaluationPipeline:
             if i >= len(rubric):
                 break
             item = rubric[i]
+            # F-06: criteria can be a list of {description, score} dicts
+            # or a legacy string. Empty list falls back to correct_answer.
+            raw_criteria = item.get("criteria")
+            if isinstance(raw_criteria, list) and len(raw_criteria) > 0:
+                criteria_value = raw_criteria
+            elif isinstance(raw_criteria, str):
+                criteria_value = raw_criteria
+            else:
+                criteria_value = item.get("correct_answer")
+
             grading_inputs.append(GradingInput(
                 question_number=item.get("question_number", i + 1),
                 student_text=ocr_res.text,
                 max_score=float(item.get("max_score", 5)),
-                criteria=item.get("criteria") or item.get("correct_answer"),
+                criteria=criteria_value,
                 question_type=item.get("type", "written"),
             ))
 

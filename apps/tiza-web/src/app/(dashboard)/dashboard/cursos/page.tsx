@@ -72,7 +72,7 @@ export default function CursosPage() {
       {!courses || courses.length === 0 ? (
         <EmptyState
           title="No tienes cursos aún"
-          description="Solicita a tu sostenedor que cree los cursos en el panel de RELEVO. Una vez creados, aparecerán aquí."
+          description="Solicita a tu equipo de gestión que cree los cursos en el panel de RELEVO. Una vez creados, aparecerán aquí."
           icon={<School size={48} />}
         />
       ) : (

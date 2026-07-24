@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'RELEVO — Datos que transforman',
-  description: 'Dashboard de analítica educativa para sostenedores',
+  description: 'Dashboard de analítica educativa para equipos de gestión',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -14,16 +14,20 @@ import {
   XCircle,
   X,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import {
   useTenants,
   useUsers,
   useCreateUser,
   useApproveUser,
+  useRejectUser,
   useResetPassword,
 } from '@/hooks/useRelevoApi';
 import { useActiveTenant } from '@/hooks/ActiveTenantContext';
+import { formatTenantDomain } from '@/lib/domain';
 import ConfirmModal from '@/components/ConfirmModal';
+import { useAuth } from '@/hooks/useAuth';
 import type { User } from '@tiza/types';
 
 // ─── Password generator ──────────────────────────────────
@@ -68,7 +72,7 @@ function formatDate(dateStr?: string | null): string {
 // ─── Role badge config ───────────────────────────────────
 
 const ROLE_CONFIG: Record<string, { label: string; variant: 'info' | 'neutral' | 'success' }> = {
-  HOLDER: { label: 'Sostenedor', variant: 'info' },
+  HOLDER: { label: 'Gestión', variant: 'info' },
   TEACHER: { label: 'Profesor', variant: 'neutral' },
   ADMIN: { label: 'Admin', variant: 'success' },
 };
@@ -128,6 +132,8 @@ function UsuariosContent() {
 
   const createUser = useCreateUser();
   const approveUser = useApproveUser();
+  const rejectUser = useRejectUser();
+  const { user: currentUser } = useAuth();
   const resetPasswordMutation = useResetPassword();
 
   const [showModal, setShowModal] = useState(false);
@@ -141,6 +147,9 @@ function UsuariosContent() {
 
   // Approval confirmation state
   const [approveTarget, setApproveTarget] = useState<User | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<User | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [rejectError, setRejectError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Password reset state
@@ -255,6 +264,29 @@ function UsuariosContent() {
     }
   };
 
+  // ─── Reject handler ────────────────────────────────
+  const handleReject = async () => {
+    if (!rejectTarget) return;
+    if (!rejectReason.trim()) {
+      setRejectError('Debes ingresar un motivo de rechazo.');
+      return;
+    }
+    try {
+      await rejectUser.mutateAsync({ userId: rejectTarget.id, reason: rejectReason.trim() });
+      showToast(`Solicitud de ${rejectTarget.name} rechazada`, 'success');
+      setRejectTarget(null);
+      setRejectReason('');
+      setRejectError('');
+    } catch (err: any) {
+      showToast(
+        err?.translatedMessage || 'Error al rechazar la solicitud. Intenta de nuevo.',
+        'error'
+      );
+      setRejectTarget(null);
+      setRejectReason('');
+    }
+  };
+
   // ─── Reset password handler ──────────────────────────
   const handleResetPassword = async () => {
     if (!resetTarget) return;
@@ -292,6 +324,10 @@ function UsuariosContent() {
     router.replace(`/dashboard/usuarios?${params.toString()}`, { scroll: false });
   };
 
+  const pendingCount = useMemo(
+    () => users?.filter((u) => u.status === 'pending' || u.status === 'rejected').length ?? 0,
+    [users]
+  );
   const usersErrorObj = usersError as { translatedMessage?: string } | null;
   const isCreatePending = createUser.isPending;
 
@@ -326,6 +362,53 @@ function UsuariosContent() {
             )?
           </p>
           <p className="mt-2 text-gray-500">El usuario recibirá acceso completo al sistema.</p>
+        </ConfirmModal>
+      )}
+
+      {/* Reject confirmation modal */}
+      {rejectTarget && (
+        <ConfirmModal
+          title="Rechazar solicitud"
+          onConfirm={handleReject}
+          onCancel={() => {
+            setRejectTarget(null);
+            setRejectReason('');
+            setRejectError('');
+          }}
+          confirmLabel="Rechazar solicitud"
+          confirmVariant="danger"
+          loading={rejectUser.isPending}
+        >
+          <p>
+            ¿Estás seguro de rechazar a <strong>{rejectTarget.name}</strong> ({rejectTarget.email})?
+          </p>
+          <div className="mt-4">
+            <label htmlFor="reject-reason" className="block text-sm font-medium text-gray-700 mb-1">
+              Motivo del rechazo <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              id="reject-reason"
+              rows={3}
+              className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                rejectError
+                  ? 'border-red-500 focus:ring-red-500'
+                  : 'border-gray-300 focus:ring-brand-primary'
+              } focus:outline-none focus:ring-2`}
+              placeholder="Indica el motivo del rechazo..."
+              value={rejectReason}
+              onChange={(e) => {
+                setRejectReason(e.target.value);
+                if (rejectError) setRejectError('');
+              }}
+              aria-invalid={!!rejectError}
+              aria-describedby={rejectError ? 'reject-error' : undefined}
+            />
+            {rejectError && (
+              <p id="reject-error" className="mt-1 text-sm text-red-600">
+                {rejectError}
+              </p>
+            )}
+          </div>
         </ConfirmModal>
       )}
 
@@ -424,7 +507,14 @@ function UsuariosContent() {
       {/* ─── Header ─────────────────────────────────── */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-brand-primary">Usuarios</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-brand-primary">Usuarios</h1>
+            {pendingCount > 0 && (
+              <Badge variant="warning">
+                {pendingCount} pendiente{pendingCount !== 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
           <p className="text-gray-500">Gestión de profesores y administradores</p>
         </div>
         <Button
@@ -469,7 +559,7 @@ function UsuariosContent() {
           )}
           {selectedTenant && (
             <>
-              <Badge variant="info">{selectedTenant.subdomain}.relevo.cl</Badge>
+              <Badge variant="info">{formatTenantDomain(selectedTenant)}</Badge>
               <span className="text-gray-300 mx-1">|</span>
               <span className="text-xs text-gray-400">Código:</span>
               <span className="font-mono text-sm font-medium tracking-wider bg-gray-100 rounded-md px-2 py-0.5 text-gray-600 select-all">
@@ -567,19 +657,43 @@ function UsuariosContent() {
                     <td className="py-3 px-4 text-gray-500">{formatDate(u.created_at)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        {u.status === 'rejected' && (
-                          <Button
-                            variant="primary"
-                            brand="relevo"
-                            size="sm"
-                            onClick={() => setApproveTarget(u)}
-                            disabled={approveTarget !== null || resetTarget !== null}
-                            aria-label={`Aprobar ${u.name}`}
-                          >
-                            <CheckCircle size={14} className="mr-1" />
-                            Aprobar
-                          </Button>
-                        )}
+                        {/* Approve — for pending and rejected */}
+                        {(u.status === 'pending' || u.status === 'rejected') &&
+                          (currentUser?.role === 'ADMIN' || u.role === 'TEACHER') && (
+                            <Button
+                              variant="primary"
+                              brand="relevo"
+                              size="sm"
+                              onClick={() => setApproveTarget(u)}
+                              disabled={
+                                approveTarget !== null ||
+                                resetTarget !== null ||
+                                rejectTarget !== null
+                              }
+                              aria-label={`Aprobar ${u.name}`}
+                            >
+                              <CheckCircle size={14} className="mr-1" />
+                              Aprobar
+                            </Button>
+                          )}
+                        {/* Reject — only for pending (backend rejects already-rejected users with 409) */}
+                        {u.status === 'pending' &&
+                          (currentUser?.role === 'ADMIN' || u.role === 'TEACHER') && (
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => setRejectTarget(u)}
+                              disabled={
+                                approveTarget !== null ||
+                                resetTarget !== null ||
+                                rejectTarget !== null
+                              }
+                              aria-label={`Rechazar a ${u.name}`}
+                            >
+                              <XCircle size={14} className="mr-1" />
+                              Rechazar
+                            </Button>
+                          )}
                         {u.status === 'active' && u.role === 'TEACHER' && (
                           <Button
                             variant="outline"
@@ -663,23 +777,34 @@ function UsuariosContent() {
                 {/* Auto-generated password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Contraseña (generada automáticamente)
+                    Contraseña provisoria
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Esta contraseña no se puede editar. Cópiala y compártela con el profesor.
+                  </p>
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono bg-gray-50 text-gray-800 select-all">
-                      {generatedPassword}
-                    </code>
+                    <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg border border-gray-300 flex-1">
+                      <Lock className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                      <code className="text-sm font-mono text-gray-700 flex-1 select-all">
+                        {generatedPassword}
+                      </code>
+                    </div>
                     <button
                       type="button"
                       onClick={handleCopyPassword}
-                      className="flex-shrink-0 p-2 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
                       aria-label="Copiar contraseña"
-                      title="Copiar contraseña"
                     >
                       {passwordCopied ? (
-                        <Check size={16} className="text-green-600" />
+                        <>
+                          <Check className="w-3.5 h-3.5" />
+                          ¡Copiada!
+                        </>
                       ) : (
-                        <Copy size={16} className="text-gray-500" />
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          Copiar
+                        </>
                       )}
                     </button>
                     <button
@@ -692,9 +817,6 @@ function UsuariosContent() {
                       <RefreshCw size={16} className="text-gray-500" />
                     </button>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Copia esta contraseña para compartirla con el profesor.
-                  </p>
                 </div>
               </div>
 

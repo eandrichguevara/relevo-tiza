@@ -3,13 +3,13 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from uuid import UUID
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models.db_models import User, Tenant, AuditLog
+from models.db_models import User, Tenant, TenantMember, AuditLog
 from models.schemas import (
     PendingListResponse,
     PendingRegistrationResponse,
@@ -113,6 +113,7 @@ async def list_pending_registrations(
 async def approve_registration(
     user_id: UUID,
     body: ApproveRejectRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
@@ -153,11 +154,19 @@ async def approve_registration(
 
     # ── HOLDER tenant scoping ──────────────────────────────────
     if current_user.role == "HOLDER":
+        # Check if HOLDER is a member of the user's tenant (supports multi-tenant)
         if user.tenant_id != current_user.tenant_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No puedes aprobar usuarios de otro colegio.",
+            membership = await db.execute(
+                select(TenantMember).where(
+                    TenantMember.tenant_id == user.tenant_id,
+                    TenantMember.user_id == current_user.id,
+                )
             )
+            if not membership.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No puedes aprobar usuarios de otro colegio.",
+                )
         if user.role != "TEACHER":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -197,7 +206,7 @@ async def approve_registration(
             "new_status": user.status,
             "reason": body.reason,
         },
-        ip_address="0.0.0.0",
+        ip_address=request.client.host if request.client else "unknown",
     )
     db.add(audit)
 
@@ -231,6 +240,7 @@ async def approve_registration(
 async def reject_registration(
     user_id: UUID,
     body: ApproveRejectRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_admin_or_holder),
     db: AsyncSession = Depends(get_db),
@@ -273,11 +283,19 @@ async def reject_registration(
 
     # ── HOLDER tenant scoping ──────────────────────────────────
     if current_user.role == "HOLDER":
+        # Check if HOLDER is a member of the user's tenant (supports multi-tenant)
         if user.tenant_id != current_user.tenant_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="No puedes rechazar usuarios de otro colegio.",
+            membership = await db.execute(
+                select(TenantMember).where(
+                    TenantMember.tenant_id == user.tenant_id,
+                    TenantMember.user_id == current_user.id,
+                )
             )
+            if not membership.scalar_one_or_none():
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="No puedes rechazar usuarios de otro colegio.",
+                )
         if user.role != "TEACHER":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -314,7 +332,7 @@ async def reject_registration(
             "new_status": user.status,
             "reason": body.reason.strip(),
         },
-        ip_address="0.0.0.0",
+        ip_address=request.client.host if request.client else "unknown",
     )
     db.add(audit)
 

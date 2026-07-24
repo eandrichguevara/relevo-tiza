@@ -146,6 +146,7 @@ def _generate_temp_password(length: int = 12) -> str:
 @router.post("/{user_id}/reset-password", response_model=ResetPasswordResponse)
 async def reset_password(
     user_id: UUID,
+    request: Request,
     current_user: User = Depends(require_role("HOLDER")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -219,7 +220,7 @@ async def reset_password(
             "target_email": user.email,
             "target_role": user.role,
         },
-        ip_address="0.0.0.0",
+        ip_address=request.client.host if request.client else "unknown",
     )
     db.add(audit)
     await db.commit()

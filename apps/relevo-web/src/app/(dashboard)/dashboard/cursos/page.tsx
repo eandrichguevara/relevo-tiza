@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, Suspense } from 'react';
+import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, Button, Input, Badge, Spinner, EmptyState, ErrorMessage } from '@tiza/ui';
 import {
@@ -23,6 +24,7 @@ import {
   type Course,
 } from '@/hooks/useRelevoApi';
 import { useActiveTenant } from '@/hooks/ActiveTenantContext';
+import { formatTenantDomain } from '@/lib/domain';
 import ConfirmModal from '@/components/ConfirmModal';
 
 // ─── Niveles disponibles ──────────────────────────────────
@@ -311,7 +313,7 @@ function CursosContent() {
               ))}
             </select>
           )}
-          {selectedTenant && <Badge variant="info">{selectedTenant.subdomain}.relevo.cl</Badge>}
+          {selectedTenant && <Badge variant="info">{formatTenantDomain(selectedTenant)}</Badge>}
         </div>
       </Card>
 
@@ -381,6 +383,17 @@ function CursosContent() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
+                  <Link href={`/dashboard/cursos/${course.id}/alumnos`} prefetch={false}>
+                    <Button
+                      variant="outline"
+                      brand="relevo"
+                      size="sm"
+                      aria-label={`Gestionar alumnos de ${course.name}`}
+                    >
+                      <Users size={14} className="mr-1" />
+                      Alumnos
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     brand="relevo"
@@ -435,51 +448,6 @@ function CursosContent() {
                     <span>
                       Agregando a: <strong>{selectedTenant.name}</strong>
                     </span>
-                  </div>
-                )}
-
-                {/* Teacher per subject */}
-                {subjects.length > 0 && (
-                  <div className="space-y-3">
-                    <span className="block text-sm font-medium text-gray-700">
-                      Profesores por asignatura
-                    </span>
-                    {subjects.map((subject) => (
-                      <div key={subject}>
-                        <label
-                          htmlFor={`course-teacher-${subject}`}
-                          className="block text-xs font-medium text-gray-500 mb-1"
-                        >
-                          {subject}
-                        </label>
-                        {teachers && teachers.length > 0 ? (
-                          <select
-                            id={`course-teacher-${subject}`}
-                            value={selectedTeachers[subject] || ''}
-                            onChange={(e) =>
-                              setSelectedTeachers((prev) => ({
-                                ...prev,
-                                [subject]: e.target.value,
-                              }))
-                            }
-                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900
-                              focus:outline-none focus:ring-2 focus:ring-[#1A3A5C] focus:ring-offset-1 bg-white"
-                            aria-label={`Seleccionar profesor para ${subject}`}
-                          >
-                            <option value="">— Selecciona profesor —</option>
-                            {teachers.map((t: any) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
-                            No hay profesores disponibles en este colegio.
-                          </p>
-                        )}
-                      </div>
-                    ))}
                   </div>
                 )}
 
@@ -552,6 +520,51 @@ function CursosContent() {
                     </p>
                   )}
                 </div>
+
+                {/* Teacher per subject */}
+                {subjects.length > 0 && (
+                  <div className="space-y-3">
+                    <span className="block text-sm font-medium text-gray-700">
+                      Profesores por asignatura
+                    </span>
+                    {subjects.map((subject) => (
+                      <div key={subject}>
+                        <label
+                          htmlFor={`course-teacher-${subject}`}
+                          className="block text-xs font-medium text-gray-500 mb-1"
+                        >
+                          {subject}
+                        </label>
+                        {teachers && teachers.length > 0 ? (
+                          <select
+                            id={`course-teacher-${subject}`}
+                            value={selectedTeachers[subject] || ''}
+                            onChange={(e) =>
+                              setSelectedTeachers((prev) => ({
+                                ...prev,
+                                [subject]: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900
+                              focus:outline-none focus:ring-2 focus:ring-[#1A3A5C] focus:ring-offset-1 bg-white"
+                            aria-label={`Seleccionar profesor para ${subject}`}
+                          >
+                            <option value="">— Selecciona profesor —</option>
+                            {teachers.map((t: any) => (
+                              <option key={t.id} value={t.id}>
+                                {t.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-sm text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+                            No hay profesores disponibles en este colegio.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Error message */}

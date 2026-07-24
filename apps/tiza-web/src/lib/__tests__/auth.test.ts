@@ -406,3 +406,136 @@ describe('clearAuth', () => {
     expect(sessionStorageMock.removeItem).toHaveBeenCalledWith('tiza-auth-token-jwt');
   });
 });
+
+describe('changePasswordUser', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.clear();
+    sessionStorageMock.clear();
+  });
+
+  it('cambia password exitosamente y retorna user + token', async () => {
+    // POST /api/auth/change-password response
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: 'new-jwt-token', token_type: 'bearer' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    // GET /api/auth/me response
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'user-1',
+          email: 'teacher@test.com',
+          name: 'Profesor Test',
+          role: 'teacher',
+          status: 'active',
+          must_change_password: false,
+          tenant_id: 'tenant-1',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    // POST /api/auth/set-token response
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    const { changePasswordUser } = await getModule();
+    const result = await changePasswordUser('old-pass', 'new-pass', 'current-token');
+
+    expect(result.user).toEqual({
+      id: 'user-1',
+      email: 'teacher@test.com',
+      name: 'Profesor Test',
+      role: 'teacher',
+      status: 'active',
+      rejectionReason: undefined,
+      mustChangePassword: false,
+      tenantId: 'tenant-1',
+    });
+    expect(result.token).toBe('new-jwt-token');
+
+    // Verify the change-password request was correct (via apiFetch)
+    expect(mockFetch).toHaveBeenNthCalledWith(
+      1,
+      'http://localhost:8000/api/auth/change-password',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ current_password: 'old-pass', new_password: 'new-pass' }),
+        headers: expect.objectContaining({
+          Authorization: 'Bearer current-token',
+          'Content-Type': 'application/json',
+          'X-Tenant-Brand': 'tiza',
+        }),
+      })
+    );
+
+    // Verify token was stored
+    expect(sessionStorageMock.setItem).toHaveBeenCalledWith('tiza-auth-token-jwt', 'new-jwt-token');
+    expect(localStorageMock.setItem).toHaveBeenCalled();
+  });
+
+  it('incluye mustChangePassword true cuando el backend lo indica', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: 'new-jwt-token', token_type: 'bearer' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    mockFetch.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: 'user-2',
+          email: 'mustchange@test.com',
+          name: 'Must Change',
+          role: 'teacher',
+          status: 'active',
+          must_change_password: true,
+          tenant_id: 'tenant-2',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    );
+    mockFetch.mockResolvedValueOnce(new Response(null, { status: 200 }));
+
+    const { changePasswordUser } = await getModule();
+    const result = await changePasswordUser('old-pass', 'new-pass', 'current-token');
+
+    expect(result.user.mustChangePassword).toBe(true);
+    expect(result.user.id).toBe('user-2');
+  });
+
+  it('lanza error cuando la API de change-password falla', async () => {
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ detail: 'Contraseña actual incorrecta' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+
+    const { changePasswordUser } = await getModule();
+
+    // apiFetch wraps the error in an ApiError object (not an Error instance)
+    await expect(changePasswordUser('wrong-pass', 'new-pass', 'token')).rejects.toMatchObject({
+      status: 400,
+      detail: 'Contraseña actual incorrecta',
+    });
+
+    // /api/auth/me should NOT have been called
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('lanza error cuando hay un problema de red', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+    const { changePasswordUser } = await getModule();
+
+    // apiFetch wraps network errors in an ApiError object
+    await expect(changePasswordUser('old-pass', 'new-pass', 'token')).rejects.toMatchObject({
+      status: 0,
+      detail: 'Network error',
+    });
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});

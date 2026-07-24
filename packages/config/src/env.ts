@@ -11,5 +11,7 @@ export const env = {
   API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
   TIZA_URL: process.env.NEXT_PUBLIC_TIZA_URL || 'http://localhost:3001',
   RELEVO_URL: process.env.NEXT_PUBLIC_RELEVO_URL || 'http://localhost:3002',
+  TIZA_DOMAIN: process.env.NEXT_PUBLIC_TIZA_DOMAIN || '.tiza.cl',
+  RELEVO_DOMAIN: process.env.NEXT_PUBLIC_RELEVO_DOMAIN || '.relevo.cl',
   GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
 };

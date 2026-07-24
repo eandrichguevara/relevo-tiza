@@ -1,4 +1,4 @@
-import type { Evaluation, Result, User, DashboardStats, MacroStats } from './models';
+import type { Evaluation, Result, User, DashboardStats, MacroStats, CriterionItem } from './models';
 
 export interface ApiResponse<T> {
   data: T;
@@ -31,18 +31,27 @@ export interface RegisterRequest {
   role?: string;
   school?: string;
   tenant_id?: string;
+  join_code?: string;
+}
+
+export interface AlternativeItem {
+  label: string;
+  text: string;
+  is_correct: boolean;
 }
 
 export interface CreateEvaluationRequest {
   title: string;
   subject: string;
   grade: string;
+  course_id: string;
   rubric: Array<{
     questionNumber: number;
     type: 'multiple_choice' | 'written';
     maxScore: number;
     correctAnswer?: string;
-    criteria?: string;
+    criteria?: CriterionItem[];
+    alternatives?: AlternativeItem[];
   }>;
 }
 

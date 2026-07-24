@@ -7,7 +7,7 @@ from typing import List
 
 from database import get_db, current_tenant_id
 from models.db_models import Course, CourseTeacher, Student, User
-from models.schemas import CreateCourseRequest, CourseResponse, SubjectEnum
+from models.schemas import CreateCourseRequest, CourseResponse, SubjectEnum, TeacherClassResponse
 from utils.security import verify_tenant_access, require_role
 
 router = APIRouter()
@@ -104,6 +104,65 @@ async def list_courses(
         course_dict["student_count"] = student_count
         course_dict["teachers"] = teachers
         response.append(CourseResponse(**course_dict))
+    return response
+
+
+@router.get("/my-classes", response_model=List[TeacherClassResponse])
+async def list_my_classes(
+    current_user: User = Depends(verify_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """Return course-subject pairs where the current teacher is assigned.
+    
+    For each CourseTeacher entry where teacher_id matches the current user,
+    returns the course details and the single subject they teach.
+    """
+    # If user is not a TEACHER, return empty list
+    if current_user.role != "TEACHER":
+        return []
+
+    # Query CourseTeacher for this teacher
+    ct_result = await db.execute(
+        select(CourseTeacher).where(CourseTeacher.teacher_id == current_user.id)
+    )
+    assignments = ct_result.scalars().all()
+
+    if not assignments:
+        return []
+
+    # Get all referenced course IDs
+    course_ids = list({a.course_id for a in assignments})
+
+    # Fetch courses
+    courses_result = await db.execute(
+        select(Course).where(Course.id.in_(course_ids), Course.deleted_at.is_(None))
+    )
+    courses = {c.id: c for c in courses_result.scalars().all()}
+
+    # Build response
+    response = []
+    for a in assignments:
+        course = courses.get(a.course_id)
+        if not course:
+            continue
+
+        # Count students for this course
+        count_result = await db.execute(
+            select(func.count(Student.id)).where(
+                Student.course_id == course.id,
+                Student.deleted_at.is_(None)
+            )
+        )
+        student_count = count_result.scalar() or 0
+
+        response.append(TeacherClassResponse(
+            course_id=course.id,
+            course_name=course.name,
+            subject=a.subject,
+            grade=course.grade,
+            student_count=student_count,
+        ))
+
     return response
 
 

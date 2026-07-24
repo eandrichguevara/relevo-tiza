@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 @dataclass
@@ -18,13 +18,15 @@ class GradingInput:
         question_number: The question number in the evaluation.
         student_text: The OCR-extracted text of the student's answer.
         max_score: The maximum possible score for this question.
-        criteria: Optional grading criteria or expected answer.
+        criteria: Optional grading criteria — a single string for backward
+            compat, or a list of ``{"description": str, "score": float}``
+            dicts for multi-criteria grading (F-06).
         question_type: Either ``"written"`` or ``"multiple_choice"``.
     """
     question_number: int
     student_text: str
     max_score: float
-    criteria: Optional[str] = None
+    criteria: Optional[Union[str, List[Dict[str, Any]]]] = None
     question_type: str = "written"
 
 

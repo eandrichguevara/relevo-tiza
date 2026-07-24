@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useFeatures } from '@/hooks/useFeatures';
 import { ActiveTenantProvider, useActiveTenant } from '@/hooks/ActiveTenantContext';
+import { formatTenantDomain } from '@/lib/domain';
 import {
   LayoutDashboard,
   School,
@@ -17,7 +18,6 @@ import {
   Menu,
   X,
   ChevronDown,
-  Clock,
   Loader2,
 } from 'lucide-react';
 
@@ -30,15 +30,6 @@ function getNavItems(userRole?: string) {
     { href: '/dashboard/usuarios', label: 'Usuarios', icon: Users },
     { href: '/dashboard/facturacion', label: 'Facturación', icon: CreditCard },
   ];
-
-  // Admin/Holder nav items — both can manage pending approvals
-  if (userRole === 'ADMIN' || userRole === 'HOLDER') {
-    items.splice(1, 0, {
-      href: '/dashboard/admin/pendientes',
-      label: 'Pendientes',
-      icon: Clock,
-    });
-  }
 
   return items;
 }
@@ -243,7 +234,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
               {/* Active tenant subdomain display */}
               {activeTenant && (
                 <p className="text-[10px] text-gray-400 mt-1 truncate">
-                  {activeTenant.subdomain}.relevo.cl
+                  {formatTenantDomain(activeTenant)}
                 </p>
               )}
             </div>

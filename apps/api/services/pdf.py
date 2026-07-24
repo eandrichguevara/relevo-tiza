@@ -75,22 +75,80 @@ def generate_evaluation_pdf(evaluation) -> BytesIO:
         q_num = item.get("question_number", i + 1)
         q_type = item.get("type", "written")
         max_score = item.get("max_score", 0)
+        statement = item.get("statement", "")
+
+        # Build question header
+        question_html = (
+            f'<b>Pregunta {q_num}</b> ({q_type}) — {max_score} pts'
+        )
+        if statement:
+            question_html += f'<br/><i>{statement}</i>'
 
         story.append(
-            Paragraph(
-                f"<b>Pregunta {q_num}</b> ({q_type}) — {max_score} pts",
-                styles["Heading3"],
-            )
+            Paragraph(question_html, styles["Heading3"])
         )
 
+        # Render criteria (new multi-level format or legacy)
+        criteria = item.get("criteria")
+        if criteria and isinstance(criteria, list):
+            criteria_html = ""
+            # Detect format: new (name + levels) vs legacy (description + score)
+            if criteria and isinstance(criteria[0], dict) and "name" in criteria[0] and "levels" in criteria[0]:
+                # New multi-level format
+                for criterion in criteria:
+                    cname = criterion.get("name", "Criterio")
+                    levels = criterion.get("levels", [])
+                    criteria_html += f'<b>{cname}</b>'
+                    if levels:
+                        max_pts = max(l.get("points", 0) for l in levels)
+                        criteria_html += f' (máx: {max_pts} pts)'
+                    criteria_html += '<br/>'
+                    for level in levels:
+                        pts = level.get("points", 0)
+                        desc = level.get("description", "")
+                        criteria_html += f'&nbsp;&nbsp;{pts} pts — {desc}<br/>'
+            else:
+                # Legacy format
+                for criterion in criteria:
+                    desc = criterion.get("description", "")
+                    score = criterion.get("score", 0)
+                    criteria_html += f'• {desc} ({score} pts)<br/>'
+
+            if criteria_html:
+                story.append(Paragraph(criteria_html, styles["Normal"]))
+                story.append(Spacer(1, 2))
+
         if q_type == "multiple_choice":
-            story.append(
-                Paragraph(
-                    "A) ________  B) ________  C) ________  D) ________",
-                    styles["Normal"],
+            # Render alternatives
+            alternatives = item.get("alternatives")
+            if alternatives and isinstance(alternatives, list):
+                alt_html = ""
+                for alt in alternatives:
+                    label = alt.get("label", "")
+                    text = alt.get("text", "")
+                    is_correct = alt.get("is_correct", False)
+                    marker = " ✓" if is_correct else ""
+                    alt_html += f'{label}) {text}{marker}<br/>'
+                story.append(Paragraph(alt_html, styles["Normal"]))
+            else:
+                story.append(
+                    Paragraph(
+                        "A) ________  B) ________  C) ________  D) ________",
+                        styles["Normal"],
+                    )
                 )
-            )
+
+            # Show correct answer
+            correct = item.get("correct_answer")
+            if correct:
+                story.append(
+                    Paragraph(
+                        f'<i>Respuesta correcta: {correct}</i>',
+                        styles["Normal"],
+                    )
+                )
         else:
+            # Written answer: show lines for student to write
             for _ in range(3):
                 story.append(
                     Paragraph("_" * 60, styles["Normal"])
