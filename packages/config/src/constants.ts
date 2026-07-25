@@ -5,7 +5,7 @@ export const BRAND = {
 
 export const ROLES = {
   TEACHER: 'TEACHER',
-  HOLDER: 'HOLDER',
+  GESTION: 'GESTION',
   ADMIN: 'ADMIN',
 } as const;
 

@@ -2,12 +2,12 @@
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from typing import List
 
 from database import get_db, current_tenant_id
 from models.db_models import Course, CourseTeacher, Student, User
-from models.schemas import CreateCourseRequest, CourseResponse, SubjectEnum, TeacherClassResponse
+from models.schemas import CreateCourseRequest, UpdateCourseRequest, CourseResponse, SubjectEnum, TeacherClassResponse
 from utils.security import verify_tenant_access, require_role
 
 router = APIRouter()
@@ -16,10 +16,10 @@ router = APIRouter()
 @router.post("", response_model=CourseResponse, status_code=201)
 async def create_course(
     body: CreateCourseRequest,
-    current_user: User = Depends(require_role("HOLDER")),
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a new course with per-subject teachers. Only HOLDER/ADMIN can create courses."""
+    """Create a new course with per-subject teachers. Only GESTION/ADMIN can create courses."""
     tid = current_tenant_id.get()
     if not tid:
         raise HTTPException(status_code=400, detail="Contexto de colegio no disponible")
@@ -197,6 +197,83 @@ async def get_course(
     return CourseResponse(**course_dict)
 
 
+@router.put("/{course_id}", response_model=CourseResponse)
+async def update_course(
+    course_id: str,
+    body: UpdateCourseRequest,
+    current_user: User = Depends(require_role("GESTION")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an existing course. Only GESTION/ADMIN can edit courses."""
+    tid = current_tenant_id.get()
+    if not tid:
+        raise HTTPException(status_code=400, detail="Contexto de colegio no disponible")
+
+    result = await db.execute(
+        select(Course).where(Course.id == course_id, Course.deleted_at.is_(None))
+    )
+    course = result.scalar_one_or_none()
+    if not course:
+        raise HTTPException(status_code=404, detail="Curso no encontrado")
+
+    if body.name is not None:
+        course.name = body.name
+    if body.grade is not None:
+        course.grade = body.grade
+    if body.subject is not None:
+        course.subject = body.subject
+
+    if body.teachers is not None:
+        course_subjects = set(s.strip() for s in course.subject.split(","))
+        teacher_subjects = set(body.teachers.keys())
+        if course_subjects != teacher_subjects:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Las asignaturas del curso ({', '.join(sorted(course_subjects))}) "
+                       f"deben coincidir con los profesores asignados ({', '.join(sorted(teacher_subjects))})",
+            )
+
+        for subject, teacher_id in body.teachers.items():
+            teacher_result = await db.execute(
+                select(User).where(
+                    User.id == teacher_id,
+                    User.role == "TEACHER",
+                    User.status == "active",
+                    User.tenant_id == tid,
+                )
+            )
+            if not teacher_result.scalar_one_or_none():
+                raise HTTPException(status_code=404, detail=f"Profesor no encontrado para {subject}")
+
+        # Remove existing teacher assignments
+        await db.execute(
+            delete(CourseTeacher).where(CourseTeacher.course_id == course.id)
+        )
+
+        # Insert new teacher assignments
+        for subject, teacher_id in body.teachers.items():
+            ct = CourseTeacher(course_id=course.id, subject=subject, teacher_id=teacher_id)
+            db.add(ct)
+
+    course.updated_at = datetime.now(timezone.utc)
+    await db.flush()
+
+    count_result = await db.execute(
+        select(func.count(Student.id)).where(Student.course_id == course.id)
+    )
+    student_count = count_result.scalar() or 0
+
+    ct_result = await db.execute(
+        select(CourseTeacher).where(CourseTeacher.course_id == course.id)
+    )
+    teachers = {ct.subject: ct.teacher_id for ct in ct_result.scalars().all()}
+
+    course_dict = {k: v for k, v in course.__dict__.items() if not k.startswith("_")}
+    course_dict["student_count"] = student_count
+    course_dict["teachers"] = teachers
+    return CourseResponse(**course_dict)
+
+
 @router.delete("/{course_id}")
 async def delete_course(
     course_id: str,
@@ -213,3 +290,4 @@ async def delete_course(
     course.deleted_at = datetime.now(timezone.utc)
     await db.flush()
     return {"message": "Curso eliminado (soft delete)"}
+

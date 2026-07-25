@@ -25,14 +25,14 @@ async def _activate_user_and_set_must_change(email: str, must_change: bool):
 @pytest.mark.asyncio
 async def test_must_change_password_enforcement(client: AsyncClient):
     """Test the complete force password change flow and path protection."""
-    # 1. Register a holder (auto-created tenant)
-    holder_resp = await client.post("/api/auth/register", json={
-        "email": "holder_must_change@test.com",
+    # 1. Register a gestion (auto-created tenant)
+    gestion_resp = await client.post("/api/auth/register", json={
+        "email": "gestion_must_change@test.com",
         "password": "TempPassword123!",
         "role": "director",
     })
-    assert holder_resp.status_code == 201
-    tenant_id = holder_resp.json()["tenant_id"]
+    assert gestion_resp.status_code == 201
+    tenant_id = gestion_resp.json()["tenant_id"]
 
     # 2. Register a teacher under the tenant
     teacher_resp = await client.post("/api/auth/register", json={

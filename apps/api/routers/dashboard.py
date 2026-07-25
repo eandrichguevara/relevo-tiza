@@ -102,10 +102,10 @@ async def get_accessible_tenant_ids(db: AsyncSession, user: User) -> list[str]:
 
 @router.get("/executive", response_model=MacroStatsResponse)
 async def executive_dashboard(
-    current_user: User = Depends(require_role("HOLDER")),
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get executive dashboard stats — cross-schema view for HOLDER/ADMIN.
+    """Get executive dashboard stats — cross-schema view for GESTION/ADMIN.
 
     Uses raw SQL UNION ALL queries across tenant schemas for aggregations.
     Public schema tables (tenants, users) are queried directly with

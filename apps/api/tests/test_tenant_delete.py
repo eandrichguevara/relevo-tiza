@@ -1,9 +1,9 @@
 """Tests for N-05: Soft delete of tenants.
 
 Covers:
-- HOLDER owner can soft-delete their own tenant → 200
+- GESTION owner can soft-delete their own tenant → 200
 - Deleted tenant has status="inactive" in list
-- HOLDER (non-owner) cannot delete another's tenant → 403
+- GESTION (non-owner) cannot delete another's tenant → 403
 - TEACHER cannot delete any tenant → 403
 """
 import sys
@@ -15,14 +15,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from httpx import AsyncClient
 
 
-async def _setup_holder_custom(
+async def _setup_gestion_custom(
     _app,
     email: str,
     password: str,
     name: str | None = None,
     with_member: bool = True,
 ) -> dict:
-    """Create a HOLDER user + tenant directly in DB.
+    """Create a GESTION user + tenant directly in DB.
     Returns dict with token and tenant_id.
     """
     from database import get_db
@@ -46,21 +46,21 @@ async def _setup_holder_custom(
         session.add(tenant)
         await session.flush()
 
-        holder = User(
+        gestion = User(
             email=email,
-            name=name or f"Holder {email}",
+            name=name or f"Gestion {email}",
             password=hash_password(password),
             status="active",
-            role="HOLDER",
+            role="GESTION",
             tenant_id=tenant.id,
         )
-        session.add(holder)
+        session.add(gestion)
         await session.flush()
 
         if with_member:
             member = TenantMember(
                 tenant_id=tenant.id,
-                user_id=holder.id,
+                user_id=gestion.id,
                 role="owner",
             )
             session.add(member)
@@ -98,16 +98,16 @@ class TestTenantDelete:
     """N-05: Soft delete of tenants."""
 
     async def test_delete_tenant_success(self, client: AsyncClient, fastapi_app):
-        """HOLDER owner can soft-delete their own tenant. Status becomes 'inactive'."""
-        holder = await _setup_holder_custom(
+        """GESTION owner can soft-delete their own tenant. Status becomes 'inactive'."""
+        gestion = await _setup_gestion_custom(
             fastapi_app, "owner@delete.test", "OwnerDel999!", with_member=True
         )
-        tid = holder["tenant_id"]
+        tid = gestion["tenant_id"]
 
         # DELETE the tenant
         resp = await client.delete(
             f"/api/tenants/{tid}",
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert resp.status_code == 200, f"Delete failed: {resp.text}"
         data = resp.json()
@@ -118,7 +118,7 @@ class TestTenantDelete:
         # Verify tenant now has status "inactive" via list endpoint
         list_resp = await client.get(
             "/api/tenants",
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert list_resp.status_code == 200
         tenants = list_resp.json()["items"]
@@ -132,31 +132,31 @@ class TestTenantDelete:
             pytest.fail(f"Tenant {tid} not found in tenant list after soft delete")
 
     async def test_delete_tenant_non_owner_returns_403(self, client: AsyncClient, fastapi_app):
-        """HOLDER who is not an owner of the tenant cannot delete it."""
+        """GESTION who is not an owner of the tenant cannot delete it."""
         # Create tenant A with owner A
-        holder_a = await _setup_holder_custom(
+        gestion_a = await _setup_gestion_custom(
             fastapi_app, "owner-a@delete.test", "OwnerADel999!", with_member=True
         )
 
-        # Create holder B (different tenant, not an owner of A)
-        holder_b = await _setup_holder_custom(
-            fastapi_app, "holder-b@delete.test", "HolderBDel999!", with_member=True
+        # Create gestion B (different tenant, not an owner of A)
+        gestion_b = await _setup_gestion_custom(
+            fastapi_app, "gestion-b@delete.test", "GestionBDel999!", with_member=True
         )
 
-        # Holder B tries to delete tenant A → 403
+        # Gestion B tries to delete tenant A → 403
         resp = await client.delete(
-            f"/api/tenants/{holder_a['tenant_id']}",
-            headers={"Authorization": f"Bearer {holder_b['token']}"},
+            f"/api/tenants/{gestion_a['tenant_id']}",
+            headers={"Authorization": f"Bearer {gestion_b['token']}"},
         )
         assert resp.status_code == 403, (
-            f"Expected 403 for non-owner HOLDER, got {resp.status_code}: {resp.text}"
+            f"Expected 403 for non-owner GESTION, got {resp.status_code}: {resp.text}"
         )
 
     async def test_delete_tenant_teacher_returns_403(self, client: AsyncClient, fastapi_app):
-        """TEACHER cannot delete a tenant (require_role('HOLDER') blocks them)."""
-        # Create HOLDER with tenant
-        holder = await _setup_holder_custom(
-            fastapi_app, "holder@teacherdel.test", "HolderTDel999!", with_member=True
+        """TEACHER cannot delete a tenant (require_role('GESTION') blocks them)."""
+        # Create GESTION with tenant
+        gestion = await _setup_gestion_custom(
+            fastapi_app, "gestion@teacherdel.test", "GestionTDel999!", with_member=True
         )
 
         # Create TEACHER in that tenant
@@ -171,7 +171,7 @@ class TestTenantDelete:
                 password=hash_password("TeacherDel999!"),
                 status="active",
                 role="TEACHER",
-                tenant_id=holder["tenant_id"],
+                tenant_id=gestion["tenant_id"],
             )
             session.add(teacher)
             await session.commit()
@@ -180,7 +180,7 @@ class TestTenantDelete:
 
         # TEACHER tries to delete tenant → 403 (require_role)
         resp = await client.delete(
-            f"/api/tenants/{holder['tenant_id']}",
+            f"/api/tenants/{gestion['tenant_id']}",
             headers={"Authorization": f"Bearer {teacher_token}"},
         )
         assert resp.status_code == 403, (

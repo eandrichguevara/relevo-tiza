@@ -29,7 +29,7 @@ class TestAuthRegister:
     """Tests for POST /api/auth/register."""
 
     async def test_register_creates_holder_with_auto_tenant(self, client: AsyncClient):
-        """Register a HOLDER should auto-create a tenant and return 201 with pending status."""
+        """Register a GESTION should auto-create a tenant and return 201 with pending status."""
         response = await client.post("/api/auth/register", json={
             "email": "director@example.com",
             "password": "SecurePass123!",
@@ -39,7 +39,7 @@ class TestAuthRegister:
         data = response.json()
         assert "id" in data
         assert data["email"] == "director@example.com"
-        assert data["role"] == "HOLDER"
+        assert data["role"] == "GESTION"
         assert data["status"] == "pending"
         assert "tenant_id" in data
         # Password should NOT be returned
@@ -58,14 +58,14 @@ class TestAuthRegister:
 
     async def test_register_teacher_with_valid_tenant_id(self, client: AsyncClient):
         """Register a TEACHER with an existing tenant_id should succeed."""
-        # First create a HOLDER to get a tenant
-        holder_resp = await client.post("/api/auth/register", json={
+        # First create a GESTION to get a tenant
+        gestion_resp = await client.post("/api/auth/register", json={
             "email": "principal@school.com",
             "password": "SecurePass123!",
             "role": "director",
         })
-        assert holder_resp.status_code == 201
-        tenant_id = holder_resp.json()["tenant_id"]
+        assert gestion_resp.status_code == 201
+        tenant_id = gestion_resp.json()["tenant_id"]
 
         # Now register a TEACHER with that tenant_id
         response = await client.post("/api/auth/register", json={
@@ -94,7 +94,7 @@ class TestAuthRegister:
         assert response.status_code == 404
 
     async def test_register_with_name_stores_name_correctly(self, client: AsyncClient):
-        """Register a HOLDER with a 'name' field should store and return it."""
+        """Register a GESTION with a 'name' field should store and return it."""
         response = await client.post("/api/auth/register", json={
             "email": "nameduser@example.com",
             "password": "SecurePass123!",
@@ -158,7 +158,7 @@ class TestAuthLogin:
 
     async def test_login_returns_token(self, client: AsyncClient, test_user_data: dict):
         """Login with valid credentials should return a JWT token."""
-        # First register (HOLDER so tenant auto-created)
+        # First register (GESTION so tenant auto-created)
         await client.post("/api/auth/register", json=test_user_data)
         # Approve user (simulate admin approval) before login
         await _approve_user(test_user_data["email"])
@@ -372,7 +372,7 @@ class TestAuthJWTClaims:
 
     async def test_login_jwt_includes_status(self, client: AsyncClient, test_user_data: dict):
         """JWT token must include 'status' claim matching user's status."""
-        # Register a HOLDER (creates with status="pending")
+        # Register a GESTION (creates with status="pending")
         reg_resp = await client.post("/api/auth/register", json=test_user_data)
         assert reg_resp.status_code == 201
 
@@ -438,7 +438,7 @@ class TestAuthSession:
         assert response.status_code == 200
         data = response.json()
         assert data["email"] == registered_user["email"]
-        assert data["role"] == "HOLDER"
+        assert data["role"] == "GESTION"
         assert data["tenant_id"] == registered_user["tenant_id"]
         assert data["authenticated"] is True
         assert "id" in data

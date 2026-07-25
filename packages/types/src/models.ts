@@ -1,5 +1,5 @@
 export type Brand = 'tiza' | 'relevo';
-export type Role = 'TEACHER' | 'HOLDER' | 'ADMIN';
+export type Role = 'TEACHER' | 'GESTION' | 'ADMIN';
 export type TenantMemberRole = 'owner' | 'admin' | 'member';
 export type UserStatus = 'pending' | 'active' | 'rejected' | 'suspended';
 export type QuestionType = 'multiple_choice' | 'written';
@@ -53,12 +53,20 @@ export interface CriterionItem {
   levels: CriterionLevel[];
 }
 
+export type ItemType = 'question' | 'info_section' | 'divider';
+
 export interface RubricItem {
-  questionNumber: number;
-  type: QuestionType;
+  itemType?: ItemType;
+  questionNumber?: number;
+  type?: QuestionType;
   maxScore?: number;
   correctAnswer?: string;
   criteria?: CriterionItem[];
+  alternatives?: AlternativeItem[];
+  // Campos para secciones de información o encabezados de sección
+  sectionTitle?: string;
+  sectionContent?: string;
+  sectionImageUrl?: string;
 }
 
 export interface Evaluation {

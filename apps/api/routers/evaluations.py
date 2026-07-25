@@ -8,7 +8,13 @@ from typing import List, Optional
 
 from database import get_db, current_tenant_id
 from models.db_models import Evaluation, User, Course, CourseTeacher, Student
-from models.schemas import CreateEvaluationRequest, EvaluationResponse
+from models.schemas import (
+    CreateEvaluationRequest, EvaluationResponse,
+    SuggestNextQuestionRequest, SuggestNextQuestionResponse,
+    SuggestDistractorsRequest, SuggestDistractorsResponse,
+    RefineQuestionRequest, RefineQuestionResponse,
+    SuggestRubricRequest, SuggestRubricResponse,
+)
 from utils.security import verify_tenant_access
 from services.gemini import GeminiService
 from services.pdf import generate_evaluation_pdf
@@ -63,11 +69,12 @@ async def create_evaluation(
 ):
     """Create a new evaluation with rubric.
     
-    The user must be a member of the course (teacher of the course, admin, or holder).
+    The user must be a member of the course (teacher of the course, admin, or gestion user).
     """
     # ─── Validar alternativas para preguntas multiple_choice ───
     for item in body.rubric:
-        if item.type == "multiple_choice":
+        item_type = getattr(item, 'item_type', 'question')
+        if item_type == 'question' and item.type == "multiple_choice":
             alts = item.alternatives
             if not alts or len(alts) < 2:
                 raise HTTPException(
@@ -341,6 +348,8 @@ async def simulate_answers(
         max_score_total = 0
 
         for item in rubric:
+            if item.get("item_type") == "info_section":
+                continue
             max_score = float(item.get("max_score", 5))
             # Simulate a score (student gets 40-100% of max)
             score = round(random.uniform(max_score * 0.4, max_score), 1)
@@ -470,3 +479,86 @@ async def get_processing_status(
         "title": evaluation.title,
         "results_count": count,
     }
+
+
+# ─── AI Evaluation Suggestions ───────────
+
+@router.post("/ai-suggestions/next-question", response_model=SuggestNextQuestionResponse)
+async def suggest_next_question(
+    body: SuggestNextQuestionRequest,
+    current_user: User = Depends(verify_tenant_access),
+):
+    """Sugerir la siguiente pregunta para una evaluación en edición."""
+    try:
+        result = await gemini_service.suggest_next_question(
+            subject=body.subject,
+            grade=body.grade,
+            topic=body.topic,
+            question_type=body.question_type.value if body.question_type else "written",
+            existing_questions=body.existing_questions,
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar sugerencia de pregunta con IA: {str(e)}",
+        )
+
+
+@router.post("/ai-suggestions/distractors", response_model=SuggestDistractorsResponse)
+async def suggest_distractors(
+    body: SuggestDistractorsRequest,
+    current_user: User = Depends(verify_tenant_access),
+):
+    """Sugerir distractores/alternativas engañosas para preguntas de opción múltiple."""
+    try:
+        distractors = await gemini_service.suggest_distractors(
+            statement=body.statement,
+            correct_answer=body.correct_answer,
+            count=body.count or 3,
+        )
+        return {"distractors": distractors}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar distractores con IA: {str(e)}",
+        )
+
+
+@router.post("/ai-suggestions/refine", response_model=RefineQuestionResponse)
+async def refine_question(
+    body: RefineQuestionRequest,
+    current_user: User = Depends(verify_tenant_access),
+):
+    """Mejorar, simplificar o ajustar dificultad del enunciado de una pregunta."""
+    try:
+        refined = await gemini_service.refine_question(
+            statement=body.statement,
+            action=body.action,
+        )
+        return {"refined_statement": refined}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al refinar enunciado con IA: {str(e)}",
+        )
+
+
+@router.post("/ai-suggestions/rubric", response_model=SuggestRubricResponse)
+async def suggest_rubric(
+    body: SuggestRubricRequest,
+    current_user: User = Depends(verify_tenant_access),
+):
+    """Sugerir rúbrica/criterios de evaluación para una pregunta de desarrollo."""
+    try:
+        criteria = await gemini_service.suggest_rubric_criteria(
+            statement=body.statement,
+            max_score=body.max_score or 3.0,
+        )
+        return {"criteria": criteria}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al generar rúbrica con IA: {str(e)}",
+        )
+

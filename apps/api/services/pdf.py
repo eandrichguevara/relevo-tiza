@@ -69,17 +69,58 @@ def generate_evaluation_pdf(evaluation) -> BytesIO:
     )
     story.append(Spacer(1, 1 * cm))
 
-    # Questions
+    # Questions and Sections
     rubric = evaluation.rubric if isinstance(evaluation.rubric, list) else []
     for i, item in enumerate(rubric):
+        item_type = item.get("item_type", "question")
+
+        if item_type == "divider":
+            story.append(Spacer(1, 0.4 * cm))
+            story.append(HRFlowable(width="100%", thickness=2, color=colors.HexColor("#3B82F6"), spaceAfter=12, spaceBefore=8))
+            story.append(Spacer(1, 0.2 * cm))
+            continue
+
+        if item_type == "info_section":
+            sec_title = item.get("section_title") or item.get("statement") or ""
+            sec_content = item.get("section_content") or ""
+            sec_img = item.get("section_image_url") or ""
+
+            from reportlab.platypus import HRFlowable
+
+            story.append(Spacer(1, 0.3 * cm))
+            if sec_title:
+                story.append(Paragraph(f"<b>{sec_title}</b>", styles["Heading2"]))
+            if sec_content:
+                # Reemplazar saltos de línea por <br/>
+                formatted_content = sec_content.replace("\n", "<br/>")
+                story.append(Paragraph(formatted_content, styles["Normal"]))
+                story.append(Spacer(1, 0.3 * cm))
+            if sec_img:
+                try:
+                    import base64
+                    from io import BytesIO
+                    from reportlab.platypus import Image as RLImage
+
+                    if sec_img.startswith("data:image/"):
+                        header, encoded = sec_img.split(",", 1)
+                        img_data = base64.b64decode(encoded)
+                        img_stream = BytesIO(img_data)
+                        story.append(RLImage(img_stream, width=14 * cm, height=8 * cm, kind='proportional'))
+                        story.append(Spacer(1, 0.3 * cm))
+                except Exception:
+                    pass
+            story.append(Spacer(1, 0.2 * cm))
+            continue
+
         q_num = item.get("question_number", i + 1)
         q_type = item.get("type", "written")
         max_score = item.get("max_score", 0)
         statement = item.get("statement", "")
 
         # Build question header
+        q_type_str = "Alternativas" if q_type == "multiple_choice" else "Desarrollo"
         question_html = (
-            f'<b>Pregunta {q_num}</b> ({q_type}) — {max_score} pts'
+            f'<b>Pregunta {q_num}</b> ({q_type_str}) — {max_score} pts'
         )
         if statement:
             question_html += f'<br/><i>{statement}</i>'

@@ -100,7 +100,7 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture
 async def test_user_data():
-    """Return test user data (HOLDER, so it auto-creates a tenant)."""
+    """Return test user data (GESTION, so it auto-creates a tenant)."""
     return {
         "email": "test@example.com",
         "password": "SecurePass123!",
@@ -109,10 +109,10 @@ async def test_user_data():
 
 
 @pytest.fixture
-async def holder_data():
-    """Return HOLDER test data for tenant management tests."""
+async def gestion_data():
+    """Return GESTION test data for tenant management tests."""
     return {
-        "email": "holder@test.com",
+        "email": "gestion@test.com",
         "password": "HolderPass789!",
         "role": "director",
         "name": "Director Test",
@@ -121,7 +121,7 @@ async def holder_data():
 
 @pytest.fixture
 async def registered_user(client: AsyncClient, test_user_data: dict) -> dict:
-    """Register a HOLDER user (auto-creates tenant) and return user + token."""
+    """Register a GESTION user (auto-creates tenant) and return user + token."""
     response = await client.post("/api/auth/register", json=test_user_data)
     assert response.status_code == 201
     user = response.json()
@@ -149,8 +149,8 @@ async def registered_user(client: AsyncClient, test_user_data: dict) -> dict:
 
 
 @pytest.fixture
-async def pre_approved_holder(client: AsyncClient) -> dict:
-    """Create a pre-approved HOLDER user + tenant directly in DB.
+async def pre_approved_gestion(client: AsyncClient) -> dict:
+    """Create a pre-approved GESTION user + tenant directly in DB.
     
     Bypasses the register endpoint to avoid the pending status requirement.
     Returns dict with token, tenant_id, and user data.
@@ -164,8 +164,8 @@ async def pre_approved_holder(client: AsyncClient) -> dict:
         now = datetime.now(timezone.utc)
 
         tenant = Tenant(
-            subdomain="pre-approved-holder-tenant",
-            name="Pre-Approved Holder School",
+            subdomain="pre-approved-gestion-tenant",
+            name="Pre-Approved Gestion School",
             brand="relevo",
             status="active",
             join_code=generate_join_code(),
@@ -173,20 +173,20 @@ async def pre_approved_holder(client: AsyncClient) -> dict:
         session.add(tenant)
         await session.flush()
 
-        holder = User(
-            email="pre-approved-holder@test.com",
-            name="Pre-Approved Holder",
+        gestion = User(
+            email="pre-approved-gestion@test.com",
+            name="Pre-Approved Gestion",
             password=hash_password("PreApprovedPass1!"),
             status="active",
-            role="HOLDER",
+            role="GESTION",
             tenant_id=tenant.id,
         )
-        session.add(holder)
+        session.add(gestion)
         await session.flush()
 
         member = TenantMember(
             tenant_id=tenant.id,
-            user_id=holder.id,
+            user_id=gestion.id,
             role="owner",
         )
         session.add(member)
@@ -194,7 +194,7 @@ async def pre_approved_holder(client: AsyncClient) -> dict:
 
         # Login via API to get token
         login_resp = await client.post("/api/auth/login", json={
-            "email": "pre-approved-holder@test.com",
+            "email": "pre-approved-gestion@test.com",
             "password": "PreApprovedPass1!",
         })
         assert login_resp.status_code == 200
@@ -203,7 +203,7 @@ async def pre_approved_holder(client: AsyncClient) -> dict:
         return {
             "token": token,
             "tenant_id": tenant.id,
-            "email": "pre-approved-holder@test.com",
+            "email": "pre-approved-gestion@test.com",
         }
 
 
@@ -236,35 +236,35 @@ async def create_test_user():
 
 
 @pytest.fixture
-async def teacher_tenant(client: AsyncClient, holder_data: dict) -> dict:
-    """Register a HOLDER, then create a tenant and a TEACHER under it.
+async def teacher_tenant(client: AsyncClient, gestion_data: dict) -> dict:
+    """Register a GESTION, then create a tenant and a TEACHER under it.
     Returns dict with tenant_id and teacher credentials."""
-    # 1. Register HOLDER
-    resp = await client.post("/api/auth/register", json=holder_data)
+    # 1. Register GESTION
+    resp = await client.post("/api/auth/register", json=gestion_data)
     assert resp.status_code == 201
-    holder = resp.json()
+    gestion = resp.json()
 
-    # Approve HOLDER before login
+    # Approve GESTION before login
     import database as db_module
     async with db_module.async_session() as session:
-        await _approve_user(session, holder_data["email"])
+        await _approve_user(session, gestion_data["email"])
 
-    holder_token = (await client.post("/api/auth/login", json={
-        "email": holder_data["email"],
-        "password": holder_data["password"],
+    gestion_token = (await client.post("/api/auth/login", json={
+        "email": gestion_data["email"],
+        "password": gestion_data["password"],
     })).json()["access_token"]
 
-    # 2. HOLDER creates a tenant
+    # 2. GESTION creates a tenant
     tenant_resp = await client.post(
         "/api/tenants",
         json={"name": "Colegio Test", "subdomain": "colegio-test"},
-        headers={"Authorization": f"Bearer {holder_token}"},
+        headers={"Authorization": f"Bearer {gestion_token}"},
     )
     assert tenant_resp.status_code == 201
     tenant = tenant_resp.json()
 
     return {
         "tenant_id": tenant["id"],
-        "holder_token": holder_token,
-        "holder": holder,
+        "gestion_token": gestion_token,
+        "gestion": gestion,
     }

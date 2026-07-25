@@ -12,7 +12,7 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     accessToken: 'mock-token',
     isAuthenticated: true,
-    user: { id: '1', role: 'HOLDER' },
+    user: { id: '1', role: 'GESTION' },
   }),
 }));
 

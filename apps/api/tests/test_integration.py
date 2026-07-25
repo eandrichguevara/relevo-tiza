@@ -4,7 +4,7 @@ evaluations, results, dashboard).
 These tests use the same SQLite test infrastructure as test_auth.py and
 exercise the full multi-tenant lifecycle:
 
-  HOLDER → create tenant → TEACHER → create course → bulk-add students
+  GESTION → create tenant → TEACHER → create course → bulk-add students
   → create evaluation → simulate answers → review → check dashboard.
 """
 
@@ -20,9 +20,9 @@ from httpx import AsyncClient
 # ─────────────────────────────────────────────
 # Constants reused across tests
 # ─────────────────────────────────────────────
-HOLDER_EMAIL = "holder@integro.com"
-HOLDER_PASS = "HolderPass999!"
-HOLDER_NAME = "Holder Integro"
+GESTION_EMAIL = "gestion@integro.com"
+GESTION_PASS = "GestionPass999!"
+GESTION_NAME = "Gestion Integro"
 
 TEACHER_EMAIL = "teacher@integro.com"
 TEACHER_PASS = "TeacherPass999!"
@@ -41,8 +41,8 @@ EVAL_TITLE = "Prueba de Matemáticas Semana 12"
 # Helpers
 # ─────────────────────────────────────────────
 @pytest.mark.asyncio
-async def _setup_holder(_app) -> dict:
-    """Create a HOLDER user + tenant directly in DB (bypasses register/pending).
+async def _setup_gestion(_app) -> dict:
+    """Create a GESTION user + tenant directly in DB (bypasses register/pending).
     Uses the app's overridden get_db dependency to ensure same session as the API.
     Returns dict with token and tenant_id.
     """
@@ -58,8 +58,8 @@ async def _setup_holder(_app) -> dict:
         import random
         ts = f"{time.time()}-{random.randint(1000,9999)}"
         tenant = Tenant(
-            subdomain=f"integro-holder-{ts}",
-            name=f"Integro Holder School {ts}",
+            subdomain=f"integro-gestion-{ts}",
+            name=f"Integro Gestion School {ts}",
             brand="relevo",
             status="active",
             join_code=generate_join_code(),
@@ -67,20 +67,20 @@ async def _setup_holder(_app) -> dict:
         session.add(tenant)
         await session.flush()
 
-        holder = User(
-            email=HOLDER_EMAIL,
-            name=HOLDER_NAME,
-            password=hash_password(HOLDER_PASS),
+        gestion = User(
+            email=GESTION_EMAIL,
+            name=GESTION_NAME,
+            password=hash_password(GESTION_PASS),
             status="active",
-            role="HOLDER",
+            role="GESTION",
             tenant_id=tenant.id,
         )
-        session.add(holder)
+        session.add(gestion)
         await session.flush()
 
         member = TenantMember(
             tenant_id=tenant.id,
-            user_id=holder.id,
+            user_id=gestion.id,
             role="owner",
         )
         session.add(member)
@@ -91,10 +91,10 @@ async def _setup_holder(_app) -> dict:
     transport = ASGITransport(app=_app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         login_resp = await c.post("/api/auth/login", json={
-            "email": HOLDER_EMAIL,
-            "password": HOLDER_PASS,
+            "email": GESTION_EMAIL,
+            "password": GESTION_PASS,
         })
-        assert login_resp.status_code == 200, f"Holder login failed: {login_resp.text}"
+        assert login_resp.status_code == 200, f"Gestion login failed: {login_resp.text}"
         token = login_resp.json()["access_token"]
 
     return {"token": token, "tenant_id": tenant_id}
@@ -156,14 +156,14 @@ async def _login(_app, email: str, password: str) -> str:
 
 
 @pytest.mark.asyncio
-async def _setup_holder_custom(
+async def _setup_gestion_custom(
     _app,
     email: str,
     password: str = "CustomPass999!",
     name: str | None = None,
     with_member: bool = True,
 ) -> dict:
-    """Create a HOLDER user + tenant directly in DB (bypasses register/pending).
+    """Create a GESTION user + tenant directly in DB (bypasses register/pending).
     If with_member=True (default), also creates a TenantMember entry.
     Returns dict with token and tenant_id.
     """
@@ -188,21 +188,21 @@ async def _setup_holder_custom(
         session.add(tenant)
         await session.flush()
 
-        holder = User(
+        gestion = User(
             email=email,
-            name=name or f"Holder {email}",
+            name=name or f"Gestion {email}",
             password=hash_password(password),
             status="active",
-            role="HOLDER",
+            role="GESTION",
             tenant_id=tenant.id,
         )
-        session.add(holder)
+        session.add(gestion)
         await session.flush()
 
         if with_member:
             member = TenantMember(
                 tenant_id=tenant.id,
-                user_id=holder.id,
+                user_id=gestion.id,
                 role="owner",
             )
             session.add(member)
@@ -216,7 +216,7 @@ async def _setup_holder_custom(
             "email": email,
             "password": password,
         })
-        assert login_resp.status_code == 200, f"Holder login failed: {login_resp.text}"
+        assert login_resp.status_code == 200, f"Gestion login failed: {login_resp.text}"
         token = login_resp.json()["access_token"]
 
     return {"token": token, "tenant_id": tenant_id}
@@ -272,16 +272,16 @@ async def _create_evaluations_direct(_app, count: int) -> int:
 
 
 # ═════════════════════════════════════════════
-#  1. TENANTS  (HOLDER only)
+#  1. TENANTS  (GESTION only)
 # ═════════════════════════════════════════════
 @pytest.mark.asyncio
 class TestTenantsIntegration:
-    """POST/GET /api/tenants — HOLDER creates and lists schools."""
+    """POST/GET /api/tenants — GESTION creates and lists schools."""
 
     async def test_create_tenant_success(self, client: AsyncClient, fastapi_app):
         """Create a tenant with valid data returns 201."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
 
         resp = await client.post(
             "/api/tenants",
@@ -297,8 +297,8 @@ class TestTenantsIntegration:
 
     async def test_create_tenant_duplicate_subdomain(self, client: AsyncClient, fastapi_app):
         """Duplicate subdomain returns 409."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
         await client.post(
             "/api/tenants",
             json={"name": "Primero", "subdomain": "dup-sub"},
@@ -313,8 +313,8 @@ class TestTenantsIntegration:
 
     async def test_create_tenant_duplicate_name(self, client: AsyncClient, fastapi_app):
         """Duplicate name returns 409 (regression: linea 31 en tenants.py)."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
         await client.post(
             "/api/tenants",
             json={"name": "Colegio Duplicado", "subdomain": "primero"},
@@ -330,8 +330,8 @@ class TestTenantsIntegration:
 
     async def test_create_tenant_duplicate_name_and_subdomain(self, client: AsyncClient, fastapi_app):
         """Same name AND same subdomain returns 409 (redundant but valid)."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
         await client.post(
             "/api/tenants",
             json={"name": "Full Dupe", "subdomain": "full-dupe"},
@@ -346,8 +346,8 @@ class TestTenantsIntegration:
 
     async def test_list_tenants(self, client: AsyncClient, fastapi_app):
         """List tenants returns all created tenants."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
 
         # Create a couple of tenants
         await client.post(
@@ -378,20 +378,20 @@ class TestTenantsIntegration:
         assert resp.status_code == 401
 
     async def test_tenant_requires_holder_role(self, client: AsyncClient, fastapi_app):
-        """A TEACHER (not HOLDER) cannot create tenants."""
-        # Register HOLDER first to get a tenant
-        holder = await _setup_holder(fastapi_app)
-        holder_token = holder["token"]
-        tenant_id = holder["tenant_id"]
+        """A TEACHER (not GESTION) cannot create tenants."""
+        # Register GESTION first to get a tenant
+        gestion = await _setup_gestion(fastapi_app)
+        gestion_token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
 
-        # Create a TEACHER via /api/users (HOLDER action) — gets status="active" by default
+        # Create a TEACHER via /api/users (GESTION action) — gets status="active" by default
         teacher_resp = await client.post("/api/users", json={
             "email": "teacher-no-tenant@test.com",
             "password": "Pass1234!",
             "name": "Teacher Sin Permiso",
             "role": "teacher",
             "tenant_id": tenant_id,
-        }, headers={"Authorization": f"Bearer {holder_token}"})
+        }, headers={"Authorization": f"Bearer {gestion_token}"})
         assert teacher_resp.status_code == 201
 
         # Approve the teacher before login (users created via /api/users are pending)
@@ -416,17 +416,17 @@ class TestTenantsIntegration:
 
 
 # ═════════════════════════════════════════════
-#  2. USERS  (HOLDER creates TEACHER)
+#  2. USERS  (GESTION creates TEACHER)
 # ═════════════════════════════════════════════
 @pytest.mark.asyncio
 class TestUsersIntegration:
-    """POST/GET /api/users — HOLDER creates and lists teachers."""
+    """POST/GET /api/users — GESTION creates and lists teachers."""
 
     async def test_create_user_teacher_success(self, client: AsyncClient, fastapi_app):
         """Create a TEACHER under an existing tenant."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
-        tenant_id = holder["tenant_id"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
 
         resp = await client.post(
             "/api/users",
@@ -449,14 +449,14 @@ class TestUsersIntegration:
 
     async def test_create_user_invalid_role_returns_400(self, client: AsyncClient, fastapi_app):
         """Only 'teacher' role can be created via /api/users."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
-        tenant_id = holder["tenant_id"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
 
         resp = await client.post(
             "/api/users",
             json={
-                "email": "holder-wannabe@test.com",
+                "email": "gestion-wannabe@test.com",
                 "password": "Pass1234!",
                 "name": "Bad Role",
                 "role": "director",  # not allowed
@@ -466,11 +466,146 @@ class TestUsersIntegration:
         )
         assert resp.status_code == 400
 
+    async def test_admin_creates_gestion_successfully(self, client: AsyncClient, fastapi_app):
+        """ADMIN can create a GESTION user via /api/users."""
+        from tests.test_admin import _create_admin_user
+
+        admin = await _create_admin_user(client)
+        admin_token = admin["token"]
+        admin_tenant_id = admin["tenant_id"]
+
+        resp = await client.post(
+            "/api/users",
+            json={
+                "email": "new-admin-gestion@test.com",
+                "password": "Pass1234!",
+                "name": "New Gestion",
+                "role": "gestion",
+                "tenant_id": admin_tenant_id,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201, f"Create gestion failed: {resp.text}"
+        data = resp.json()
+        assert data["role"] == "GESTION"
+        assert data["email"] == "new-admin-gestion@test.com"
+
+    async def test_gestion_cannot_create_gestion(self, client: AsyncClient, fastapi_app):
+        """GESTION cannot create another GESTION (privilege escalation prevention)."""
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
+
+        resp = await client.post(
+            "/api/users",
+            json={
+                "email": "second-gestion@test.com",
+                "password": "Pass1234!",
+                "name": "Second Gestion",
+                "role": "gestion",
+                "tenant_id": tenant_id,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 400
+        assert "teacher" in resp.text.lower()
+
+    async def test_admin_cannot_be_created_via_endpoint(self, client: AsyncClient, fastapi_app):
+        """Nobody (including ADMIN) can create an ADMIN via /api/users."""
+        from tests.test_admin import _create_admin_user
+
+        admin = await _create_admin_user(client)
+        admin_token = admin["token"]
+        admin_tenant_id = admin["tenant_id"]
+
+        resp = await client.post(
+            "/api/users",
+            json={
+                "email": "another-admin@test.com",
+                "password": "Pass1234!",
+                "name": "Another Admin",
+                "role": "admin",
+                "tenant_id": admin_tenant_id,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 400
+        assert "admin" in resp.text.lower()
+
+    async def test_admin_creates_gestion_also_creates_tenant_member(self, client: AsyncClient, fastapi_app):
+        """SEC-1: Creating a GESTION via ADMIN also creates a TenantMember so the GESTION can operate."""
+        from tests.test_admin import _create_admin_user
+        from models.db_models import TenantMember
+        from sqlalchemy import select
+        import database as db_module
+
+        admin = await _create_admin_user(client)
+        admin_token = admin["token"]
+        admin_tenant_id = admin["tenant_id"]
+
+        resp = await client.post(
+            "/api/users",
+            json={
+                "email": "new-gestion-tm@test.com",
+                "password": "Pass1234!",
+                "name": "Gestion With TM",
+                "role": "gestion",
+                "tenant_id": admin_tenant_id,
+            },
+            headers={"Authorization": f"Bearer {admin_token}"},
+        )
+        assert resp.status_code == 201
+        new_user_id = resp.json()["id"]
+
+        # Verify TenantMember was created
+        async with db_module.async_session() as session:
+            member_result = await session.execute(
+                select(TenantMember).where(
+                    TenantMember.user_id == new_user_id,
+                    TenantMember.tenant_id == admin_tenant_id,
+                )
+            )
+            member = member_result.scalar_one_or_none()
+            assert member is not None, "TenantMember should have been created for new GESTION"
+            assert member.role == "owner"
+
+    async def test_create_user_writes_audit_log(self, client: AsyncClient, fastapi_app):
+        """SEC-2: Creating a user writes an AuditLog entry for traceability."""
+        from models.db_models import AuditLog
+        from sqlalchemy import select
+        import database as db_module
+
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
+
+        resp = await client.post(
+            "/api/users",
+            json={
+                "email": "audited-user@test.com",
+                "password": "Pass1234!",
+                "name": "Audited User",
+                "role": "teacher",
+                "tenant_id": tenant_id,
+            },
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 201
+
+        # Verify AuditLog was created
+        async with db_module.async_session() as session:
+            audit_result = await session.execute(
+                select(AuditLog).where(AuditLog.action == "user_created")
+            )
+            logs = audit_result.scalars().all()
+            assert len(logs) >= 1
+            assert any(log.details.get("target_email") == "audited-user@test.com" for log in logs)
+
     async def test_create_user_duplicate_email_returns_409(self, client: AsyncClient, fastapi_app):
         """Duplicate user email returns 409."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
-        tenant_id = holder["tenant_id"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
 
         await client.post(
             "/api/users",
@@ -499,8 +634,8 @@ class TestUsersIntegration:
 
     async def test_create_user_invalid_tenant_returns_404(self, client: AsyncClient, fastapi_app):
         """Non-existent tenant_id returns 404."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
 
         resp = await client.post(
             "/api/users",
@@ -517,9 +652,9 @@ class TestUsersIntegration:
 
     async def test_list_users_filters_by_tenant(self, client: AsyncClient, fastapi_app):
         """Listing users respects tenant_id filter."""
-        holder = await _setup_holder(fastapi_app)
-        token = holder["token"]
-        tenant_id = holder["tenant_id"]
+        gestion = await _setup_gestion(fastapi_app)
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
 
         await client.post(
             "/api/users",
@@ -548,7 +683,7 @@ class TestUsersIntegration:
         assert resp.status_code == 401
 
     # ─────────────────────────────────────────────
-    #  RESET PASSWORD  (HOLDER action)
+    #  RESET PASSWORD  (GESTION action)
     # ─────────────────────────────────────────────
 
     RESET_TEACHER_EMAIL = "reset-teacher@integro.com"
@@ -579,13 +714,13 @@ class TestUsersIntegration:
         return {"id": teacher_id, "email": self.RESET_TEACHER_EMAIL}
 
     async def test_reset_password_success(self, client: AsyncClient, fastapi_app):
-        """HOLDER can reset a teacher's password and gets a temporary password back."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await self._create_teacher_for_reset(fastapi_app, holder["tenant_id"])
+        """GESTION can reset a teacher's password and gets a temporary password back."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await self._create_teacher_for_reset(fastapi_app, gestion["tenant_id"])
 
         resp = await client.post(
             f"/api/users/{teacher['id']}/reset-password",
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert resp.status_code == 200, f"Reset password failed: {resp.text}"
         data = resp.json()
@@ -614,18 +749,18 @@ class TestUsersIntegration:
 
     async def test_reset_password_user_not_found(self, client: AsyncClient, fastapi_app):
         """Reset password on non-existent user returns 404."""
-        holder = await _setup_holder(fastapi_app)
+        gestion = await _setup_gestion(fastapi_app)
 
         resp = await client.post(
             "/api/users/00000000-0000-0000-0000-000000000000/reset-password",
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert resp.status_code == 404
 
     async def test_reset_password_requires_holder(self, client: AsyncClient, fastapi_app):
-        """A TEACHER (not HOLDER) cannot reset passwords — returns 403."""
-        holder = await _setup_holder(fastapi_app)
-        teacher_data = await self._create_teacher_for_reset(fastapi_app, holder["tenant_id"])
+        """A TEACHER (not GESTION) cannot reset passwords — returns 403."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher_data = await self._create_teacher_for_reset(fastapi_app, gestion["tenant_id"])
 
         # Login as teacher to get teacher token
         teacher_token = await _login(fastapi_app, teacher_data["email"], self.RESET_TEACHER_PASS)
@@ -642,17 +777,17 @@ class TestUsersIntegration:
         assert resp.status_code == 401
 
     async def test_reset_password_tenant_isolation(self, client: AsyncClient, fastapi_app):
-        """HOLDER from tenant A cannot reset password for a user in tenant B."""
+        """GESTION from tenant A cannot reset password for a user in tenant B."""
         from database import get_db
         from models.db_models import Tenant, User, TenantMember
         from utils.security import hash_password
         from models.db_models import generate_join_code
         from httpx import AsyncClient, ASGITransport
 
-        # Create holder_a with tenant_a
-        holder_a = await _setup_holder(fastapi_app)
+        # Create gestion_a with tenant_a
+        gestion_a = await _setup_gestion(fastapi_app)
 
-        # Create a second holder (holder_b) with their own tenant
+        # Create a second gestion (gestion_b) with their own tenant
         override = fastapi_app.dependency_overrides.get(get_db)
         session_generator = override() if override else get_db()
         async for session in session_generator:
@@ -668,42 +803,42 @@ class TestUsersIntegration:
             session.add(tenant_b)
             await session.flush()
 
-            holder_b = User(
-                email="holder-iso-reset@test.com",
-                name="Holder Iso Reset",
+            gestion_b = User(
+                email="gestion-iso-reset@test.com",
+                name="Gestion Iso Reset",
                 password=hash_password("HolderIso999!"),
                 status="active",
-                role="HOLDER",
+                role="GESTION",
                 tenant_id=tenant_b.id,
             )
-            session.add(holder_b)
+            session.add(gestion_b)
             await session.flush()
 
             member_b = TenantMember(
                 tenant_id=tenant_b.id,
-                user_id=holder_b.id,
+                user_id=gestion_b.id,
                 role="owner",
             )
             session.add(member_b)
             tenant_b_id = tenant_b.id
 
-        # Login as holder_b
+        # Login as gestion_b
         transport = ASGITransport(app=fastapi_app)
         async with AsyncClient(transport=transport, base_url="http://test") as c:
             login_resp = await c.post("/api/auth/login", json={
-                "email": "holder-iso-reset@test.com",
+                "email": "gestion-iso-reset@test.com",
                 "password": "HolderIso999!",
             })
             assert login_resp.status_code == 200
-            holder_b_token = login_resp.json()["access_token"]
+            gestion_b_token = login_resp.json()["access_token"]
 
-        # Create a teacher in holder_a's tenant
-        teacher = await self._create_teacher_for_reset(fastapi_app, holder_a["tenant_id"])
+        # Create a teacher in gestion_a's tenant
+        teacher = await self._create_teacher_for_reset(fastapi_app, gestion_a["tenant_id"])
 
-        # Holder_b tries to reset password for a teacher in holder_a's tenant → 403
+        # Holder_b tries to reset password for a teacher in gestion_a's tenant → 403
         resp = await client.post(
             f"/api/users/{teacher['id']}/reset-password",
-            headers={"Authorization": f"Bearer {holder_b_token}"},
+            headers={"Authorization": f"Bearer {gestion_b_token}"},
         )
         assert resp.status_code == 403, (
             f"Expected 403 (tenant isolation), got {resp.status_code}: {resp.text}"
@@ -711,12 +846,12 @@ class TestUsersIntegration:
 
     async def test_reset_password_returns_valid_response_shape(self, client: AsyncClient, fastapi_app):
         """ResetPasswordResponse schema is respected."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await self._create_teacher_for_reset(fastapi_app, holder["tenant_id"])
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await self._create_teacher_for_reset(fastapi_app, gestion["tenant_id"])
 
         resp = await client.post(
             f"/api/users/{teacher['id']}/reset-password",
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -737,18 +872,18 @@ class TestCoursesIntegration:
 
     @pytest.fixture
     async def teacher_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create HOLDER + TEACHER users directly in DB."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Create GESTION + TEACHER users directly in DB."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
         return {
-            "holder_token": holder["token"],
+            "gestion_token": gestion["token"],
             "teacher_token": teacher["token"],
             "teacher_id": teacher["teacher_id"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
         }
 
     async def test_create_course_success(self, client: AsyncClient, teacher_context: dict):
-        """HOLDER creates a course for a teacher."""
+        """GESTION creates a course for a teacher."""
         ctx = teacher_context
         resp = await client.post(
             "/api/courses",
@@ -758,7 +893,7 @@ class TestCoursesIntegration:
                 "subject": COURSE_SUBJECT,
                 "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         assert resp.status_code == 201, f"Create course failed: {resp.text}"
         data = resp.json()
@@ -772,14 +907,14 @@ class TestCoursesIntegration:
     async def test_list_courses(self, client: AsyncClient, teacher_context: dict):
         """List courses for the tenant (should include the created course)."""
         ctx = teacher_context
-        # Create a course first (HOLDER action)
+        # Create a course first (GESTION action)
         await client.post(
             "/api/courses",
             json={
                 "name": COURSE_NAME, "grade": COURSE_GRADE,
                 "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         resp = await client.get(
             "/api/courses",
@@ -800,7 +935,7 @@ class TestCoursesIntegration:
                 "name": COURSE_NAME, "grade": COURSE_GRADE,
                 "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         course_id = create_resp.json()["id"]
 
@@ -829,7 +964,7 @@ class TestCoursesIntegration:
                 "name": "Curso a eliminar", "grade": "1°",
                 "subject": "Matemáticas", "teachers": {"Matemáticas": ctx["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         course_id = create_resp.json()["id"]
 
@@ -855,7 +990,7 @@ class TestCoursesIntegration:
         assert resp.status_code == 401
 
     async def test_teacher_cannot_create_course(self, client: AsyncClient, teacher_context: dict):
-        """N-01: TEACHER cannot create courses — only HOLDER/ADMIN can."""
+        """N-01: TEACHER cannot create courses — only GESTION/ADMIN can."""
         ctx = teacher_context
         resp = await client.post(
             "/api/courses",
@@ -886,7 +1021,7 @@ class TestCoursesIntegration:
                 "subject": "Matemáticas",
                 "teachers": {"Matemáticas": "00000000-0000-0000-0000-000000000000"},
             },
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         assert resp.status_code == 404
         assert "profesor" in resp.text.lower()
@@ -897,10 +1032,10 @@ class TestCoursesIntegration:
         from models.db_models import User
         from utils.security import hash_password
 
-        # Create two holders in different tenants
-        holder_a = await _setup_holder(fastapi_app)
-        holder_b = await _setup_holder_custom(
-            fastapi_app, "holder-wt@test.com", "HolderWT99!", with_member=True
+        # Create two gestion users in different tenants
+        gestion_a = await _setup_gestion(fastapi_app)
+        gestion_b = await _setup_gestion_custom(
+            fastapi_app, "gestion-wt@test.com", "HolderWT99!", with_member=True
         )
 
         # Create teacher in tenant B (active)
@@ -911,13 +1046,13 @@ class TestCoursesIntegration:
                 password=hash_password("TeacherWT99!"),
                 status="active",
                 role="TEACHER",
-                tenant_id=holder_b["tenant_id"],
+                tenant_id=gestion_b["tenant_id"],
             )
             session.add(teacher_b)
             await session.commit()
             teacher_b_id = teacher_b.id
 
-        # Try creating course with holder_a's token but teacher from tenant_b
+        # Try creating course with gestion_a's token but teacher from tenant_b
         resp = await client.post(
             "/api/courses",
             json={
@@ -926,7 +1061,7 @@ class TestCoursesIntegration:
                 "subject": "Matemáticas",
                 "teachers": {"Matemáticas": teacher_b_id},
             },
-            headers={"Authorization": f"Bearer {holder_a['token']}"},
+            headers={"Authorization": f"Bearer {gestion_a['token']}"},
         )
         assert resp.status_code == 404
 
@@ -963,7 +1098,7 @@ class TestCoursesIntegration:
                 "subject": "Matemáticas",
                 "teachers": {"Matemáticas": pending_teacher_id},
             },
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         assert resp.status_code == 404
 
@@ -977,25 +1112,25 @@ class TestStudentsIntegration:
 
     @pytest.fixture
     async def course_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create HOLDER → tenant → TEACHER → course."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Create GESTION → tenant → TEACHER → course."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
-        # Create course (HOLDER action)
+        # Create course (GESTION action)
         course_resp = await client.post(
             "/api/courses",
             json={
                 "name": COURSE_NAME, "grade": COURSE_GRADE,
                 "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": teacher["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         course_id = course_resp.json()["id"]
         return {
             "teacher_token": teacher["token"],
-            "holder_token": holder["token"],
+            "gestion_token": gestion["token"],
             "teacher_id": teacher["teacher_id"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
             "course_name": COURSE_NAME,
         }
@@ -1089,9 +1224,9 @@ class TestEvaluationsIntegration:
 
     @pytest.fixture
     async def eval_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create HOLDER → tenant → TEACHER → course."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Create GESTION → tenant → TEACHER → course."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
         # Create a course first (needed for evaluations — N-07)
         # Assign the teacher for both Matemáticas and Lenguaje since the eval
@@ -1103,15 +1238,15 @@ class TestEvaluationsIntegration:
                 "subject": "Matemáticas, Lenguaje",
                 "teachers": {"Matemáticas": teacher["teacher_id"], "Lenguaje": teacher["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         course_id = course_resp.json()["id"]
 
         return {
             "teacher_token": teacher["token"],
-            "holder_token": holder["token"],
+            "gestion_token": gestion["token"],
             "teacher_id": teacher["teacher_id"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
         }
 
@@ -1225,20 +1360,20 @@ class TestEvaluationsIntegration:
         self, client: AsyncClient, fastapi_app
     ):
         """N-07: TEACHER from different tenant cannot create evaluation in another's course."""
-        # ── Set up tenant A with HOLDER A + TEACHER A + Course A ──
-        holder_a = await _setup_holder(fastapi_app)
-        teacher_a = await _setup_teacher(fastapi_app, holder_a["tenant_id"])
+        # ── Set up tenant A with GESTION A + TEACHER A + Course A ──
+        gestion_a = await _setup_gestion(fastapi_app)
+        teacher_a = await _setup_teacher(fastapi_app, gestion_a["tenant_id"])
 
         c_resp = await client.post("/api/courses", json={
             "name": "Course A for N-07", "grade": "1°",
             "subject": "Matemáticas", "teachers": {"Matemáticas": teacher_a["teacher_id"]},
-        }, headers={"Authorization": f"Bearer {holder_a['token']}"})
+        }, headers={"Authorization": f"Bearer {gestion_a['token']}"})
         assert c_resp.status_code == 201, f"Course creation failed: {c_resp.text}"
         course_a_id = c_resp.json()["id"]
 
         # ── Set up tenant B with TEACHER B ──
-        holder_b = await _setup_holder_custom(
-            fastapi_app, "holder-b-n07@test.com", "HolderBN07!", with_member=True
+        gestion_b = await _setup_gestion_custom(
+            fastapi_app, "gestion-b-n07@test.com", "HolderBN07!", with_member=True
         )
 
         import database as db_module
@@ -1251,7 +1386,7 @@ class TestEvaluationsIntegration:
                 password=hash_password("TeacherBN07!"),
                 status="active",
                 role="TEACHER",
-                tenant_id=holder_b["tenant_id"],
+                tenant_id=gestion_b["tenant_id"],
             )
             session.add(teacher_b)
             await session.commit()
@@ -1286,15 +1421,15 @@ class TestResultsIntegration:
 
     @pytest.fixture
     async def full_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Full setup: HOLDER → tenant → TEACHER → course → students → evaluation."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Full setup: GESTION → tenant → TEACHER → course → students → evaluation."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
-        # Course (HOLDER action — N-01)
+        # Course (GESTION action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": COURSE_NAME, "grade": COURSE_GRADE,
             "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": teacher["teacher_id"]},
-        }, headers={"Authorization": f"Bearer {holder['token']}"})
+        }, headers={"Authorization": f"Bearer {gestion['token']}"})
         course_id = c_resp.json()["id"]
 
         # Students
@@ -1314,9 +1449,9 @@ class TestResultsIntegration:
 
         return {
             "teacher_token": teacher["token"],
-            "holder_token": holder["token"],
+            "gestion_token": gestion["token"],
             "teacher_id": teacher["teacher_id"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
             "eval_id": eval_id,
         }
@@ -1401,13 +1536,13 @@ class TestResultsIntegration:
 
     async def test_simulate_no_students_returns_400(self, client: AsyncClient, fastapi_app):
         """Simulate on course with no students returns 400."""
-        holder = await _setup_holder(fastapi_app)
+        gestion = await _setup_gestion(fastapi_app)
 
-        # Create teacher via /api/users (HOLDER action)
+        # Create teacher via /api/users (GESTION action)
         teacher_resp = await client.post("/api/users", json={
             "email": "teacher-nostudents@test.com", "password": TEACHER_PASS,
-            "name": "Teacher No Students", "role": "teacher", "tenant_id": holder["tenant_id"],
-        }, headers={"Authorization": f"Bearer {holder['token']}"})
+            "name": "Teacher No Students", "role": "teacher", "tenant_id": gestion["tenant_id"],
+        }, headers={"Authorization": f"Bearer {gestion['token']}"})
         teacher_id = teacher_resp.json()["id"]
 
         # Approve the teacher before login (users created via /api/users are pending)
@@ -1422,11 +1557,11 @@ class TestResultsIntegration:
 
         teacher_token = await _login(fastapi_app, "teacher-nostudents@test.com", TEACHER_PASS)
 
-        # Create course (HOLDER action — N-01)
+        # Create course (GESTION action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": "Empty Course", "grade": "1°", "subject": "Matemáticas",
             "teachers": {"Matemáticas": teacher_id},
-        }, headers={"Authorization": f"Bearer {holder['token']}"})
+        }, headers={"Authorization": f"Bearer {gestion['token']}"})
         course_id = c_resp.json()["id"]
 
         # Create evaluation (requires course_id — N-07)
@@ -1458,14 +1593,14 @@ class TestDashboardIntegration:
     @pytest.fixture
     async def dashboard_context(self, client: AsyncClient, fastapi_app) -> dict:
         """Full data setup including simulated results."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
-        # Course (HOLDER action — N-01)
+        # Course (GESTION action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": COURSE_NAME, "grade": COURSE_GRADE,
             "subject": COURSE_SUBJECT, "teachers": {"Matemáticas": teacher["teacher_id"]},
-        }, headers={"Authorization": f"Bearer {holder['token']}"})
+        }, headers={"Authorization": f"Bearer {gestion['token']}"})
         course_id = c_resp.json()["id"]
 
         await client.post(
@@ -1489,9 +1624,9 @@ class TestDashboardIntegration:
         )
 
         return {
-            "holder_token": holder["token"],
+            "gestion_token": gestion["token"],
             "teacher_token": teacher["token"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
         }
 
@@ -1514,11 +1649,11 @@ class TestDashboardIntegration:
         assert data["total_students"] >= 3
 
     async def test_dashboard_executive(self, client: AsyncClient, dashboard_context: dict):
-        """GET /api/dashboard/executive returns macro stats (HOLDER only)."""
+        """GET /api/dashboard/executive returns macro stats (GESTION only)."""
         ctx = dashboard_context
         resp = await client.get(
             "/api/dashboard/executive",
-            headers={"Authorization": f"Bearer {ctx['holder_token']}"},
+            headers={"Authorization": f"Bearer {ctx['gestion_token']}"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -1569,14 +1704,14 @@ class TestDashboardIntegration:
     async def test_dashboard_executive_holder_without_tenantmember(
         self, client: AsyncClient, fastapi_app
     ):
-        """HOLDER without TenantMember must still see their own tenant data
+        """GESTION without TenantMember must still see their own tenant data
         via the fallback path (current_user.tenant_id), not global data."""
-        # Create holder WITHOUT TenantMember entry
-        holder = await _setup_holder_custom(
+        # Create gestion WITHOUT TenantMember entry
+        gestion = await _setup_gestion_custom(
             fastapi_app, "holdernm@test.com", "HolderNM999!", with_member=False
         )
-        token = holder["token"]
-        tenant_id = holder["tenant_id"]
+        token = gestion["token"]
+        tenant_id = gestion["tenant_id"]
 
         # Create teachers and evaluations in that tenant
         teachers = await _create_teachers_direct(fastapi_app, tenant_id, 2, prefix="nm")
@@ -1605,17 +1740,17 @@ class TestDashboardIntegration:
     ):
         """X-Tenant-Id header must NOT alter dashboard results.
         Regression: IDOR vulnerability where header was used for tenant resolution."""
-        # Create two holders with their own tenants
-        holder_a = await _setup_holder_custom(
+        # Create two gestion users with their own tenants
+        gestion_a = await _setup_gestion_custom(
             fastapi_app, "inject-a@test.com", "InjectA999!", with_member=True
         )
-        token_a = holder_a["token"]
-        tenant_a_id = holder_a["tenant_id"]
+        token_a = gestion_a["token"]
+        tenant_a_id = gestion_a["tenant_id"]
 
-        holder_b = await _setup_holder_custom(
+        gestion_b = await _setup_gestion_custom(
             fastapi_app, "inject-b@test.com", "InjectB999!", with_member=True
         )
-        tenant_b_id = holder_b["tenant_id"]
+        tenant_b_id = gestion_b["tenant_id"]
 
         # Create 5 teachers in tenant_A, 2 in tenant_B
         await _create_teachers_direct(fastapi_app, tenant_a_id, 5, prefix="inja")
@@ -1643,18 +1778,18 @@ class TestDashboardIntegration:
     ):
         """Tenants must have fully isolated dashboard executive data."""
         # Create tenant_A with holder_A
-        holder_a = await _setup_holder_custom(
+        gestion_a = await _setup_gestion_custom(
             fastapi_app, "isol-a@test.com", "IsoA999!", with_member=True
         )
-        token_a = holder_a["token"]
-        tenant_a_id = holder_a["tenant_id"]
+        token_a = gestion_a["token"]
+        tenant_a_id = gestion_a["tenant_id"]
 
         # Create tenant_B with holder_B
-        holder_b = await _setup_holder_custom(
+        gestion_b = await _setup_gestion_custom(
             fastapi_app, "isol-b@test.com", "IsoB999!", with_member=True
         )
-        token_b = holder_b["token"]
-        tenant_b_id = holder_b["tenant_id"]
+        token_b = gestion_b["token"]
+        tenant_b_id = gestion_b["tenant_id"]
 
         # Tenant A: 3 teachers
         await _create_teachers_direct(fastapi_app, tenant_a_id, 3, prefix="isoa")
@@ -1670,10 +1805,10 @@ class TestDashboardIntegration:
         assert resp_a.status_code == 200
         data_a = resp_a.json()
         assert data_a["total_schools"] == 1, (
-            f"Holder A: expected 1 school, got {data_a['total_schools']}"
+            f"Gestion A: expected 1 school, got {data_a['total_schools']}"
         )
         assert data_a["total_teachers"] == 3, (
-            f"Holder A: expected 3 teachers, got {data_a['total_teachers']}"
+            f"Gestion A: expected 3 teachers, got {data_a['total_teachers']}"
         )
 
         # Verify holder_B's view
@@ -1684,10 +1819,10 @@ class TestDashboardIntegration:
         assert resp_b.status_code == 200
         data_b = resp_b.json()
         assert data_b["total_schools"] == 1, (
-            f"Holder B: expected 1 school, got {data_b['total_schools']}"
+            f"Gestion B: expected 1 school, got {data_b['total_schools']}"
         )
         assert data_b["total_teachers"] == 2, (
-            f"Holder B: expected 2 teachers, got {data_b['total_teachers']}"
+            f"Gestion B: expected 2 teachers, got {data_b['total_teachers']}"
         )
 
 
@@ -1705,14 +1840,14 @@ class TestResultReviewIntegration:
     @pytest.fixture
     async def review_context(self, client: AsyncClient, fastapi_app) -> dict:
         """Setup + simulate to get a result to review."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
-        # Create course (HOLDER action — N-01)
+        # Create course (GESTION action — N-01)
         c_resp = await client.post("/api/courses", json={
             "name": "Review Course", "grade": "1°", "subject": "Matemáticas",
             "teachers": {"Matemáticas": teacher["teacher_id"]},
-        }, headers={"Authorization": f"Bearer {holder['token']}"})
+        }, headers={"Authorization": f"Bearer {gestion['token']}"})
         course_id = c_resp.json()["id"]
 
         await client.post(

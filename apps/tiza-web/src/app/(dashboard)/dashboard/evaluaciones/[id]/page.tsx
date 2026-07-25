@@ -115,17 +115,25 @@ export default function EvaluationDetailPage() {
           <Button
             brand="tiza"
             onClick={() => fileInputRef.current?.click()}
-            loading={uploading}
+            loading={uploading || processEval.isPending}
             className="w-full"
           >
             <Upload size={16} className="mr-1" /> Subir y procesar
           </Button>
         </Card>
         <Card>
-          <h3 className="font-semibold mb-3">Rúbrica</h3>
+          <h3 className="font-semibold mb-3">Estructura y Rúbrica</h3>
           <p className="text-sm text-gray-500">
             {Array.isArray(evaluation.rubric)
-              ? `${evaluation.rubric.length} preguntas definidas`
+              ? (() => {
+                  const questionsCount = evaluation.rubric.filter(
+                    (it: any) => it.item_type !== 'info_section'
+                  ).length;
+                  const sectionsCount = evaluation.rubric.filter(
+                    (it: any) => it.item_type === 'info_section'
+                  ).length;
+                  return `${questionsCount} preguntas` + (sectionsCount > 0 ? `, ${sectionsCount} sección(es)` : '');
+                })()
               : 'Sin rúbrica'}
           </p>
         </Card>

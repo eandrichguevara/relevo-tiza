@@ -234,7 +234,7 @@ describe('EvaluationDetailPage (Tiza)', () => {
   it('muestra la card de Rúbrica con cantidad de preguntas', async () => {
     await renderEvaluationDetailPage();
 
-    expect(screen.getByText('2 preguntas definidas')).toBeInTheDocument();
+    expect(screen.getByText('2 preguntas')).toBeInTheDocument();
   });
 
   it('rubrica muestra "Sin rúbrica" cuando no hay array', async () => {
@@ -423,7 +423,7 @@ describe('EvaluationDetailPage (Tiza)', () => {
 
     await renderEvaluationDetailPage();
 
-    const uploadBtn = screen.getByText('Subir y procesar');
+    const uploadBtn = screen.getByRole('button', { name: /Procesando/i });
     expect(uploadBtn).toBeDisabled();
   });
 

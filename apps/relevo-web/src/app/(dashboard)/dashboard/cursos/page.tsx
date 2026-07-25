@@ -8,6 +8,7 @@ import {
   BookOpen,
   Plus,
   Trash2,
+  Pencil,
   X,
   School,
   Users,
@@ -19,6 +20,7 @@ import {
   useTenants,
   useCourses,
   useCreateCourse,
+  useUpdateCourse,
   useDeleteCourse,
   useUsers,
   type Course,
@@ -95,6 +97,7 @@ function CursosContent() {
   } = useCourses(selectedTenantId);
 
   const createCourse = useCreateCourse();
+  const updateCourse = useUpdateCourse();
   const deleteCourse = useDeleteCourse();
   const { data: users } = useUsers(selectedTenantId);
   const teachers = useMemo(
@@ -103,6 +106,7 @@ function CursosContent() {
   );
 
   const [showModal, setShowModal] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [form, setForm] = useState({ name: '', grade: GRADES[0] });
   const [subjects, setSubjects] = useState<string[]>(['Lenguaje', 'Matemáticas']);
   const [selectedTeachers, setSelectedTeachers] = useState<Record<string, string>>({});
@@ -126,6 +130,7 @@ function CursosContent() {
   // ── Modal handlers ───────────────────────────────────
 
   const handleOpenModal = () => {
+    setEditingCourse(null);
     setForm({ name: '', grade: GRADES[0] });
     setSubjects(['Lenguaje', 'Matemáticas']);
     setSelectedTeachers({});
@@ -133,13 +138,26 @@ function CursosContent() {
     setShowModal(true);
   };
 
+  const handleEditModal = (course: Course) => {
+    setEditingCourse(course);
+    setForm({ name: course.name, grade: course.grade });
+    const parsedSubjects = course.subject
+      ? course.subject.split(',').map((s) => s.trim())
+      : ['Lenguaje', 'Matemáticas'];
+    setSubjects(parsedSubjects);
+    setSelectedTeachers(course.teachers || {});
+    setFormError(null);
+    setShowModal(true);
+  };
+
   const handleCloseModal = () => {
     setShowModal(false);
+    setEditingCourse(null);
     setFormError(null);
     setSelectedTeachers({});
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
 
@@ -168,21 +186,40 @@ function CursosContent() {
     }
 
     try {
-      await createCourse.mutateAsync({
-        name,
-        grade: form.grade,
-        subject: subjects.join(', '),
-        teachers: subjects.reduce(
-          (acc, s) => ({ ...acc, [s]: selectedTeachers[s] }),
-          {} as Record<string, string>
-        ),
-        tenant_id: selectedTenantId,
-      });
-      handleCloseModal();
-      showToast(`Curso "${name}" creado exitosamente`, 'success');
+      const teacherPayload = subjects.reduce(
+        (acc, s) => ({ ...acc, [s]: selectedTeachers[s] }),
+        {} as Record<string, string>
+      );
+
+      if (editingCourse) {
+        await updateCourse.mutateAsync({
+          id: editingCourse.id,
+          name,
+          grade: form.grade,
+          subject: subjects.join(', '),
+          teachers: teacherPayload,
+          tenant_id: selectedTenantId,
+        });
+        handleCloseModal();
+        showToast(`Curso "${name}" actualizado exitosamente`, 'success');
+      } else {
+        await createCourse.mutateAsync({
+          name,
+          grade: form.grade,
+          subject: subjects.join(', '),
+          teachers: teacherPayload,
+          tenant_id: selectedTenantId,
+        });
+        handleCloseModal();
+        showToast(`Curso "${name}" creado exitosamente`, 'success');
+      }
     } catch (err: any) {
       setFormError(
-        err?.translatedMessage || err?.detail || 'Error al crear el curso. Intenta de nuevo.'
+        err?.translatedMessage ||
+          err?.detail ||
+          (editingCourse
+            ? 'Error al actualizar el curso. Intenta de nuevo.'
+            : 'Error al crear el curso. Intenta de nuevo.')
       );
     }
   };
@@ -398,6 +435,15 @@ function CursosContent() {
                     variant="outline"
                     brand="relevo"
                     size="sm"
+                    onClick={() => handleEditModal(course)}
+                    aria-label={`Editar ${course.name}`}
+                  >
+                    <Pencil size={14} />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    brand="relevo"
+                    size="sm"
                     onClick={() => setDeleteTarget(course)}
                     aria-label={`Eliminar ${course.name}`}
                   >
@@ -426,7 +472,7 @@ function CursosContent() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-6 pb-2">
               <h2 id="course-modal-title" className="text-xl font-bold text-brand-primary">
-                Nuevo curso
+                {editingCourse ? 'Editar curso' : 'Nuevo curso'}
               </h2>
               <button
                 type="button"
@@ -439,7 +485,7 @@ function CursosContent() {
             </div>
 
             {/* Body */}
-            <form onSubmit={handleCreate}>
+            <form onSubmit={handleSave}>
               <div className="px-6 py-4 space-y-4">
                 {/* Selected school info */}
                 {selectedTenant && (
@@ -579,8 +625,12 @@ function CursosContent() {
                 <Button type="button" variant="ghost" onClick={handleCloseModal}>
                   Cancelar
                 </Button>
-                <Button type="submit" brand="relevo" loading={createCourse.isPending}>
-                  Crear curso
+                <Button
+                  type="submit"
+                  brand="relevo"
+                  loading={editingCourse ? updateCourse.isPending : createCourse.isPending}
+                >
+                  {editingCourse ? 'Guardar cambios' : 'Crear curso'}
                 </Button>
               </div>
             </form>

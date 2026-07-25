@@ -65,7 +65,7 @@ async def seed():
         # Check if demo users already exist
         demo_users = [
             ("profesor@demo.cl", "María González", "TEACHER", "demo123"),
-            ("director@demo.cl", "Carlos Rodríguez", "HOLDER", "demo123"),
+            ("director@demo.cl", "Carlos Rodríguez", "GESTION", "demo123"),
         ]
 
         for email, name, role, password in demo_users:
@@ -85,23 +85,23 @@ async def seed():
                 db.add(user)
                 print(f"   ✅ User '{email}' ({role}) created")
 
-        # Assign HOLDER user as owner of the demo tenant
-        holder_result = await db.execute(
+        # Assign GESTION user as owner of the demo tenant
+        gestion_result = await db.execute(
             select(User).where(User.email == "director@demo.cl")
         )
-        holder = holder_result.scalar_one_or_none()
+        gestion = gestion_result.scalar_one_or_none()
 
-        if holder:
+        if gestion:
             existing_member = await db.execute(
                 select(TenantMember).where(
                     TenantMember.tenant_id == tenant.id,
-                    TenantMember.user_id == holder.id,
+                    TenantMember.user_id == gestion.id,
                 )
             )
             if not existing_member.scalar_one_or_none():
                 tm = TenantMember(
                     tenant_id=tenant.id,
-                    user_id=holder.id,
+                    user_id=gestion.id,
                     role="owner",
                 )
                 db.add(tm)
@@ -159,7 +159,7 @@ async def seed():
 
     print("✅ Seed complete!")
     print("   Teacher:     profesor@demo.cl / demo123")
-    print("   Holder:      director@demo.cl / demo123")
+    print("   Gestion:      director@demo.cl / demo123")
     print(f"   Super Admin: {super_admin_email} / {super_admin_password}")
     print("   TenantMember: director@demo.cl → colegio-demo (owner)")
 

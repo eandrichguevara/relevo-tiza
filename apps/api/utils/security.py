@@ -147,13 +147,13 @@ async def require_super_admin(current_user: User = Depends(get_current_user)) ->
     return current_user
 
 
-async def require_admin_or_holder(current_user: User = Depends(get_current_user)) -> User:
-    """Allows ADMIN or HOLDER roles. Used for tenant-scoped approval endpoints.
+async def require_admin_or_gestion(current_user: User = Depends(get_current_user)) -> User:
+    """Allows ADMIN or GESTION roles. Used for tenant-scoped approval endpoints.
     
     ADMIN can approve/reject users across all tenants.
-    HOLDER can only approve/reject TEACHERs within their own tenant.
+    GESTION can only approve/reject TEACHERs within their own tenant.
     """
-    if current_user.role not in ("ADMIN", "HOLDER"):
+    if current_user.role not in ("ADMIN", "GESTION"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Se requieren privilegios de administrador o director para esta operación.",

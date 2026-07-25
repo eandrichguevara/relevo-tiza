@@ -135,7 +135,7 @@ const MOCK_TENANTS = [
 const DEFAULT_AUTH = {
   accessToken: 'mock-token',
   isAuthenticated: true,
-  user: { id: '1', role: 'HOLDER' },
+  user: { id: '1', role: 'GESTION' },
 };
 
 // ─── Helpers ────────────────────────────────────────────────

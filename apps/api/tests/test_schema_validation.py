@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from httpx import AsyncClient
 
-from tests.test_integration import _setup_holder, _setup_teacher
+from tests.test_integration import _setup_gestion, _setup_teacher
 
 
 # ─────────────────────────────────────────────
@@ -32,9 +32,9 @@ class TestAlternativeValidation:
 
     @pytest.fixture
     async def eval_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create holder + teacher + course for evaluation tests."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Create gestion + teacher + course for evaluation tests."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
         course_resp = await client.post(
             "/api/courses",
@@ -44,14 +44,14 @@ class TestAlternativeValidation:
                 "subject": "Matemáticas",
                 "teachers": {"Matemáticas": teacher["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert course_resp.status_code == 201, f"Course creation failed: {course_resp.text}"
         course_id = course_resp.json()["id"]
 
         return {
             "teacher_token": teacher["token"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
         }
 
@@ -185,9 +185,9 @@ class TestCriteriaValidation:
 
     @pytest.fixture
     async def eval_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create holder + teacher + course for evaluation tests."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Create gestion + teacher + course for evaluation tests."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
         course_resp = await client.post(
             "/api/courses",
@@ -197,14 +197,14 @@ class TestCriteriaValidation:
                 "subject": "Matemáticas",
                 "teachers": {"Matemáticas": teacher["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert course_resp.status_code == 201, f"Course creation failed: {course_resp.text}"
         course_id = course_resp.json()["id"]
 
         return {
             "teacher_token": teacher["token"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
         }
 
@@ -356,9 +356,9 @@ class TestCourseIdRequired:
 
     @pytest.fixture
     async def eval_context(self, client: AsyncClient, fastapi_app) -> dict:
-        """Create holder + teacher + course for evaluation tests."""
-        holder = await _setup_holder(fastapi_app)
-        teacher = await _setup_teacher(fastapi_app, holder["tenant_id"])
+        """Create gestion + teacher + course for evaluation tests."""
+        gestion = await _setup_gestion(fastapi_app)
+        teacher = await _setup_teacher(fastapi_app, gestion["tenant_id"])
 
         course_resp = await client.post(
             "/api/courses",
@@ -368,14 +368,14 @@ class TestCourseIdRequired:
                 "subject": "Matemáticas",
                 "teachers": {"Matemáticas": teacher["teacher_id"]},
             },
-            headers={"Authorization": f"Bearer {holder['token']}"},
+            headers={"Authorization": f"Bearer {gestion['token']}"},
         )
         assert course_resp.status_code == 201, f"Course creation failed: {course_resp.text}"
         course_id = course_resp.json()["id"]
 
         return {
             "teacher_token": teacher["token"],
-            "tenant_id": holder["tenant_id"],
+            "tenant_id": gestion["tenant_id"],
             "course_id": course_id,
         }
 

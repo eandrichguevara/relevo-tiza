@@ -18,7 +18,7 @@ from models.schemas import (
     UserStatusEnum,
 )
 from services.email import send_approval_notification, send_rejection_notification
-from utils.security import require_admin_or_holder
+from utils.security import require_admin_or_gestion
 
 logger = logging.getLogger(__name__)
 
@@ -26,16 +26,16 @@ router = APIRouter()
 
 
 def _build_tenant_scoped_query(current_user: User):
-    """Build the base pending-users query, scoped by tenant for HOLDERs.
+    """Build the base pending-users query, scoped by tenant for GESTION users.
     
     - ADMIN: sees all pending users across all tenants.
-    - HOLDER: sees only TEACHERs pending within their own tenant.
+    - GESTION: sees only TEACHERs pending within their own tenant.
     """
     query = select(User).where(User.status == "pending")
     count_query = select(func.count(User.id)).where(User.status == "pending")
 
-    if current_user.role == "HOLDER":
-        # HOLDER can only see TEACHERs in their own tenant
+    if current_user.role == "GESTION":
+        # GESTION can only see TEACHERs in their own tenant
         query = query.where(
             User.tenant_id == current_user.tenant_id,
             User.role == "TEACHER",
@@ -52,23 +52,23 @@ def _build_tenant_scoped_query(current_user: User):
 async def list_pending_registrations(
     page: int = Query(1, ge=1, description="Page number"),
     page_size: int = Query(20, ge=1, le=100, description="Items per page"),
-    role: str = Query(None, description="Filter by role (TEACHER, HOLDER, ADMIN)"),
-    current_user: User = Depends(require_admin_or_holder),
+    role: str = Query(None, description="Filter by role (TEACHER, GESTION, ADMIN)"),
+    current_user: User = Depends(require_admin_or_gestion),
     db: AsyncSession = Depends(get_db),
 ):
     """List pending user registrations with pagination and optional role filter.
     
     - ADMIN: sees all pending users across all tenants.
-    - HOLDER: sees only TEACHERs pending within their own tenant.
+    - GESTION: sees only TEACHERs pending within their own tenant.
     """
     query, count_query = _build_tenant_scoped_query(current_user)
 
     if role:
         role_upper = role.upper().strip()
-        if role_upper not in ("TEACHER", "HOLDER", "ADMIN"):
+        if role_upper not in ("TEACHER", "GESTION", "ADMIN"):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Rol inválido: {role}. Use TEACHER, HOLDER o ADMIN.",
+                detail=f"Rol inválido: {role}. Use TEACHER, GESTION o ADMIN.",
             )
         query = query.where(User.role == role_upper)
         count_query = count_query.where(User.role == role_upper)
@@ -115,14 +115,14 @@ async def approve_registration(
     body: ApproveRejectRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_admin_or_holder),
+    current_user: User = Depends(require_admin_or_gestion),
     db: AsyncSession = Depends(get_db),
 ):
     """Approve a pending user registration.
 
-    - ADMIN: can approve any user. Also approves their tenant if HOLDER/ADMIN.
-    - HOLDER: can only approve TEACHERs within their own tenant.
-      Cannot approve other HOLDERs or ADMINs (privilege escalation prevention).
+    - ADMIN: can approve any user. Also approves their tenant if GESTION/ADMIN.
+    - GESTION: can only approve TEACHERs within their own tenant.
+      Cannot approve other GESTION users or ADMINs (privilege escalation prevention).
     """
     user_id_str = str(user_id)
 
@@ -152,9 +152,9 @@ async def approve_registration(
         user.rejection_reason = None
         user.rejected_at = None
 
-    # ── HOLDER tenant scoping ──────────────────────────────────
-    if current_user.role == "HOLDER":
-        # Check if HOLDER is a member of the user's tenant (supports multi-tenant)
+    # ── GESTION tenant scoping ──────────────────────────────────
+    if current_user.role == "GESTION":
+        # Check if GESTION is a member of the user's tenant (supports multi-tenant)
         if user.tenant_id != current_user.tenant_id:
             membership = await db.execute(
                 select(TenantMember).where(
@@ -178,8 +178,8 @@ async def approve_registration(
     user.approved_at = now
     user.approved_by = current_user.email
 
-    # If HOLDER or ADMIN, also approve the tenant
-    if user.role in ("HOLDER", "ADMIN") and user.tenant:
+    # If GESTION or ADMIN, also approve the tenant
+    if user.role in ("GESTION", "ADMIN") and user.tenant:
         tenant = user.tenant
         if tenant.status in ("pending", "rejected"):
             tenant.status = "active"
@@ -242,14 +242,14 @@ async def reject_registration(
     body: ApproveRejectRequest,
     request: Request,
     background_tasks: BackgroundTasks,
-    current_user: User = Depends(require_admin_or_holder),
+    current_user: User = Depends(require_admin_or_gestion),
     db: AsyncSession = Depends(get_db),
 ):
     """Reject a pending user registration.
 
-    - ADMIN: can reject any user. Also rejects their tenant if HOLDER/ADMIN.
-    - HOLDER: can only reject TEACHERs within their own tenant.
-      Cannot reject other HOLDERs or ADMINs (privilege escalation prevention).
+    - ADMIN: can reject any user. Also rejects their tenant if GESTION/ADMIN.
+    - GESTION: can only reject TEACHERs within their own tenant.
+      Cannot reject other GESTION users or ADMINs (privilege escalation prevention).
 
     A rejection reason is required.
     """
@@ -281,9 +281,9 @@ async def reject_registration(
             detail=f"El usuario no está pendiente. Estado actual: {user.status}",
         )
 
-    # ── HOLDER tenant scoping ──────────────────────────────────
-    if current_user.role == "HOLDER":
-        # Check if HOLDER is a member of the user's tenant (supports multi-tenant)
+    # ── GESTION tenant scoping ──────────────────────────────────
+    if current_user.role == "GESTION":
+        # Check if GESTION is a member of the user's tenant (supports multi-tenant)
         if user.tenant_id != current_user.tenant_id:
             membership = await db.execute(
                 select(TenantMember).where(
@@ -307,8 +307,8 @@ async def reject_registration(
     user.rejection_reason = body.reason.strip()
     user.rejected_at = now
 
-    # If HOLDER or ADMIN, also reject the tenant
-    if user.role in ("HOLDER", "ADMIN") and user.tenant:
+    # If GESTION or ADMIN, also reject the tenant
+    if user.role in ("GESTION", "ADMIN") and user.tenant:
         tenant = user.tenant
         if tenant.status == "pending":
             tenant.status = "rejected"

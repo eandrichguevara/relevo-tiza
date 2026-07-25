@@ -1,4 +1,4 @@
-"""Tenants router — multi-tenant management for HOLDERs."""
+"""Tenants router — multi-tenant management for GESTION users."""
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -124,7 +124,7 @@ async def create_tenant(
             detail="Ya existe un colegio con este nombre o subdominio",
         )
 
-    # Automatically add the creating HOLDER as an owner member (tenant isolation)
+    # Automatically add the creating GESTION as an owner member (tenant isolation)
     # TODO: When TenantMember management endpoints are added, allow changing roles
     member = TenantMember(
         tenant_id=tenant.id,
@@ -149,13 +149,13 @@ async def list_tenants(
     request: Request,
     skip: int = Query(0, ge=0, description="Number of records to skip"),
     limit: int = Query(100, ge=1, le=100, description="Max records to return"),
-    current_user: User = Depends(require_role("HOLDER")),
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
     """List tenants with pagination.
 
     - ADMIN: sees ALL tenants across the system.
-    - HOLDER: only sees tenants where they are a member (tenant isolation).
+    - GESTION: only sees tenants where they are a member (tenant isolation).
     """
     # ADMIN can see all tenants
     if current_user.role == "ADMIN":
@@ -178,7 +178,7 @@ async def list_tenants(
             limit=limit,
         )
 
-    # HOLDER: get IDs of all tenants where they are a member
+    # GESTION: get IDs of all tenants where they are a member
     member_result = await db.execute(
         select(TenantMember.tenant_id).where(TenantMember.user_id == current_user.id)
     )
@@ -208,7 +208,7 @@ async def list_tenants(
         )
 
     # Safe fallback: only return the user's own tenant.
-    # HOLDERs without TenantMember entries should still only see
+    # GESTION users without TenantMember entries should still only see
     # the tenant they're directly assigned to.
     # Use current_user.tenant_id (DB value, not manipulable)
     # instead of get_tenant_id() which reads headers — Consistent
@@ -241,7 +241,7 @@ async def list_tenants(
 @router.delete("/{tenant_id}", response_model=DeleteTenantResponse)
 async def delete_tenant(
     tenant_id: str,
-    current_user: User = Depends(require_role("HOLDER")),
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
     """Eliminar un colegio (tenant). Solo el dueño o un ADMIN puede eliminarlo.
@@ -258,7 +258,7 @@ async def delete_tenant(
             detail="Colegio no encontrado",
         )
 
-    # Verify ownership: ADMIN can delete any tenant, HOLDER must be owner
+    # Verify ownership: ADMIN can delete any tenant, GESTION must be owner
     if current_user.role != "ADMIN":
         membership = await db.execute(
             select(TenantMember).where(

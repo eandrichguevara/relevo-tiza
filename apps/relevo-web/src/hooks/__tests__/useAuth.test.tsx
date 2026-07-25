@@ -92,7 +92,7 @@ describe('AuthProvider + useAuth', () => {
         id: 'user-1',
         email: 'test@test.com',
         name: 'Test User',
-        role: 'HOLDER',
+        role: 'GESTION',
         status: 'active',
         tenantId: 't1',
       };
@@ -131,7 +131,7 @@ describe('AuthProvider + useAuth', () => {
               id: 'user-2',
               email: 'reconstructed@test.com',
               name: 'Reconstructed',
-              role: 'HOLDER',
+              role: 'GESTION',
               status: 'active',
               tenant_id: 't1',
             }),
@@ -206,7 +206,7 @@ describe('AuthProvider + useAuth', () => {
           id: 'login-user',
           email: 'login@test.com',
           name: 'Login User',
-          role: 'HOLDER',
+          role: 'GESTION',
           status: 'active',
           tenant_id: 't1',
         });

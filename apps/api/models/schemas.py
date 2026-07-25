@@ -25,7 +25,7 @@ class BrandEnum(str, Enum):
 
 class RoleEnum(str, Enum):
     TEACHER = "TEACHER"
-    HOLDER = "HOLDER"
+    GESTION = "GESTION"
     ADMIN = "ADMIN"
 
 
@@ -67,8 +67,8 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=8)
     name: Optional[str] = None
-    role: Optional[str] = None  # 'teacher' | 'director' | 'holder' | 'admin'
-    school: Optional[str] = None  # school name for relevo (HOLDER) registrations
+    role: Optional[str] = None  # 'teacher' | 'director' | 'gestion' | 'admin'
+    school: Optional[str] = None  # school name for relevo (GESTION) registrations
     tenant_id: Optional[str] = None  # pre-existing tenant to assign user to
     join_code: Optional[str] = None  # school join code (TIZA teachers use this instead of tenant_id)
 
@@ -218,7 +218,7 @@ class CreateUserRequest(BaseModel):
     email: str
     password: str
     name: str
-    role: str  # only "teacher" allowed via this endpoint
+    role: str  # "teacher" for GESTION users; "teacher" or "gestion" for ADMINs
     tenant_id: str
 
 
@@ -267,10 +267,17 @@ class CriterionItem(BaseModel):
     levels: List[CriterionLevel] = Field(..., min_length=1, description="Niveles de desempeño (al menos 1)")
 
 
+class ItemTypeEnum(str, Enum):
+    question = "question"
+    info_section = "info_section"
+    divider = "divider"
+
+
 class RubricItem(BaseModel):
-    question_number: int
+    item_type: ItemTypeEnum = Field(default=ItemTypeEnum.question, description="Tipo de elemento: 'question' o 'info_section'")
+    question_number: Optional[int] = Field(None, description="Número de pregunta (solo para item_type=question)")
     statement: Optional[str] = Field(None, description="Enunciado o texto de la pregunta")
-    type: QuestionTypeEnum
+    type: Optional[QuestionTypeEnum] = Field(None, description="Tipo de pregunta (escrita o alternativas)")
     max_score: Optional[float] = Field(None, description="Puntaje máximo. Para written se calcula automáticamente de los criterios.")
     correct_answer: Optional[str] = None
     criteria: Optional[List[CriterionItem]] = Field(
@@ -281,6 +288,9 @@ class RubricItem(BaseModel):
         None,
         description="Lista de alternativas (obligatorio si type=multiple_choice, debe tener ≥2 opciones y exactamente 1 correcta)",
     )
+    section_title: Optional[str] = Field(None, description="Título de la sección informativa o encabezado de grupo")
+    section_content: Optional[str] = Field(None, description="Instrucciones generales, texto de lectura o información adicional")
+    section_image_url: Optional[str] = Field(None, description="URL o Data URI de imagen adjunta a la sección informativa")
 
     @model_validator(mode='after')
     def compute_max_score_from_criteria(self) -> 'RubricItem':
@@ -290,7 +300,7 @@ class RubricItem(BaseModel):
         de cada criterio. Ej: si hay 2 criterios con niveles máximos de 5 y 3 pts,
         max_score = 8.
         """
-        if self.type == QuestionTypeEnum.written:
+        if self.item_type == ItemTypeEnum.question and self.type == QuestionTypeEnum.written:
             if self.criteria and len(self.criteria) > 0:
                 total = sum(
                     max(level.points for level in criterion.levels)
@@ -305,7 +315,7 @@ class RubricItem(BaseModel):
     @model_validator(mode='after')
     def validate_criteria_levels(self) -> 'RubricItem':
         """Validaciones adicionales para los criterios."""
-        if self.criteria:
+        if self.item_type == ItemTypeEnum.question and self.criteria:
             for i, criterion in enumerate(self.criteria):
                 if len(criterion.levels) == 0:
                     raise ValueError(
@@ -443,6 +453,54 @@ class CreateCourseRequest(BaseModel):
                 raise ValueError(f"El teacher_id para '{subject}' no puede estar vacío")
         return v
 
+
+class UpdateCourseRequest(BaseModel):
+    name: Optional[str] = None
+    grade: Optional[str] = None
+    subject: Optional[str] = Field(
+        None, max_length=200,
+        description="Asignaturas comma-separated: 'Lenguaje, Matemáticas'"
+    )
+    teachers: Optional[dict[str, str]] = Field(
+        None, description='Mapping of subject to teacher_id, e.g. {"Lenguaje": "uuid1", "Matemáticas": "uuid2"}'
+    )
+
+    @field_validator("subject")
+    @classmethod
+    def validate_subjects(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        parts = [s.strip() for s in v.split(",") if s.strip()]
+        if not parts:
+            raise ValueError("Debe especificar al menos una asignatura")
+        allowed = {s.value for s in SubjectEnum}
+        for part in parts:
+            if part not in allowed:
+                raise ValueError(
+                    f"Asignatura '{part}' no es válida. "
+                    f"Asignaturas disponibles: {', '.join(sorted(allowed))}"
+                )
+        return ", ".join(dict.fromkeys(parts))
+
+    @field_validator("teachers")
+    @classmethod
+    def validate_teachers(cls, v: Optional[dict[str, str]]) -> Optional[dict[str, str]]:
+        if v is None:
+            return v
+        if not v:
+            raise ValueError("Debe asignar al menos un profesor")
+        allowed = {s.value for s in SubjectEnum}
+        for subject, teacher_id in v.items():
+            if subject not in allowed:
+                raise ValueError(
+                    f"La asignatura '{subject}' no es válida. "
+                    f"Asignaturas disponibles: {', '.join(sorted(allowed))}"
+                )
+            if not teacher_id or not teacher_id.strip():
+                raise ValueError(f"El teacher_id para '{subject}' no puede estar vacío")
+        return v
+
+
 class CourseResponse(BaseModel):
     id: str
     name: str
@@ -484,3 +542,50 @@ class TeacherClassResponse(BaseModel):
     subject: str
     grade: str
     student_count: int = 0
+
+
+# ─── AI Evaluation Suggestions ───────────
+
+class SuggestNextQuestionRequest(BaseModel):
+    subject: Optional[str] = None
+    grade: Optional[str] = None
+    topic: Optional[str] = None
+    question_type: Optional[QuestionTypeEnum] = QuestionTypeEnum.written
+    existing_questions: Optional[List[str]] = Field(default_factory=list)
+
+
+class SuggestNextQuestionResponse(BaseModel):
+    statement: str
+    type: QuestionTypeEnum
+    alternatives: Optional[List[AlternativeItem]] = None
+    criteria: Optional[List[CriterionItem]] = None
+    correct_answer: Optional[str] = None
+
+
+class SuggestDistractorsRequest(BaseModel):
+    statement: str
+    correct_answer: str
+    count: Optional[int] = 3
+
+
+class SuggestDistractorsResponse(BaseModel):
+    distractors: List[str]
+
+
+class RefineQuestionRequest(BaseModel):
+    statement: str
+    action: str = Field(..., description="Acción: 'improve', 'simplify', 'harder'")
+
+
+class RefineQuestionResponse(BaseModel):
+    refined_statement: str
+
+
+class SuggestRubricRequest(BaseModel):
+    statement: str
+    max_score: Optional[float] = 3.0
+
+
+class SuggestRubricResponse(BaseModel):
+    criteria: List[CriterionItem]
+

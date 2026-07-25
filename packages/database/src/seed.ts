@@ -27,7 +27,7 @@ async function main() {
 
   const usersToCreate = [
     { email: 'profesor@demo.cl', name: 'María González', role: 'TEACHER' },
-    { email: 'director@demo.cl', name: 'Carlos Rodríguez', role: 'HOLDER' },
+    { email: 'director@demo.cl', name: 'Carlos Rodríguez', role: 'GESTION' },
   ];
 
   for (const user of usersToCreate) {
@@ -45,7 +45,7 @@ async function main() {
     console.log(`   ✅ User '${user.email}' (${user.role})`);
   }
 
-  // Assign HOLDER user as owner of the demo tenant
+  // Assign GESTION user as owner of the demo tenant
   const holder = await prisma.user.findUnique({ where: { email: 'director@demo.cl' } });
   if (holder) {
     await prisma.tenantMember.upsert({
@@ -65,7 +65,7 @@ async function main() {
   console.log('✅ Seed complete');
   console.log('   Tenant: colegio-demo');
   console.log('   Teacher: profesor@demo.cl / demo123');
-  console.log('   Holder:  director@demo.cl / demo123');
+  console.log('   Gestion:  director@demo.cl / demo123');
   console.log('   TenantMember: director@demo.cl → colegio-demo (owner)');
 }
 

@@ -70,7 +70,7 @@ describe('PendingPage', () => {
       id: '1',
       email: 'test@test.com',
       name: 'Test',
-      role: 'HOLDER',
+      role: 'GESTION',
       status: 'active',
       tenantId: 't1',
     });
@@ -103,7 +103,7 @@ describe('PendingPage', () => {
       id: '1',
       email: 'pending@test.com',
       name: 'Pending',
-      role: 'HOLDER',
+      role: 'GESTION',
       status: 'pending',
       tenantId: 't1',
     });

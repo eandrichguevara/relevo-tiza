@@ -218,7 +218,7 @@ const MOCK_USERS = [
     id: 'u5',
     name: 'Admin User',
     email: 'admin@test.cl',
-    role: 'HOLDER' as const,
+    role: 'GESTION' as const,
     status: 'active' as const,
     tenantId: 't1',
     created_at: '2026-01-01T12:00:00Z',
@@ -228,7 +228,7 @@ const MOCK_USERS = [
 const DEFAULT_AUTH = {
   accessToken: 'mock-token',
   isAuthenticated: true,
-  user: { id: 'auth-1', role: 'HOLDER' },
+  user: { id: 'auth-1', role: 'GESTION' },
 };
 
 const DEFAULT_ACTIVE_TENANT = {
@@ -312,9 +312,9 @@ describe('UsuariosPage', () => {
       expect(screen.getByText('Gestión de profesores y administradores')).toBeInTheDocument();
     });
 
-    it('renderiza el botón "Nuevo profesor"', async () => {
+    it('renderiza el botón "Nuevo usuario"', async () => {
       await renderPage();
-      const btn = screen.getByRole('button', { name: /nuevo profesor/i });
+      const btn = screen.getByRole('button', { name: /nuevo usuario/i });
       expect(btn).toBeInTheDocument();
       expect(btn).not.toBeDisabled();
     });
@@ -358,8 +358,8 @@ describe('UsuariosPage', () => {
 
       // Debe mostrar spinner en el selector
       expect(screen.getByTestId('spinner')).toBeInTheDocument();
-      // Botón "Nuevo profesor" deshabilitado porque no hay tenant
-      expect(screen.getByRole('button', { name: /nuevo profesor/i })).toBeDisabled();
+      // Botón "Nuevo usuario" deshabilitado porque no hay tenant
+      expect(screen.getByRole('button', { name: /nuevo usuario/i })).toBeDisabled();
       // Debe mostrar empty state de "selecciona un colegio"
       expect(screen.getByTestId('empty-state')).toBeInTheDocument();
       expect(screen.getByTestId('empty-title')).toHaveTextContent('Selecciona un colegio');
@@ -399,9 +399,9 @@ describe('UsuariosPage', () => {
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
     });
 
-    it('botón "Nuevo profesor" deshabilitado sin tenant', async () => {
+    it('botón "Nuevo usuario" deshabilitado sin tenant', async () => {
       await renderPage();
-      expect(screen.getByRole('button', { name: /nuevo profesor/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /nuevo usuario/i })).toBeDisabled();
     });
   });
 
@@ -465,7 +465,7 @@ describe('UsuariosPage', () => {
       // Los TEACHER deben mostrar "Profesor"
       const profesorBadges = screen.getAllByText('Profesor');
       expect(profesorBadges.length).toBeGreaterThanOrEqual(4);
-      // El HOLDER debe mostrar "Gestión"
+      // El GESTION debe mostrar "Gestión"
       const gestionBadges = screen.getAllByText('Gestión');
       expect(gestionBadges.length).toBeGreaterThanOrEqual(1);
     });
@@ -540,10 +540,10 @@ describe('UsuariosPage', () => {
       );
     });
 
-    it('muestra botón "Agregar profesor" en el EmptyState', async () => {
+    it('muestra botón "Agregar usuario" en el EmptyState', async () => {
       await renderPage();
       expect(screen.getByTestId('empty-action')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /agregar profesor/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /agregar usuario/i })).toBeInTheDocument();
     });
   });
 
@@ -596,21 +596,21 @@ describe('UsuariosPage', () => {
   // ─── Modal crear usuario — apertura y cierre ──────────
 
   describe('Modal de crear usuario — apertura y cierre', () => {
-    it('abre el modal al hacer click en "Nuevo profesor"', async () => {
+    it('abre el modal al hacer click en "Nuevo usuario"', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
-      expect(screen.getByRole('dialog', { name: /nuevo profesor/i })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
+      expect(screen.getByRole('dialog', { name: /nuevo usuario/i })).toBeInTheDocument();
     });
 
-    it('muestra el título "Nuevo profesor" en el modal', async () => {
+    it('muestra el título "Nuevo usuario" en el modal', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
-      expect(screen.getByRole('heading', { name: /nuevo profesor/i })).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
+      expect(screen.getByRole('heading', { name: /nuevo usuario/i })).toBeInTheDocument();
     });
 
     it('muestra la información del colegio seleccionado en el modal', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
       expect(screen.getByText(/Agregando a:/)).toBeInTheDocument();
       // El nombre del colegio aparece en el modal y en el selector
       const colegioElements = screen.getAllByText('Colegio San Miguel');
@@ -619,7 +619,7 @@ describe('UsuariosPage', () => {
 
     it('cierra el modal al hacer click en la X', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
       await userEvent.click(screen.getByLabelText('Cerrar modal'));
@@ -628,7 +628,7 @@ describe('UsuariosPage', () => {
 
     it('cierra el modal al hacer click en Cancelar', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
       expect(screen.getByRole('dialog')).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole('button', { name: /cancelar/i }));
@@ -637,7 +637,7 @@ describe('UsuariosPage', () => {
 
     it('genera contraseña automática al abrir el modal', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
       // Debe mostrar un campo de contraseña (generada automáticamente)
       expect(screen.getByText('Contraseña provisoria')).toBeInTheDocument();
@@ -652,11 +652,11 @@ describe('UsuariosPage', () => {
   describe('Formulario de creación — campos', () => {
     beforeEach(async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
     });
 
-    it('renderiza campo "Nombre del profesor"', () => {
-      expect(screen.getByLabelText('Nombre del profesor')).toBeInTheDocument();
+    it('renderiza campo "Nombre del usuario"', () => {
+      expect(screen.getByLabelText('Nombre del usuario')).toBeInTheDocument();
     });
 
     it('renderiza campo "Correo electrónico"', () => {
@@ -703,7 +703,7 @@ describe('UsuariosPage', () => {
   describe('Formulario de creación — validación', () => {
     it('muestra error si los campos están vacíos', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
       const form = document.querySelector('form')!;
       fireEvent.submit(form);
@@ -716,12 +716,12 @@ describe('UsuariosPage', () => {
 
     it('muestra error si el email no tiene @', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Test User');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Test User');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'invalid-email');
 
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
         expect(screen.getByText('Ingresa un correo electrónico válido.')).toBeInTheDocument();
@@ -731,9 +731,9 @@ describe('UsuariosPage', () => {
 
     it('muestra error si solo se ingresan espacios', async () => {
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), '   ');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), '   ');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), '   ');
 
       const form = document.querySelector('form')!;
@@ -752,21 +752,21 @@ describe('UsuariosPage', () => {
     it('llama createUser.mutateAsync con los datos correctos', async () => {
       mutateAsyncCreateUser.mockResolvedValueOnce({ id: 'u6' });
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Nuevo Profesor');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Nuevo Usuario');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'nuevo@test.cl');
 
       // Obtener la contraseña generada
       const passwordEl = screen.getByText(/^[A-Za-z0-9!@#$%&*]{14}$/);
       const generatedPassword = passwordEl.textContent!;
 
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
         expect(mutateAsyncCreateUser).toHaveBeenCalledWith({
           email: 'nuevo@test.cl',
-          name: 'Nuevo Profesor',
+          name: 'Nuevo Usuario',
           password: generatedPassword,
           tenant_id: 't1',
           role: 'teacher',
@@ -777,29 +777,29 @@ describe('UsuariosPage', () => {
     it('muestra mensaje de éxito con la contraseña tras crear', async () => {
       mutateAsyncCreateUser.mockResolvedValueOnce({ id: 'u6' });
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Nuevo Profesor');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Nuevo Usuario');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'nuevo@test.cl');
 
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/Profesor creado exitosamente/i)).toBeInTheDocument();
+        expect(screen.getByText(/Usuario creado exitosamente/i)).toBeInTheDocument();
       });
     });
 
     it('el modal permanece abierto tras éxito (para crear otro)', async () => {
       mutateAsyncCreateUser.mockResolvedValueOnce({ id: 'u6' });
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Nuevo Profesor');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Nuevo Usuario');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'nuevo@test.cl');
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
-        expect(screen.getByText(/Profesor creado exitosamente/i)).toBeInTheDocument();
+        expect(screen.getByText(/Usuario creado exitosamente/i)).toBeInTheDocument();
       });
       // Modal debe permanecer abierto
       expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -808,13 +808,13 @@ describe('UsuariosPage', () => {
     it('regenera la contraseña tras crear exitosamente', async () => {
       mutateAsyncCreateUser.mockResolvedValueOnce({ id: 'u6' });
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
       const passwordBefore = screen.getByText(/^[A-Za-z0-9!@#$%&*]{14}$/).textContent;
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Nuevo Profesor');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Nuevo Usuario');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'nuevo@test.cl');
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
         const passwordAfter = screen.getByText(/^[A-Za-z0-9!@#$%&*]{14}$/).textContent;
@@ -831,11 +831,11 @@ describe('UsuariosPage', () => {
         translatedMessage: 'El email ya está registrado.',
       });
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Test');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Test');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'test@test.cl');
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
         expect(screen.getByText('El email ya está registrado.')).toBeInTheDocument();
@@ -845,15 +845,15 @@ describe('UsuariosPage', () => {
     it('muestra mensaje genérico si no hay translatedMessage', async () => {
       mutateAsyncCreateUser.mockRejectedValueOnce(new Error('fail'));
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Test');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Test');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'test@test.cl');
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
         expect(
-          screen.getByText('Error al crear el profesor. Intenta de nuevo.')
+          screen.getByText('Error al crear el usuario. Intenta de nuevo.')
         ).toBeInTheDocument();
       });
     });
@@ -1228,11 +1228,11 @@ describe('UsuariosPage', () => {
     it('desaparece tras crear usuario exitosamente', async () => {
       mutateAsyncCreateUser.mockResolvedValueOnce({ id: 'u6' });
       await renderPage();
-      await userEvent.click(screen.getByRole('button', { name: /nuevo profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /nuevo usuario/i }));
 
-      await userEvent.type(screen.getByLabelText('Nombre del profesor'), 'Test');
+      await userEvent.type(screen.getByLabelText('Nombre del usuario'), 'Test');
       await userEvent.type(screen.getByLabelText('Correo electrónico'), 'test@test.cl');
-      await userEvent.click(screen.getByRole('button', { name: /crear profesor/i }));
+      await userEvent.click(screen.getByRole('button', { name: /crear usuario/i }));
 
       await waitFor(() => {
         // El toast de éxito se muestra como alert

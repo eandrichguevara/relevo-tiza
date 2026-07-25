@@ -59,6 +59,63 @@ export function useDeleteEvaluation() {
   });
 }
 
+// ─── AI Evaluation Suggestions ───────────
+
+export function useSuggestNextQuestion() {
+  const { accessToken } = useAuth();
+  return useMutation({
+    mutationFn: (data: {
+      subject?: string;
+      grade?: string;
+      topic?: string;
+      question_type?: 'written' | 'multiple_choice';
+      existing_questions?: string[];
+    }) =>
+      apiFetch<any>('/api/evaluations/ai-suggestions/next-question', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useSuggestDistractors() {
+  const { accessToken } = useAuth();
+  return useMutation({
+    mutationFn: (data: { statement: string; correct_answer: string; count?: number }) =>
+      apiFetch<{ distractors: string[] }>('/api/evaluations/ai-suggestions/distractors', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useRefineQuestion() {
+  const { accessToken } = useAuth();
+  return useMutation({
+    mutationFn: (data: { statement: string; action: 'improve' | 'simplify' | 'harder' }) =>
+      apiFetch<{ refined_statement: string }>('/api/evaluations/ai-suggestions/refine', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+export function useSuggestRubric() {
+  const { accessToken } = useAuth();
+  return useMutation({
+    mutationFn: (data: { statement: string; max_score?: number }) =>
+      apiFetch<{ criteria: any[] }>('/api/evaluations/ai-suggestions/rubric', {
+        method: 'POST',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+  });
+}
+
+
 // ─── Results ──────────────────────────────
 
 export function useResults(evaluationId: string) {

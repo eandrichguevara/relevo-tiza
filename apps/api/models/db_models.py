@@ -190,7 +190,7 @@ class Student(Base):
 
 class TenantMember(Base):
     """Many-to-many relationship between users and tenants.
-    Allows a HOLDER to administer multiple tenants (schools)."""
+    Allows a GESTION to administer multiple tenants (schools)."""
     __tablename__ = "tenant_members"
     __table_args__ = (
         UniqueConstraint("tenant_id", "user_id", name="uq_tenant_member"),

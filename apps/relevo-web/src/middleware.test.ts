@@ -234,6 +234,53 @@ describe('middleware (relevo-web)', () => {
     });
   });
 
+  // ─── Must change password ──────────────────────────────────────
+
+  describe('must_change_password', () => {
+    it('redirige a /change-password cuando must_change_password es true y la ruta no es /change-password', async () => {
+      const mustChangePayload = {
+        sub: 'user-1',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        status: 'active',
+        must_change_password: true,
+      };
+      const req = createMiddlewareRequest('/dashboard', buildJwt(mustChangePayload));
+      const response = await middleware(req);
+
+      expect(response.status).toBe(307);
+      const location = response.headers.get('location');
+      expect(location).toContain('/change-password');
+    });
+
+    it('permite acceso a /change-password cuando must_change_password es true', async () => {
+      const mustChangePayload = {
+        sub: 'user-1',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        status: 'active',
+        must_change_password: true,
+      };
+      const req = createMiddlewareRequest('/change-password', buildJwt(mustChangePayload));
+      const response = await middleware(req);
+
+      expect(response.status).toBe(200);
+    });
+
+    it('redirige a /dashboard cuando entra a /change-password sin cambio pendiente', async () => {
+      const normalPayload = {
+        sub: 'user-1',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+        status: 'active',
+        must_change_password: false,
+      };
+      const req = createMiddlewareRequest('/change-password', buildJwt(normalPayload));
+      const response = await middleware(req);
+
+      expect(response.status).toBe(307);
+      const location = response.headers.get('location');
+      expect(location).toContain('/dashboard');
+    });
+  });
+
   // ─── X-Tenant-Brand header ─────────────────────────────────────
 
   describe('X-Tenant-Brand header', () => {

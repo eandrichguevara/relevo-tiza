@@ -39,19 +39,31 @@ function generatePassword(): string {
   const special = '!@#$%&*';
   const all = upper + lower + digits + special;
 
+  // Pick random index from a string using crypto.getRandomValues
+  const randomIndex = (max: number): number => {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    return array[0]! % max;
+  };
+
   // Ensure at least one of each category
   const required = [
-    upper[Math.floor(Math.random() * upper.length)],
-    lower[Math.floor(Math.random() * lower.length)],
-    digits[Math.floor(Math.random() * digits.length)],
-    special[Math.floor(Math.random() * special.length)],
+    upper[randomIndex(upper.length)],
+    lower[randomIndex(lower.length)],
+    digits[randomIndex(digits.length)],
+    special[randomIndex(special.length)],
   ];
 
   // Fill the rest randomly
-  const remaining = Array.from({ length: 10 }, () => all[Math.floor(Math.random() * all.length)]);
+  const remaining = Array.from({ length: 10 }, () => all[randomIndex(all.length)]);
 
-  // Shuffle and join
-  return [...required, ...remaining].sort(() => Math.random() - 0.5).join('');
+  // Fisher-Yates shuffle for uniform distribution
+  const arr = [...required, ...remaining];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.join('');
 }
 
 // ─── Date formatting ─────────────────────────────────────
@@ -72,7 +84,7 @@ function formatDate(dateStr?: string | null): string {
 // ─── Role badge config ───────────────────────────────────
 
 const ROLE_CONFIG: Record<string, { label: string; variant: 'info' | 'neutral' | 'success' }> = {
-  HOLDER: { label: 'Gestión', variant: 'info' },
+  GESTION: { label: 'Gestión', variant: 'info' },
   TEACHER: { label: 'Profesor', variant: 'neutral' },
   ADMIN: { label: 'Admin', variant: 'success' },
 };
@@ -144,6 +156,7 @@ function UsuariosContent() {
   const [passwordCopied, setPasswordCopied] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [resetCopied, setResetCopied] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<'teacher' | 'gestion'>('teacher');
 
   // Approval confirmation state
   const [approveTarget, setApproveTarget] = useState<User | null>(null);
@@ -167,6 +180,7 @@ function UsuariosContent() {
     const pw = generatePassword();
     setForm({ email: '', name: '' });
     setGeneratedPassword(pw);
+    setSelectedRole('teacher');
     setFormError('');
     setFormSuccess('');
     setPasswordCopied(false);
@@ -202,20 +216,29 @@ function UsuariosContent() {
       return;
     }
 
+    if (!selectedRole) {
+      setFormError('Selecciona un rol para el usuario.');
+      return;
+    }
+
     try {
       await createUser.mutateAsync({
         email,
         name,
         password: generatedPassword,
         tenant_id: selectedTenantId,
-        role: 'teacher',
+        role: selectedRole,
       });
-      setFormSuccess(`Profesor creado exitosamente. Contraseña: ${generatedPassword}`);
+      const roleLabel = 'usuario';
+      setFormSuccess(
+        `${roleLabel.charAt(0).toUpperCase() + roleLabel.slice(1)} creado exitosamente. Contraseña: ${generatedPassword}`
+      );
       setForm({ email: '', name: '' });
       setGeneratedPassword(generatePassword());
+      setSelectedRole('teacher');
       setPasswordCopied(false);
     } catch (err: any) {
-      setFormError(err?.translatedMessage || 'Error al crear el profesor. Intenta de nuevo.');
+      setFormError(err?.translatedMessage || 'Error al crear el usuario. Intenta de nuevo.');
     }
   };
 
@@ -521,10 +544,10 @@ function UsuariosContent() {
           brand="relevo"
           onClick={handleOpenModal}
           disabled={!selectedTenantId}
-          aria-label="Nuevo profesor"
+          aria-label="Nuevo usuario"
         >
           <UserPlus size={16} className="mr-1" />
-          Nuevo profesor
+          Nuevo usuario
         </Button>
       </div>
 
@@ -610,12 +633,12 @@ function UsuariosContent() {
       {selectedTenantId && !usersLoading && !usersError && users && users.length === 0 && (
         <EmptyState
           title="No hay usuarios en este colegio"
-          description="Agrega el primer profesor para empezar a trabajar."
+          description="Agrega el primer usuario para empezar a trabajar."
           icon={<Users size={48} />}
           action={
             <Button brand="relevo" onClick={handleOpenModal}>
               <UserPlus size={16} className="mr-1" />
-              Agregar profesor
+              Agregar usuario
             </Button>
           }
         />
@@ -733,7 +756,7 @@ function UsuariosContent() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 pt-6 pb-2">
               <h2 id="user-modal-title" className="text-xl font-bold text-brand-primary">
-                Nuevo profesor
+                {selectedRole === 'gestion' ? 'Nuevo usuario de gestión' : 'Nuevo usuario'}
               </h2>
               <button
                 type="button"
@@ -759,7 +782,7 @@ function UsuariosContent() {
                 )}
 
                 <Input
-                  label="Nombre del profesor"
+                  label="Nombre del usuario"
                   placeholder="Ej: María González"
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -774,13 +797,38 @@ function UsuariosContent() {
                   required
                 />
 
+                {currentUser?.role === 'ADMIN' && (
+                  <div>
+                    <label
+                      htmlFor="user-role"
+                      className="block text-sm font-medium text-gray-700 mb-1"
+                    >
+                      Rol del usuario
+                    </label>
+                    <select
+                      id="user-role"
+                      value={selectedRole}
+                      onChange={(e) => setSelectedRole(e.target.value as 'teacher' | 'gestion')}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900
+                        focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#F4813D]
+                        transition-colors"
+                    >
+                      <option value="teacher">Profesor</option>
+                      <option value="gestion">Gestión (Director)</option>
+                    </select>
+                    <p className="mt-1 text-sm text-gray-500">
+                      Como administrador puedes crear usuarios de gestión con acceso al panel.
+                    </p>
+                  </div>
+                )}
+
                 {/* Auto-generated password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Contraseña provisoria
                   </label>
                   <p className="text-xs text-gray-500 mb-2">
-                    Esta contraseña no se puede editar. Cópiala y compártela con el profesor.
+                    Esta contraseña no se puede editar. Cópiala y compártela con el usuario.
                   </p>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center gap-2 p-3 bg-gray-100 rounded-lg border border-gray-300 flex-1">
@@ -846,7 +894,7 @@ function UsuariosContent() {
                   Cancelar
                 </Button>
                 <Button type="submit" brand="relevo" loading={isCreatePending}>
-                  Crear profesor
+                  {selectedRole === 'gestion' ? 'Crear usuario de gestión' : 'Crear usuario'}
                 </Button>
               </div>
             </form>

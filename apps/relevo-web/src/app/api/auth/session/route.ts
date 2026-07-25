@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     name: String(payload.name ?? ''),
     role: String(payload.role ?? ''),
     status: String(payload.status ?? 'active'),
+    mustChangePassword: Boolean(payload.must_change_password ?? false),
     tenantId: String(payload.tenant_id ?? ''),
   };
 

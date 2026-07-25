@@ -73,7 +73,7 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
         return;
       }
       // Then: check role
-      if (user && user.role !== 'HOLDER' && user.role !== 'ADMIN') {
+      if (user && user.role !== 'GESTION' && user.role !== 'ADMIN') {
         const tizaUrl = process.env.NEXT_PUBLIC_TIZA_URL || 'http://localhost:3001';
         window.location.href = `${tizaUrl}${pathname}`;
       }
@@ -92,8 +92,8 @@ function DashboardLayoutInner({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  // Early return: prevenir content flash para roles no-HOLDER ni ADMIN
-  if (!isLoading && isAuthenticated && user && user.role !== 'HOLDER' && user.role !== 'ADMIN') {
+  // Early return: prevenir content flash para roles no-GESTION ni ADMIN
+  if (!isLoading && isAuthenticated && user && user.role !== 'GESTION' && user.role !== 'ADMIN') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-brand-light">
         <div className="text-center">

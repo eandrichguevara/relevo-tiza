@@ -1,4 +1,4 @@
-"""Users router — multi-tenant user management for HOLDERs."""
+"""Users router — multi-tenant user management for GESTION users."""
 import secrets
 import string
 import uuid
@@ -16,25 +16,36 @@ from utils.security import hash_password, require_role, get_tenant_id
 
 router = APIRouter()
 
-# SECURITY: Only TEACHER can be created via this endpoint.
-# HOLDER or ADMIN creation via this endpoint is forbidden to prevent
-# privilege escalation (a HOLDER should never create other HOLDERs or ADMINs).
-ALLOWED_CREATE_ROLES = {"teacher": "TEACHER"}
-
-
 @router.post("", response_model=UserResponse, status_code=201)
 async def create_user(
     body: CreateUserRequest,
-    current_user: User = Depends(require_role("HOLDER")),
+    request: Request,
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a user (TEACHER only) under a specific tenant. Only HOLDERs can create users."""
-    # Validate role — only TEACHER allowed
-    resolved_role = ALLOWED_CREATE_ROLES.get(body.role.lower().strip())
-    if not resolved_role:
+    """Create a user (TEACHER for GESTION users; TEACHER or GESTION for ADMINs) under a specific tenant."""
+    # Determine allowed roles based on the current user's role
+    if current_user.role == "ADMIN":
+        role_map = {"teacher": "TEACHER", "gestion": "GESTION"}
+    else:
+        role_map = {"teacher": "TEACHER"}
+
+    requested = body.role.lower().strip()
+    if requested == "admin":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Solo el rol 'teacher' puede ser creado a través de este endpoint",
+            detail="No se puede crear un usuario con rol 'admin' a través de este endpoint.",
+        )
+
+    resolved_role = role_map.get(requested)
+    if not resolved_role:
+        if current_user.role == "ADMIN":
+            detail_msg = "Solo se pueden crear usuarios con rol 'teacher' o 'gestion'."
+        else:
+            detail_msg = "Solo el rol 'teacher' puede ser creado a través de este endpoint"
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=detail_msg,
         )
 
     # Verify tenant exists
@@ -48,7 +59,7 @@ async def create_user(
             detail="Colegio no encontrado",
         )
 
-    # SEC-2: Verify HOLDER is a member of this tenant (tenant isolation)
+    # SEC-2: Verify GESTION is a member of this tenant (tenant isolation)
     if current_user.role != "ADMIN":
         member_result = await db.execute(
             select(TenantMember).where(
@@ -82,7 +93,36 @@ async def create_user(
     db.add(user)
     await db.flush()
     await db.refresh(user)
+
+    # SEC-1: Create TenantMember for GESTION so they can operate within the tenant
+    if resolved_role == "GESTION":
+        member = TenantMember(
+            tenant_id=body.tenant_id,
+            user_id=user.id,
+            role="owner",
+        )
+        db.add(member)
+
     await db.commit()
+
+    # ── Audit log ────────────────────────────────────────────────
+    audit = AuditLog(
+        id=str(uuid.uuid4()),
+        tenant_id=body.tenant_id,
+        user_id=current_user.id,
+        action="user_created",
+        resource="user",
+        resource_id=user.id,
+        details={
+            "target_email": user.email,
+            "target_role": resolved_role,
+            "creator_role": current_user.role,
+        },
+        ip_address=request.client.host if request.client else "unknown",
+    )
+    db.add(audit)
+    await db.commit()
+
     return user
 
 
@@ -90,20 +130,20 @@ async def create_user(
 async def list_users(
     request: Request,
     tenant_id: Optional[str] = Query(None, description="Filter by tenant UUID"),
-    role: Optional[str] = Query(None, description="Filter by role (TEACHER, HOLDER, ADMIN)"),
-    current_user: User = Depends(require_role("HOLDER")),
+    role: Optional[str] = Query(None, description="Filter by role (TEACHER, GESTION, ADMIN)"),
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
-    """List users with optional filters. Only HOLDERs can list users.
+    """List users with optional filters. Only GESTION users can list users.
     
     SECURITY: Tenant isolation is enforced. If no tenant_id is specified,
-    only users from tenants the current HOLDER is a member of are returned.
-    If tenant_id is specified, the HOLDER must be a member of that tenant.
+    only users from tenants the current GESTION is a member of are returned.
+    If tenant_id is specified, the GESTION must be a member of that tenant.
     """
     stmt = select(User)
 
     if tenant_id:
-        # Verify the HOLDER has access to the specified tenant
+        # Verify the GESTION has access to the specified tenant
         membership = await db.execute(
             select(TenantMember).where(
                 TenantMember.tenant_id == tenant_id,
@@ -117,7 +157,7 @@ async def list_users(
             )
         stmt = stmt.where(User.tenant_id == tenant_id)
     else:
-        # Only show users from tenants the HOLDER is a member of
+        # Only show users from tenants the GESTION is a member of
         member_result = await db.execute(
             select(TenantMember.tenant_id).where(TenantMember.user_id == current_user.id)
         )
@@ -147,12 +187,12 @@ def _generate_temp_password(length: int = 12) -> str:
 async def reset_password(
     user_id: UUID,
     request: Request,
-    current_user: User = Depends(require_role("HOLDER")),
+    current_user: User = Depends(require_role("GESTION")),
     db: AsyncSession = Depends(get_db),
 ):
     """Reset a user's password to a secure temporary password.
     
-    Only HOLDERs can reset passwords. The HOLDER must belong to the same
+    Only GESTION users can reset passwords. The GESTION must belong to the same
     tenant as the target user (tenant isolation). The temporary password
     is returned in the response and is not stored in plaintext.
     """
@@ -166,14 +206,14 @@ async def reset_password(
             detail="Usuario no encontrado",
         )
 
-    # SECURITY: Prevent HOLDER from resetting their own password
+    # SECURITY: Prevent GESTION from resetting their own password
     if user_id_str == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No puedes restaurar tu propia contraseña desde este panel.",
         )
 
-    # SECURITY: Tenant isolation — HOLDER must be a member of the user's tenant
+    # SECURITY: Tenant isolation — GESTION must be a member of the user's tenant
     if current_user.role != "ADMIN":
         member_result = await db.execute(
             select(TenantMember).where(

@@ -28,17 +28,17 @@ async def _generate_unique_join_code(db: AsyncSession) -> str:
 router = APIRouter()
 
 # ─── Role & brand mapping ─────────────────────────────────
-# SECURITY: Only TEACHER and HOLDER can be created via public registration.
+# SECURITY: Only TEACHER and GESTION can be created via public registration.
 # "admin" role is intentionally excluded to prevent privilege escalation.
 ROLE_MAP = {
     "teacher": "TEACHER",
-    "director": "HOLDER",
-    "holder": "HOLDER",
+    "director": "GESTION",
+    "holder": "GESTION",
 }
 
 BRAND_MAP = {
     "TEACHER": "tiza",
-    "HOLDER": "relevo",
+    "GESTION": "relevo",
     "ADMIN": "tiza",
 }
 
@@ -64,7 +64,7 @@ async def register(
     """Register a new user.
 
     - TEACHER: requires an existing ``tenant_id`` in body.
-    - HOLDER/ADMIN: creates a default tenant when ``tenant_id`` is omitted.
+    - GESTION/ADMIN: creates a default tenant when ``tenant_id`` is omitted.
     """
     # Check existing user
     result = await db.execute(select(User).where(User.email == body.email))
@@ -111,7 +111,7 @@ async def register(
             detail="Los profesores deben estar asignados a un colegio existente. Proporciona un tenant_id, un código de acceso, o pide a tu director(a) que cree una cuenta.",
         )
     else:
-        # HOLDER / ADMIN → create a default tenant
+        # GESTION / ADMIN → create a default tenant
         tenant_subdomain = f"colegio-demo-{brand}"
         tenant_result = await db.execute(
             select(Tenant).where(Tenant.subdomain == tenant_subdomain)
@@ -163,7 +163,7 @@ async def register(
     member = TenantMember(
         tenant_id=tenant_id,
         user_id=user.id,
-        role="owner" if resolved_role in ("HOLDER", "ADMIN") else "member",
+        role="owner" if resolved_role in ("GESTION", "ADMIN") else "member",
     )
     db.add(member)
 

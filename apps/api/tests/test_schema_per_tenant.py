@@ -230,11 +230,11 @@ class TestDashboardPostgresPaths:
         from routers.dashboard import executive_dashboard
         from models.db_models import User
 
-        # Mock user with HOLDER role
-        holder_user = Mock(spec=User, role="HOLDER", id="user-1")
+        # Mock user with GESTION role
+        gestion_user = Mock(spec=User, role="GESTION", id="user-1")
 
         # Mock the require_role dependency bypass
-        with patch("routers.dashboard.require_role", return_value=lambda: holder_user):
+        with patch("routers.dashboard.require_role", return_value=lambda: gestion_user):
             mock_db = AsyncMock()
 
             # Mock get_accessible_tenant_ids to return some tenants
@@ -248,7 +248,7 @@ class TestDashboardPostgresPaths:
                 # but we verify the _is_postgres() check is called
                 # and schema_names would be populated
                 from routers.dashboard import get_accessible_tenant_ids
-                accessible = await get_accessible_tenant_ids(mock_db, holder_user)
+                accessible = await get_accessible_tenant_ids(mock_db, gestion_user)
 
                 # For non-ADMIN, should use TenantMember membership
                 assert len(accessible) >= 0  # depends on mock setup
@@ -317,10 +317,10 @@ class TestSchemaCreationOnRegistration:
     """Verify tenant schema creation is triggered during registration."""
 
     async def test_register_holder_calls_create_tenant_schema(self, client):
-        """Registering a HOLDER must call create_tenant_schema (bypasses SQLite no-op)."""
+        """Registering a GESTION must call create_tenant_schema (bypasses SQLite no-op)."""
         with patch("routers.auth.create_tenant_schema") as mock_create_schema:
             response = await client.post("/api/auth/register", json={
-                "email": "schema-test-holder@test.com",
+                "email": "schema-test-gestion@test.com",
                 "password": "SecurePass123!",
                 "role": "director",
             })
@@ -329,13 +329,13 @@ class TestSchemaCreationOnRegistration:
             tenant_id = response.json()["tenant_id"]
             mock_create_schema.assert_called_once_with(tenant_id)
 
-    async def test_create_tenant_calls_create_tenant_schema(self, client, pre_approved_holder):
+    async def test_create_tenant_calls_create_tenant_schema(self, client, pre_approved_gestion):
         """POST /api/tenants must call create_tenant_schema."""
         with patch("routers.tenants.create_tenant_schema") as mock_create_schema:
             response = await client.post(
                 "/api/tenants",
                 json={"name": "Schema Test School", "subdomain": "schema-test-school"},
-                headers={"Authorization": f"Bearer {pre_approved_holder['token']}"},
+                headers={"Authorization": f"Bearer {pre_approved_gestion['token']}"},
             )
             assert response.status_code == 201
             tenant_id = response.json()["id"]

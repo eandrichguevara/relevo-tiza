@@ -833,8 +833,8 @@ describe('useRelevoApi — Pending Registrations', () => {
     expect(result.current.data).toEqual(mockPendingRegistrations);
   });
 
-  it('usePendingRegistrations fetches for HOLDER role', async () => {
-    setAuthenticated({ user: { id: 'u1', role: 'HOLDER' } });
+  it('usePendingRegistrations fetches for GESTION role', async () => {
+    setAuthenticated({ user: { id: 'u1', role: 'GESTION' } });
     mockApiFetch.mockResolvedValueOnce(mockPendingRegistrations);
 
     const { usePendingRegistrations } = await import('../useRelevoApi');

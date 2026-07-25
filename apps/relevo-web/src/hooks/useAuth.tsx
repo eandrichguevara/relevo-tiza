@@ -9,6 +9,7 @@ import {
   fetchTokenFromSession,
   getStoredUser,
   storeUser,
+  changePasswordUser,
   type AuthUser,
 } from '@/lib/auth';
 
@@ -29,6 +30,7 @@ interface AuthContextValue {
     role: string;
     school?: string;
   }) => Promise<void>;
+  changePassword: (currentPass: string, newPass: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -71,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 role: meData.role,
                 status: meData.status ?? 'active',
                 rejectionReason: meData.rejection_reason,
+                mustChangePassword: meData.must_change_password,
                 tenantId: meData.tenant_id,
               };
               storeUser(reconstructedUser);
@@ -111,6 +114,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const changePassword = useCallback(async (currentPass: string, newPass: string) => {
+    if (!token) throw new Error('No autenticado');
+    const result = await changePasswordUser(currentPass, newPass, token);
+    setToken(result.token);
+    setUser(result.user);
+  }, [token]);
+
   const logout = useCallback(async () => {
     await clearAuth();
     setToken(null);
@@ -131,6 +141,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         userStatus,
         login,
         register,
+        changePassword,
         logout,
       }}
     >

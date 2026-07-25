@@ -69,16 +69,13 @@ vi.mock('@tiza/ui', () => ({
 }));
 
 vi.mock('lucide-react', () => ({
-  Plus: ({ size }: any) => (
-    <span data-testid="icon-plus" data-size={size}>
-      +
-    </span>
-  ),
-  Trash2: ({ size }: any) => (
-    <span data-testid="icon-trash" data-size={size}>
-      🗑
-    </span>
-  ),
+  Plus: ({ size }: any) => <span data-testid="icon-plus">+</span>,
+  Trash2: ({ size }: any) => <span data-testid="icon-trash">🗑</span>,
+  FileText: ({ size }: any) => <span data-testid="icon-filetext">📄</span>,
+  ImageIcon: ({ size }: any) => <span data-testid="icon-image">🖼</span>,
+  HelpCircle: ({ size }: any) => <span data-testid="icon-help">❓</span>,
+  ArrowUp: ({ size }: any) => <span data-testid="icon-arrowup">⬆</span>,
+  ArrowDown: ({ size }: any) => <span data-testid="icon-arrowdown">⬇</span>,
 }));
 
 // ─── Test Data ──────────────────────────────────────────────
@@ -150,7 +147,8 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     expect(select).toBeInTheDocument();
     expect(select).toHaveValue('');
 
-    const options = screen.getAllByRole('option');
+    const { within } = await import('@testing-library/react');
+    const options = within(select).getAllByRole('option');
     expect(options.length).toBe(3); // placeholder + 2 classes
     expect(options[1]).toHaveTextContent('1° — 1° A (Matemáticas)');
     expect(options[2]).toHaveTextContent('2° — 2° B (Lenguaje)');
@@ -192,54 +190,58 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('comienza con 1 pregunta por defecto', async () => {
     await renderNuevaEvaluacionPage();
 
-    expect(screen.getByText('Q1')).toBeInTheDocument();
-    expect(screen.queryByText('Q2')).not.toBeInTheDocument();
+    expect(screen.getByText('Pregunta 1')).toBeInTheDocument();
+    expect(screen.queryByText('Pregunta 2')).not.toBeInTheDocument();
   });
 
-  it('agrega una pregunta al hacer clic en "Agregar pregunta"', async () => {
+  it('agrega una pregunta al hacer clic en "Agregar Pregunta"', async () => {
     await renderNuevaEvaluacionPage();
 
-    const addBtn = screen.getByText('Agregar pregunta');
+    const addBtn = screen.getByText('Agregar Pregunta');
     await userEvent.click(addBtn);
 
-    expect(screen.getByText('Q1')).toBeInTheDocument();
-    expect(screen.getByText('Q2')).toBeInTheDocument();
+    expect(screen.getByText('Pregunta 1')).toBeInTheDocument();
+    expect(screen.getByText('Pregunta 2')).toBeInTheDocument();
   });
 
   it('agrega dos preguntas al hacer clic dos veces', async () => {
     await renderNuevaEvaluacionPage();
 
-    const addBtn = screen.getByText('Agregar pregunta');
+    const addBtn = screen.getByText('Agregar Pregunta');
     await userEvent.click(addBtn);
     await userEvent.click(addBtn);
 
-    expect(screen.getByText('Q1')).toBeInTheDocument();
-    expect(screen.getByText('Q2')).toBeInTheDocument();
-    expect(screen.getByText('Q3')).toBeInTheDocument();
+    expect(screen.getByText('Pregunta 1')).toBeInTheDocument();
+    expect(screen.getByText('Pregunta 2')).toBeInTheDocument();
+    expect(screen.getByText('Pregunta 3')).toBeInTheDocument();
   });
 
   it('elimina una pregunta y reenumera las restantes', async () => {
     await renderNuevaEvaluacionPage();
 
-    const addBtn = screen.getByText('Agregar pregunta');
+    const addBtn = screen.getByText('Agregar Pregunta');
     await userEvent.click(addBtn);
     await userEvent.click(addBtn);
 
-    // Should have Q1, Q2, Q3
-    expect(screen.getByText('Q3')).toBeInTheDocument();
+    // Should have Pregunta 1, Pregunta 2, Pregunta 3
+    expect(screen.getByText('Pregunta 3')).toBeInTheDocument();
 
-    // Delete Q2
-    const deleteButtons = screen.getAllByLabelText(/Eliminar pregunta/);
-    await userEvent.click(deleteButtons[1]); // Delete Q2
+    // Delete Pregunta 2
+    const deleteButtons = screen.getAllByTitle('Eliminar elemento');
+    await userEvent.click(deleteButtons[1]); // Delete Pregunta 2
 
-    expect(screen.queryByText('Q3')).not.toBeInTheDocument();
-    expect(screen.getByText('Q2')).toBeInTheDocument();
+    expect(screen.queryByText('Pregunta 3')).not.toBeInTheDocument();
+    expect(screen.getByText('Pregunta 2')).toBeInTheDocument();
   });
 
-  it('no muestra botón eliminar cuando hay solo una pregunta', async () => {
+  it('no muestra botón eliminar cuando hay solo un elemento', async () => {
     await renderNuevaEvaluacionPage();
 
-    expect(screen.queryByLabelText('Eliminar pregunta 1')).not.toBeInTheDocument();
+    // Default has 2 items (1 info section + 1 question), so remove 1 first
+    const deleteButtons = screen.getAllByTitle('Eliminar elemento');
+    await userEvent.click(deleteButtons[0]);
+
+    expect(screen.queryByTitle('Eliminar elemento')).not.toBeInTheDocument();
   });
 
   // ─── Tipo de pregunta ──────────────────────────────────
@@ -266,7 +268,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
 
     // Switch back to written
     await userEvent.selectOptions(typeSelect, 'written');
-    expect(screen.queryByText('Alternativas')).not.toBeInTheDocument();
+    expect(screen.queryByText('Alternativas', { selector: 'label' })).not.toBeInTheDocument();
   });
 
   // ─── Alternativas ──────────────────────────────────────
@@ -378,25 +380,21 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('elimina un criterio', async () => {
     await renderNuevaEvaluacionPage();
 
+    // Written question comes with 1 criterion (C1). Add a second criterion (C2).
     const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
     await userEvent.click(addCriterionBtn);
 
     const deleteCriterionBtn = screen.getByLabelText('Eliminar criterio 1');
     await userEvent.click(deleteCriterionBtn);
 
     expect(screen.queryByText('C2')).not.toBeInTheDocument();
-    expect(screen.getByText('C1')).toBeInTheDocument(); // C2 is now relabeled C1
+    expect(screen.getByText('C1')).toBeInTheDocument(); // Former C2 is now relabeled C1
   });
 
   it('agrega nivel a un criterio', async () => {
     await renderNuevaEvaluacionPage();
 
-    // Add criterion first
-    const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
-
-    // Add a level
+    // The written question comes with 1 criterion by default. Add a second level.
     const addLevelBtn = screen.getByText('+ Agregar nivel');
     await userEvent.click(addLevelBtn);
 
@@ -408,10 +406,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('elimina nivel de un criterio', async () => {
     await renderNuevaEvaluacionPage();
 
-    const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
-
-    // Add a second level
+    // The written question comes with 1 criterion by default. Add a second level.
     const addLevelBtn = screen.getByText('+ Agregar nivel');
     await userEvent.click(addLevelBtn);
 
@@ -426,22 +421,19 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('actualiza el total de puntos cuando se usan criterios', async () => {
     await renderNuevaEvaluacionPage();
 
-    const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
-
-    // Default level has 3 pts
-    expect(screen.getByText('Total máx: 3 pts')).toBeInTheDocument();
+    // The default written question comes with 1 criterion with 1 level of 3 pts
+    expect(screen.getByText('Total: 3 pts')).toBeInTheDocument();
   });
 
   // ─── Validación ───────────────────────────────────────
 
   it('muestra alert si no se selecciona clase', async () => {
+    const { fireEvent } = await import('@testing-library/react');
     await renderNuevaEvaluacionPage();
 
-    // Fill required title to bypass HTML5 validation
     await userEvent.type(screen.getByLabelText('Título de la evaluación'), 'Test');
-    const submitBtn = screen.getByText('Crear evaluación');
-    await userEvent.click(submitBtn);
+    const form = screen.getByText('Crear evaluación').closest('form')!;
+    fireEvent.submit(form);
 
     expect(window.alert).toHaveBeenCalledWith('Selecciona una clase para la evaluación.');
   });
@@ -451,6 +443,9 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
 
     // Fill required title to bypass HTML5 validation
     await userEvent.type(screen.getByLabelText('Título de la evaluación'), 'Test');
+    const secTitle = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitle, 'Instrucciones');
+
     // Select a class
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
@@ -469,17 +464,15 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('muestra alert si criterio no tiene nombre', async () => {
     await renderNuevaEvaluacionPage();
 
-    // Fill required title to bypass HTML5 validation
+    // Fill required fields
     await userEvent.type(screen.getByLabelText('Título de la evaluación'), 'Test');
-    // Select a class
+    const secTitle = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitle, 'Instrucciones');
+
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
 
-    // Add a criterion without name
-    const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
-
-    // Submit
+    // Submit (written question has a default empty criterion)
     const submitBtn = screen.getByText('Crear evaluación');
     await userEvent.click(submitBtn);
 
@@ -491,15 +484,12 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('muestra alert si nivel tiene puntaje cero', async () => {
     await renderNuevaEvaluacionPage();
 
-    // Fill required title to bypass HTML5 validation
     await userEvent.type(screen.getByLabelText('Título de la evaluación'), 'Test');
-    // Select a class
+    const secTitle = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitle, 'Instrucciones');
+
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
-
-    // Add a criterion
-    const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
 
     // Set criterion name
     const nameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
@@ -520,10 +510,19 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   });
 
   it('valida que alternativa tenga texto', async () => {
+    const mockMutateAsync = vi.fn().mockResolvedValue(undefined);
+    mockUseCreateEvaluation.mockReturnValue({
+      mutateAsync: mockMutateAsync,
+      isPending: false,
+    });
+
     await renderNuevaEvaluacionPage();
 
-    // Fill required title to bypass HTML5 validation
+    // Fill required title & section title to bypass HTML5 validation
     await userEvent.type(screen.getByLabelText('Título de la evaluación'), 'Test');
+    const secTitle = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitle, 'Instrucciones');
+
     // Select a class
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
@@ -532,21 +531,9 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     const typeSelect = screen.getByLabelText('Tipo de pregunta 1');
     await userEvent.selectOptions(typeSelect, 'multiple_choice');
 
-    // Mark A as correct (but don't set text — it stays empty)
+    // Mark A as correct
     const checkboxes = screen.getAllByRole('checkbox');
     await userEvent.click(checkboxes[0]);
-
-    // The validation only checks for correct answer existence and alt count.
-    // The text validation is not in the client-side validation (it's in the API).
-    // Submit should still pass client validation at this point but fail if text empty...
-    // Actually looking at the code, there's no client validation for alternative text.
-    // So this test verifies that client validation does NOT block on empty alt text:
-    // The submit should get past validation and call createEvaluation
-    const mockMutateAsync = vi.fn().mockResolvedValue(undefined);
-    mockUseCreateEvaluation.mockReturnValue({
-      mutateAsync: mockMutateAsync,
-      isPending: false,
-    });
 
     const submitBtn = screen.getByText('Crear evaluación');
     await userEvent.click(submitBtn);
@@ -568,9 +555,12 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
 
     await renderNuevaEvaluacionPage();
 
-    // Fill in title
+    // Fill in title & section title
     const titleInput = screen.getByLabelText('Título de la evaluación');
     await userEvent.type(titleInput, 'Evaluación Diagnóstica');
+
+    const secTitleInput = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitleInput, 'Instrucciones');
 
     // Select class
     const select = screen.getByLabelText('Clase');
@@ -579,6 +569,12 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     // Fill in question statement
     const statementInput = screen.getByPlaceholderText('Enunciado de la pregunta');
     await userEvent.type(statementInput, '¿Cuánto es 2+2?');
+
+    // Fill in criterion name and level description
+    const criterionNameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    await userEvent.type(criterionNameInput, 'Criterio 1');
+    const descInput = screen.getByPlaceholderText('Descripción del nivel');
+    await userEvent.type(descInput, 'Nivel 1');
 
     // Submit
     const submitBtn = screen.getByText('Crear evaluación');
@@ -614,9 +610,12 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
 
     await renderNuevaEvaluacionPage();
 
-    // Fill in title
+    // Fill in title & section title
     const titleInput = screen.getByLabelText('Título de la evaluación');
     await userEvent.type(titleInput, 'Test MC');
+
+    const secTitleInput = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitleInput, 'Instrucciones');
 
     // Select class
     const select = screen.getByLabelText('Clase');
@@ -654,7 +653,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
           subject: 'Lenguaje',
           grade: '2°',
           course_id: 'c2',
-          rubric: [
+          rubric: expect.arrayContaining([
             expect.objectContaining({
               question_number: 1,
               type: 'multiple_choice',
@@ -664,7 +663,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
                 { label: 'B', text: 'Buenos Aires', is_correct: false },
               ],
             }),
-          ],
+          ]),
         })
       );
     });
@@ -682,8 +681,17 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     const titleInput = screen.getByLabelText('Título de la evaluación');
     await userEvent.type(titleInput, 'Test');
 
+    const secTitleInput = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitleInput, 'Instrucciones');
+
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
+
+    const criterionNameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    await userEvent.type(criterionNameInput, 'Criterio 1');
+
+    const descInput = screen.getByPlaceholderText('Descripción del nivel');
+    await userEvent.type(descInput, 'Nivel 1');
 
     const submitBtn = screen.getByText('Crear evaluación');
     await userEvent.click(submitBtn);
@@ -756,6 +764,9 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     const titleInput = screen.getByLabelText('Título de la evaluación');
     await userEvent.type(titleInput, 'Test Written');
 
+    const secTitleInput = screen.getByPlaceholderText('Ej: Texto de Lectura N° 1 o Instrucciones Generales');
+    await userEvent.type(secTitleInput, 'Instrucciones');
+
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
 
@@ -763,17 +774,13 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     const statementInput = screen.getByPlaceholderText('Enunciado de la pregunta');
     await userEvent.type(statementInput, 'Describe el proceso');
 
-    // Add criterion
-    const addCriterionBtn = screen.getByText('+ Agregar criterio');
-    await userEvent.click(addCriterionBtn);
-
-    // Set criterion name
-    const nameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
-    await userEvent.type(nameInput, 'Claridad');
+    // Set criterion name (the written question comes with 1 default criterion)
+    const nameInputs = screen.getAllByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    await userEvent.type(nameInputs[0], 'Claridad');
 
     // Set level description
-    const descInput = screen.getByPlaceholderText('Descripción del nivel');
-    await userEvent.type(descInput, 'Excelente');
+    const descInputs = screen.getAllByPlaceholderText('Descripción del nivel');
+    await userEvent.type(descInputs[0], 'Excelente');
 
     // Submit
     const submitBtn = screen.getByText('Crear evaluación');
@@ -782,7 +789,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledWith(
         expect.objectContaining({
-          rubric: [
+          rubric: expect.arrayContaining([
             expect.objectContaining({
               type: 'written',
               criteria: [
@@ -797,7 +804,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
                 }),
               ],
             }),
-          ],
+          ]),
         })
       );
     });

@@ -22,9 +22,9 @@ from httpx import AsyncClient
 class TestDuplicateTenantsRegression:
     """Regression: duplicate tenant names are rejected."""
 
-    async def test_duplicate_name_rejected(self, client: AsyncClient, pre_approved_holder: dict):
+    async def test_duplicate_name_rejected(self, client: AsyncClient, pre_approved_gestion: dict):
         """BUG: Creating two tenants with same name returns 409."""
-        token = pre_approved_holder["token"]
+        token = pre_approved_gestion["token"]
 
         # First tenant — should succeed
         resp1 = await client.post(
@@ -44,9 +44,9 @@ class TestDuplicateTenantsRegression:
             f"Expected 409 for duplicate name, got {resp2.status_code}: {resp2.text}"
         )
 
-    async def test_duplicate_name_error_message_generic(self, client: AsyncClient, pre_approved_holder: dict):
+    async def test_duplicate_name_error_message_generic(self, client: AsyncClient, pre_approved_gestion: dict):
         """Error message is generic (no info leak)."""
-        token = pre_approved_holder["token"]
+        token = pre_approved_gestion["token"]
 
         await client.post(
             "/api/tenants",
@@ -63,9 +63,9 @@ class TestDuplicateTenantsRegression:
         assert "colegio" in data["detail"].lower()
         assert "nombre" in data["detail"].lower()
 
-    async def test_unique_names_allowed(self, client: AsyncClient, pre_approved_holder: dict):
+    async def test_unique_names_allowed(self, client: AsyncClient, pre_approved_gestion: dict):
         """Different names with different subdomains are all accepted."""
-        token = pre_approved_holder["token"]
+        token = pre_approved_gestion["token"]
 
         for i in range(3):
             resp = await client.post(
@@ -80,9 +80,9 @@ class TestDuplicateTenantsRegression:
                 f"Tenant {i} should be created: {resp.status_code} {resp.text}"
             )
 
-    async def test_duplicate_subdomain_still_rejected(self, client: AsyncClient, pre_approved_holder: dict):
+    async def test_duplicate_subdomain_still_rejected(self, client: AsyncClient, pre_approved_gestion: dict):
         """Existing subdomain uniqueness is still enforced (no regression)."""
-        token = pre_approved_holder["token"]
+        token = pre_approved_gestion["token"]
 
         await client.post(
             "/api/tenants",

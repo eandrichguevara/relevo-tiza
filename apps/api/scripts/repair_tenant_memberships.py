@@ -9,8 +9,8 @@ Usage:
 
 This script:
   1. Finds every User with a tenant_id that lacks a TenantMember entry.
-  2. Creates TenantMember (role=owner for HOLDER/ADMIN, role=member for TEACHER).
-  3. For HOLDERs with zero memberships, grants access to ALL tenants (legacy fallback).
+  2. Creates TenantMember (role=owner for GESTION/ADMIN, role=member for TEACHER).
+  3. For GESTION users with zero memberships, grants access to ALL tenants (legacy fallback).
 """
 import asyncio
 import os
@@ -64,16 +64,16 @@ async def repair() -> None:
             if user.tenant_id and user.tenant_id in tenant_map:
                 target_tenant_ids.add(user.tenant_id)
 
-            # HOLDERs without ANY memberships → grant access to ALL tenants
-            # (legacy data fallback: these HOLDERs managed all schools before SEC-7)
-            if user.role == "HOLDER" and not user_memberships:
+            # GESTION users without ANY memberships → grant access to ALL tenants
+            # (legacy data fallback: these GESTION users managed all schools before SEC-7)
+            if user.role == "GESTION" and not user_memberships:
                 for tid in tenant_map:
                     target_tenant_ids.add(tid)
 
             # Create missing memberships
             for tid in target_tenant_ids:
                 if tid not in user_memberships:
-                    role = "owner" if user.role in ("HOLDER", "ADMIN") else "member"
+                    role = "owner" if user.role in ("GESTION", "ADMIN") else "member"
                     member = TenantMember(
                         tenant_id=tid,
                         user_id=user.id,

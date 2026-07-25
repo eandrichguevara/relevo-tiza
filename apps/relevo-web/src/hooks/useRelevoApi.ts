@@ -50,6 +50,7 @@ export interface Course {
   name: string;
   grade: string;
   subject: string;
+  teachers?: Record<string, string>;
   student_count: number;
   created_at: string;
 }
@@ -86,6 +87,37 @@ export function useCreateCourse() {
       }),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['courses', variables.tenant_id] });
+    },
+  });
+}
+
+export function useUpdateCourse() {
+  const { accessToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      tenant_id,
+      ...data
+    }: {
+      id: string;
+      name?: string;
+      grade?: string;
+      subject?: string;
+      teachers?: Record<string, string>;
+      tenant_id?: string;
+    }) =>
+      apiFetch<Course>(`/api/courses/${id}`, {
+        method: 'PUT',
+        token: accessToken,
+        body: JSON.stringify(data),
+      }),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['courses'] });
+      if (variables.tenant_id) {
+        queryClient.invalidateQueries({ queryKey: ['courses', variables.tenant_id] });
+      }
     },
   });
 }
@@ -190,7 +222,7 @@ export function useExecutiveStats() {
 
 export function usePendingRegistrations() {
   const { accessToken, user } = useAuth();
-  const isAdminOrHolder = user?.role === 'ADMIN' || user?.role === 'HOLDER';
+  const isAdminOrGestion = user?.role === 'ADMIN' || user?.role === 'GESTION';
 
   return useQuery<PendingListResponse>({
     queryKey: ['pending-registrations'],
@@ -198,7 +230,7 @@ export function usePendingRegistrations() {
       apiFetch<PendingListResponse>('/api/admin/pending-registrations', {
         token: accessToken,
       }),
-    enabled: isAdminOrHolder && !!accessToken,
+    enabled: isAdminOrGestion && !!accessToken,
     refetchInterval: 30000, // poll every 30s
   });
 }

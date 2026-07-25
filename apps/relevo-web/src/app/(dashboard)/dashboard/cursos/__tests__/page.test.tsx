@@ -29,6 +29,7 @@ vi.mock('@/hooks/ActiveTenantContext', () => ({
 const mockUseTenants = vi.fn();
 const mockUseCourses = vi.fn();
 const mockUseCreateCourse = vi.fn();
+const mockUseUpdateCourse = vi.fn();
 const mockUseDeleteCourse = vi.fn();
 const mockUseUsers = vi.fn();
 
@@ -36,6 +37,7 @@ vi.mock('@/hooks/useRelevoApi', () => ({
   useTenants: (...args: any[]) => mockUseTenants(...args),
   useCourses: (...args: any[]) => mockUseCourses(...args),
   useCreateCourse: (...args: any[]) => mockUseCreateCourse(...args),
+  useUpdateCourse: (...args: any[]) => mockUseUpdateCourse(...args),
   useDeleteCourse: (...args: any[]) => mockUseDeleteCourse(...args),
   useUsers: (...args: any[]) => mockUseUsers(...args),
 }));
@@ -97,6 +99,7 @@ vi.mock('lucide-react', () => ({
   BookOpen: () => <svg data-testid="icon-book" />,
   Plus: () => <svg data-testid="icon-plus" />,
   Trash2: () => <svg data-testid="icon-trash" />,
+  Pencil: () => <svg data-testid="icon-pencil" />,
   X: () => <svg data-testid="icon-x" />,
   School: () => <svg data-testid="icon-school" />,
   Users: () => <svg data-testid="icon-users" />,
@@ -217,7 +220,7 @@ const MOCK_USERS = [
     id: 'u3',
     name: 'Juan Admin',
     email: 'admin@test.cl',
-    role: 'HOLDER',
+    role: 'GESTION',
     status: 'active',
     tenantId: 't1',
     created_at: '2025-01-01',
@@ -227,7 +230,7 @@ const MOCK_USERS = [
 const DEFAULT_AUTH = {
   accessToken: 'mock-token',
   isAuthenticated: true,
-  user: { id: '1', role: 'HOLDER' },
+  user: { id: '1', role: 'GESTION' },
 };
 
 const DEFAULT_ACTIVE_TENANT = {
@@ -250,6 +253,7 @@ async function renderPage() {
 
 describe('CursosPage', () => {
   let mutateAsyncCreate: ReturnType<typeof vi.fn>;
+  let mutateAsyncUpdate: ReturnType<typeof vi.fn>;
   let mutateAsyncDelete: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
@@ -274,6 +278,12 @@ describe('CursosPage', () => {
     mutateAsyncCreate = vi.fn();
     mockUseCreateCourse.mockReturnValue({
       mutateAsync: mutateAsyncCreate,
+      isPending: false,
+    });
+
+    mutateAsyncUpdate = vi.fn();
+    mockUseUpdateCourse.mockReturnValue({
+      mutateAsync: mutateAsyncUpdate,
       isPending: false,
     });
 
@@ -1351,4 +1361,82 @@ describe('CursosPage', () => {
       });
     });
   });
+
+  // ─── Edición de curso ───────────────────────────────────
+
+  describe('Edición de curso', () => {
+    it('cada curso tiene botón para editar con aria-label', async () => {
+      await renderPage();
+      const editButtons = screen.getAllByRole('button', { name: /editar/i });
+      expect(editButtons).toHaveLength(MOCK_COURSES.length);
+    });
+
+    it('al hacer click en editar abre el modal con título "Editar curso" y precarga los campos', async () => {
+      await renderPage();
+      const editButtons = screen.getAllByRole('button', { name: /editar/i });
+      await userEvent.click(editButtons[0]);
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /editar curso/i })).toBeInTheDocument();
+      expect(screen.getByLabelText('Nombre del curso')).toHaveValue('4° básico A');
+    });
+
+    it('envía la actualización llamando a updateCourse.mutateAsync', async () => {
+      mutateAsyncUpdate.mockResolvedValueOnce({ id: 'c1' });
+      await renderPage();
+
+      const editButtons = screen.getAllByRole('button', { name: /editar/i });
+      await userEvent.click(editButtons[0]);
+
+      const nameInput = screen.getByLabelText('Nombre del curso');
+      await userEvent.clear(nameInput);
+      await userEvent.type(nameInput, '4° básico A Editado');
+
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u2'
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+      await waitFor(() => {
+        expect(mutateAsyncUpdate).toHaveBeenCalledWith({
+          id: 'c1',
+          name: '4° básico A Editado',
+          grade: '4° básico',
+          subject: 'Lenguaje, Matemáticas',
+          teachers: { Lenguaje: 'u1', Matemáticas: 'u2' },
+          tenant_id: 't1',
+        });
+      });
+    });
+
+    it('muestra toast de éxito tras actualizar el curso', async () => {
+      mutateAsyncUpdate.mockResolvedValueOnce({ id: 'c1' });
+      await renderPage();
+
+      const editButtons = screen.getAllByRole('button', { name: /editar/i });
+      await userEvent.click(editButtons[0]);
+
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Lenguaje'),
+        'u1'
+      );
+      await userEvent.selectOptions(
+        screen.getByLabelText('Seleccionar profesor para Matemáticas'),
+        'u2'
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /guardar cambios/i }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/actualizado exitosamente/i)).toBeInTheDocument();
+      });
+    });
+  });
 });
+

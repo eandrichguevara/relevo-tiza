@@ -35,7 +35,7 @@ describe('GET /api/auth/session', () => {
       sub: 'user-1',
       email: 'director@colegio.cl',
       name: 'Director Test',
-      role: 'HOLDER',
+      role: 'GESTION',
       status: 'active',
       tenant_id: 't1',
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -50,7 +50,7 @@ describe('GET /api/auth/session', () => {
       id: 'user-1',
       email: 'director@colegio.cl',
       name: 'Director Test',
-      role: 'HOLDER',
+      role: 'GESTION',
       status: 'active',
       tenantId: 't1',
     });
@@ -81,7 +81,7 @@ describe('GET /api/auth/session', () => {
       sub: 'user-3',
       email: 'pending@test.com',
       name: 'Pending User',
-      role: 'HOLDER',
+      role: 'GESTION',
       status: 'pending',
       tenant_id: 't1',
       exp: Math.floor(Date.now() / 1000) + 3600,
@@ -123,7 +123,7 @@ describe('GET /api/auth/session', () => {
       sub: 'user-expired',
       email: 'expired@test.com',
       name: 'Expired',
-      role: 'HOLDER',
+      role: 'GESTION',
       tenant_id: 't1',
       exp: Math.floor(Date.now() / 1000) - 3600, // expired 1h ago
     };
@@ -168,7 +168,7 @@ describe('GET /api/auth/session', () => {
       sub: 'user-edge',
       email: 'edge@test.com',
       name: 'Edge Case',
-      role: 'HOLDER',
+      role: 'GESTION',
       tenant_id: 't1',
       exp: Math.floor(Date.now() / 1000), // exact current time
     };

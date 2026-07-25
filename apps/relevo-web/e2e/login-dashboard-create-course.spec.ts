@@ -1,9 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
 /**
- * E2E: Flujo completo RELEVO (HOLDER)
+ * E2E: Flujo completo RELEVO (GESTION)
  *
- * 1. Autenticarse contra la API (director@demo.cl / demo123 — HOLDER)
+ * 1. Autenticarse contra la API (director@demo.cl / demo123 — GESTION)
  * 2. Verificar redirección al dashboard
  * 3. Navegar a Cursos
  * 4. Seleccionar colegio "Colegio Demo"
@@ -75,7 +75,7 @@ async function loginViaApi(page: Page): Promise<void> {
   await page.waitForURL(/\/dashboard/, { timeout: 15_000 });
 }
 
-test.describe('RELEVO — Flujo HOLDER: login → dashboard → crear curso', () => {
+test.describe('RELEVO — Flujo GESTION: login → dashboard → crear curso', () => {
   const COURSE_NAME = `E2E Test Course ${Date.now()}`;
 
   test('login vía API y llegar al dashboard con sesión', async ({ page }) => {

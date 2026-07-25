@@ -25,8 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 CONCURRENCY_COUNT = 10
 
 
-async def _create_holder(token_store: list, fastapi_app, email_suffix: int, name_seed: str):
-    """Create a HOLDER by directly inserting into DB, then login via API."""
+async def _create_gestion(token_store: list, fastapi_app, email_suffix: int, name_seed: str):
+    """Create a GESTION by directly inserting into DB, then login via API."""
     from database import get_db
     from models.db_models import Tenant, User, TenantMember, generate_join_code
     from utils.security import hash_password
@@ -49,20 +49,20 @@ async def _create_holder(token_store: list, fastapi_app, email_suffix: int, name
         session.add(tenant)
         await session.flush()
 
-        holder = User(
+        gestion = User(
             email=email,
-            name=f"Concurrency Holder {email_suffix}",
+            name=f"Concurrency Gestion {email_suffix}",
             password=hash_password(password),
             status="active",
-            role="HOLDER",
+            role="GESTION",
             tenant_id=tenant.id,
         )
-        session.add(holder)
+        session.add(gestion)
         await session.flush()
 
         member = TenantMember(
             tenant_id=tenant.id,
-            user_id=holder.id,
+            user_id=gestion.id,
             role="owner",
         )
         session.add(member)
@@ -96,24 +96,24 @@ class TestTenantConcurrency:
 
         name_seed = secrets.token_hex(3)
 
-        # ── Create 10 HOLDERs sequentially ───────────────
-        holders = []
+        # ── Create 10 GESTION users sequentially ───────────────
+        gestions = []
         for i in range(CONCURRENCY_COUNT):
-            await _create_holder(holders, fastapi_app, i, name_seed)
+            await _create_gestion(gestions, fastapi_app, i, name_seed)
 
         # ── Common name for all 10 concurrent creates ────
         common_name = f"Race Condition School {secrets.token_hex(4)}"
 
         async def make_request(idx: int) -> tuple:
             """Single request — each uses its own client + transport."""
-            holder = holders[idx]
+            gestion = gestions[idx]
             subdomain = f"race-cond-{idx}-{secrets.token_hex(4)}"
             transport = ASGITransport(app=fastapi_app)
             async with AsyncClient(transport=transport, base_url="http://test") as c:
                 resp = await c.post(
                     "/api/tenants",
                     json={"name": common_name, "subdomain": subdomain},
-                    headers={"Authorization": f"Bearer {holder['token']}"},
+                    headers={"Authorization": f"Bearer {gestion['token']}"},
                 )
                 try:
                     body = resp.json()

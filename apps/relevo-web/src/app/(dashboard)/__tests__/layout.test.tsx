@@ -107,7 +107,7 @@ const DEFAULT_AUTH = {
     id: '1',
     email: 'director@colegio.cl',
     name: 'Director Test',
-    role: 'HOLDER',
+    role: 'GESTION',
     tenantId: 't1',
   },
   isAuthenticated: true,
@@ -212,9 +212,9 @@ describe('DashboardLayout', () => {
     });
   });
 
-  // ─── Non-HOLDER role redirect (BUG-2: whitelist !== HOLDER) ─────
+  // ─── Non-GESTION role redirect (BUG-2: whitelist !== GESTION) ─────
 
-  describe('Non-HOLDER role redirect (whitelist fix)', () => {
+  describe('Non-GESTION role redirect (whitelist fix)', () => {
     const OLD_ENV = process.env;
 
     beforeEach(() => {
@@ -253,12 +253,12 @@ describe('DashboardLayout', () => {
 
       // ADMIN should NOT be redirected — stays on relevo dashboard
       expect(mockPush).not.toHaveBeenCalledWith('/login');
-      // ADMIN should see the dashboard (like HOLDER) + admin-only nav items
+      // ADMIN should see the dashboard (like GESTION) + admin-only nav items
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       // 'Pendientes' page was removed — anchor assertion was removed accordingly
     });
 
-    it('redirige a tiza-web para rol SUPERVISOR (también !== HOLDER)', () => {
+    it('redirige a tiza-web para rol SUPERVISOR (también !== GESTION)', () => {
       const originalLocation = window.location;
       // @ts-ignore
       delete window.location;
@@ -311,7 +311,7 @@ describe('DashboardLayout', () => {
       expect(window.location.href).toContain('http://localhost:3001/dashboard/colegios');
     });
 
-    it('NO redirige a tiza-web si el rol es HOLDER', () => {
+    it('NO redirige a tiza-web si el rol es GESTION', () => {
       const originalLocation = window.location;
       // @ts-ignore
       delete window.location;
@@ -349,7 +349,7 @@ describe('DashboardLayout', () => {
   // ─── Early return: prevención de content flash (BUG-1) ────────
 
   describe('Early return — Redirigiendo... (BUG-1)', () => {
-    it('muestra "Redirigiendo..." cuando el rol no es HOLDER (previene content flash)', () => {
+    it('muestra "Redirigiendo..." cuando el rol no es GESTION (previene content flash)', () => {
       mockUseAuth.mockReturnValue({
         ...DEFAULT_AUTH,
         user: { ...DEFAULT_AUTH.user, role: 'TEACHER' },
@@ -371,7 +371,7 @@ describe('DashboardLayout', () => {
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
     });
 
-    it('NO muestra "Redirigiendo..." para rol HOLDER', () => {
+    it('NO muestra "Redirigiendo..." para rol GESTION', () => {
       renderLayout();
       expect(screen.queryByText('Redirigiendo...')).not.toBeInTheDocument();
       expect(screen.queryByText('No tienes acceso a esta aplicación')).not.toBeInTheDocument();
@@ -404,10 +404,10 @@ describe('DashboardLayout', () => {
     });
   });
 
-  // ─── HOLDER can view dashboard ──────────────────────────────────
+  // ─── GESTION can view dashboard ──────────────────────────────────
 
-  describe('HOLDER access', () => {
-    it('renderiza los elementos de navegación para HOLDER', () => {
+  describe('GESTION access', () => {
+    it('renderiza los elementos de navegación para GESTION', () => {
       renderLayout();
       expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Colegios')).toBeInTheDocument();

@@ -46,12 +46,17 @@ export interface CreateEvaluationRequest {
   grade: string;
   course_id: string;
   rubric: Array<{
-    questionNumber: number;
-    type: 'multiple_choice' | 'written';
-    maxScore: number;
-    correctAnswer?: string;
+    item_type?: 'question' | 'info_section' | 'divider';
+    question_number?: number;
+    statement?: string;
+    type?: 'multiple_choice' | 'written';
+    max_score?: number;
+    correct_answer?: string;
     criteria?: CriterionItem[];
     alternatives?: AlternativeItem[];
+    section_title?: string;
+    section_content?: string;
+    section_image_url?: string;
   }>;
 }
 

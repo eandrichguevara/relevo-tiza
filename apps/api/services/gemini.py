@@ -209,3 +209,209 @@ class GeminiService:
             return "OK" in response.text
         except Exception:
             return False
+
+    async def suggest_next_question(
+        self,
+        subject: Optional[str] = None,
+        grade: Optional[str] = None,
+        topic: Optional[str] = None,
+        question_type: str = "written",
+        existing_questions: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Suggest a new question aligned with course subject/grade and context."""
+        existing_str = "\n- ".join(existing_questions) if existing_questions else "Ninguna aún"
+        prompt = f"""Eres un docente experto en diseño de evaluaciones escolares en Chile.
+Genera una pregunta pedagógicamente sólida para:
+- Asignatura: {subject or 'General'}
+- Nivel: {grade or 'General'}
+- Tema / Objetivo: {topic or 'Alineado al currículum nacional'}
+- Tipo de pregunta: {'Opción Múltiple (multiple_choice)' if question_type == 'multiple_choice' else 'Desarrollo / Escrita (written)'}
+
+Preguntas ya existentes en la evaluación (NO repetir estos temas):
+- {existing_str}
+
+Responde ÚNICAMENTE con un objeto JSON válido con el siguiente formato exacto:
+"""
+        if question_type == "multiple_choice":
+            prompt += """{
+  "statement": "Enunciado claro de la pregunta",
+  "type": "multiple_choice",
+  "correct_answer": "A",
+  "alternatives": [
+    {"label": "A", "text": "Opción correcta", "is_correct": true},
+    {"label": "B", "text": "Distractor plausible 1", "is_correct": false},
+    {"label": "C", "text": "Distractor plausible 2", "is_correct": false},
+    {"label": "D", "text": "Distractor plausible 3", "is_correct": false}
+  ]
+}"""
+        else:
+            prompt += """{
+  "statement": "Enunciado claro de la pregunta de desarrollo",
+  "type": "written",
+  "criteria": [
+    {
+      "name": "Comprensión / Contenido",
+      "levels": [
+        {"points": 3.0, "description": "Responde de forma completa y precisa"},
+        {"points": 1.5, "description": "Responde parcialmente o con imprecisiones menores"},
+        {"points": 0.0, "description": "No responde o la respuesta es incorrecta"}
+      ]
+    }
+  ]
+}"""
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=1024,
+            ),
+        )
+
+        raw_text = response.text.strip()
+        json_match = re.search(r"\{[\s\S]*\}", raw_text)
+        if json_match:
+            raw_text = json_match.group(0)
+
+        try:
+            return json.loads(raw_text)
+        except json.JSONDecodeError:
+            if question_type == "multiple_choice":
+                return {
+                    "statement": "Pregunta de opción múltiple sugerida",
+                    "type": "multiple_choice",
+                    "correct_answer": "A",
+                    "alternatives": [
+                        {"label": "A", "text": "Opción correcta", "is_correct": True},
+                        {"label": "B", "text": "Opción B", "is_correct": False},
+                    ],
+                }
+            return {
+                "statement": "Pregunta de desarrollo sugerida",
+                "type": "written",
+                "criteria": [
+                    {
+                        "name": "Criterio General",
+                        "levels": [{"points": 3.0, "description": "Respuesta correcta"}],
+                    }
+                ],
+            }
+
+    async def suggest_distractors(
+        self, statement: str, correct_answer: str, count: int = 3
+    ) -> List[str]:
+        """Generate plausible distractors for a multiple choice question."""
+        prompt = f"""Eres un profesor diseñando alternativas engañosas pero pedagógicamente valiosas (distractores) para una pregunta de opción múltiple.
+
+Enunciado de la pregunta: "{statement}"
+Respuesta correcta: "{correct_answer}"
+
+Genera exactamente {count} distractores plausiblemente incorrectos pero verosímiles que reflejen errores comunes de los estudiantes.
+
+Responde ÚNICAMENTE con un JSON con el siguiente formato exacto:
+{{
+  "distractors": ["Distractor 1", "Distractor 2", "Distractor 3"]
+}}"""
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.7,
+                max_output_tokens=512,
+            ),
+        )
+
+        raw_text = response.text.strip()
+        json_match = re.search(r"\{[\s\S]*\}", raw_text)
+        if json_match:
+            raw_text = json_match.group(0)
+
+        try:
+            data = json.loads(raw_text)
+            return data.get("distractors", [])[:count]
+        except json.JSONDecodeError:
+            return [f"Opción alternativa {i+1}" for i in range(count)]
+
+    async def refine_question(self, statement: str, action: str) -> str:
+        """Improve, simplify, or increase difficulty of a question statement."""
+        action_instructions = {
+            "improve": "Mejora la claridad, precisión gramatical y ortografía del enunciado sin cambiar su intención ni dificultad.",
+            "simplify": "Simplifica el lenguaje para que sea más fácil de comprender por estudiantes con menor comprensión lectora.",
+            "harder": "Aumenta el nivel cognitivo de la pregunta (ej: pasando de memorización a análisis o aplicación).",
+        }
+        instruction = action_instructions.get(
+            action, action_instructions["improve"]
+        )
+
+        prompt = f"""Eres un docente experto en evaluación escolar.
+Tu tarea es modificar el siguiente enunciado de evaluación según esta indicación: {instruction}
+
+Enunciado original: "{statement}"
+
+Responde ÚNICAMENTE con el enunciado refinado final en texto plano, sin comillas adicionales ni explicaciones."""
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.4,
+                max_output_tokens=512,
+            ),
+        )
+
+        return response.text.strip().strip('"')
+
+    async def suggest_rubric_criteria(
+        self, statement: str, max_score: float = 3.0
+    ) -> List[Dict[str, Any]]:
+        """Generate evaluation rubric criteria for a written question."""
+        prompt = f"""Eres un profesor experto creando rúbricas de evaluación cualitativa en Chile.
+Genera criterios e indicadores de evaluación detallados para la siguiente pregunta de desarrollo:
+
+Enunciado de la pregunta: "{statement}"
+Puntaje máximo de referencia: {max_score} puntos.
+
+Responde ÚNICAMENTE con un JSON con el siguiente formato exacto:
+{{
+  "criteria": [
+    {{
+      "name": "Nombre del Criterio 1",
+      "levels": [
+        {{"points": 2.0, "description": "Descripción para puntaje alto"}},
+        {{"points": 1.0, "description": "Descripción para puntaje medio"}},
+        {{"points": 0.0, "description": "Descripción para puntaje insuficiente"}}
+      ]
+    }}
+  ]
+}}"""
+
+        response = self.client.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.5,
+                max_output_tokens=1024,
+            ),
+        )
+
+        raw_text = response.text.strip()
+        json_match = re.search(r"\{[\s\S]*\}", raw_text)
+        if json_match:
+            raw_text = json_match.group(0)
+
+        try:
+            data = json.loads(raw_text)
+            return data.get("criteria", [])
+        except json.JSONDecodeError:
+            return [
+                {
+                    "name": "Criterio General",
+                    "levels": [
+                        {"points": max_score, "description": "Respuesta correcta y fundamentada"},
+                        {"points": 0.0, "description": "Respuesta incorrecta o en blanco"},
+                    ],
+                }
+            ]
+
