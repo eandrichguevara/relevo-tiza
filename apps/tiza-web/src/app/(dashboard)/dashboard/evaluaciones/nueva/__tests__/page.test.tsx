@@ -20,10 +20,18 @@ vi.mock('next/link', () => ({
 
 const mockUseCreateEvaluation = vi.fn();
 const mockUseMyClasses = vi.fn();
+const mockUseSuggestDistractors = vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+const mockUseRefineQuestion = vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+const mockUseSuggestRubric = vi.fn().mockReturnValue({ mutateAsync: vi.fn(), isPending: false });
+
 vi.mock('@/hooks/useApi', () => ({
   useCreateEvaluation: (...args: any[]) => mockUseCreateEvaluation(...args),
   useMyClasses: (...args: any[]) => mockUseMyClasses(...args),
+  useSuggestDistractors: (...args: any[]) => mockUseSuggestDistractors(...args),
+  useRefineQuestion: (...args: any[]) => mockUseRefineQuestion(...args),
+  useSuggestRubric: (...args: any[]) => mockUseSuggestRubric(...args),
 }));
+
 
 vi.mock('@tiza/ui', () => ({
   Card: ({ children, title, subtitle }: any) => (
@@ -76,7 +84,16 @@ vi.mock('lucide-react', () => ({
   HelpCircle: ({ size }: any) => <span data-testid="icon-help">❓</span>,
   ArrowUp: ({ size }: any) => <span data-testid="icon-arrowup">⬆</span>,
   ArrowDown: ({ size }: any) => <span data-testid="icon-arrowdown">⬇</span>,
+  Sparkles: ({ size }: any) => <span data-testid="icon-sparkles">✨</span>,
+  Wand2: ({ size }: any) => <span data-testid="icon-wand">🪄</span>,
+  Eye: ({ size }: any) => <span data-testid="icon-eye">👁</span>,
+  Undo2: ({ size }: any) => <span data-testid="icon-undo">↩</span>,
+  Redo2: ({ size }: any) => <span data-testid="icon-redo">↪</span>,
+  Printer: ({ size }: any) => <span data-testid="icon-printer">🖨</span>,
+  X: ({ size }: any) => <span data-testid="icon-x">✕</span>,
+  CheckCircle2: ({ size }: any) => <span data-testid="icon-check">✓</span>,
 }));
+
 
 // ─── Test Data ──────────────────────────────────────────────
 
@@ -226,9 +243,9 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     // Should have Pregunta 1, Pregunta 2, Pregunta 3
     expect(screen.getByText('Pregunta 3')).toBeInTheDocument();
 
-    // Delete Pregunta 2
+    // Delete Pregunta 2 (index 3 in items: info, divider, q1, q2, q3)
     const deleteButtons = screen.getAllByTitle('Eliminar elemento');
-    await userEvent.click(deleteButtons[1]); // Delete Pregunta 2
+    await userEvent.click(deleteButtons[3]);
 
     expect(screen.queryByText('Pregunta 3')).not.toBeInTheDocument();
     expect(screen.getByText('Pregunta 2')).toBeInTheDocument();
@@ -237,8 +254,10 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
   it('no muestra botón eliminar cuando hay solo un elemento', async () => {
     await renderNuevaEvaluacionPage();
 
-    // Default has 2 items (1 info section + 1 question), so remove 1 first
-    const deleteButtons = screen.getAllByTitle('Eliminar elemento');
+    // Default has 3 items (info section + divider + question), so remove 2 first
+    let deleteButtons = screen.getAllByTitle('Eliminar elemento');
+    await userEvent.click(deleteButtons[0]);
+    deleteButtons = screen.getAllByTitle('Eliminar elemento');
     await userEvent.click(deleteButtons[0]);
 
     expect(screen.queryByTitle('Eliminar elemento')).not.toBeInTheDocument();
@@ -492,7 +511,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     await userEvent.selectOptions(select, 'c1|Matemáticas');
 
     // Set criterion name
-    const nameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    const nameInput = screen.getByPlaceholderText(/Nombre del criterio/i);
     await userEvent.type(nameInput, 'Ortografía');
 
     // Change points to 0
@@ -567,13 +586,13 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     await userEvent.selectOptions(select, 'c1|Matemáticas');
 
     // Fill in question statement
-    const statementInput = screen.getByPlaceholderText('Enunciado de la pregunta');
+    const statementInput = screen.getByPlaceholderText(/enunciado/i);
     await userEvent.type(statementInput, '¿Cuánto es 2+2?');
 
     // Fill in criterion name and level description
-    const criterionNameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    const criterionNameInput = screen.getByPlaceholderText(/Nombre del criterio/i);
     await userEvent.type(criterionNameInput, 'Criterio 1');
-    const descInput = screen.getByPlaceholderText('Descripción del nivel');
+    const descInput = screen.getByPlaceholderText(/Descripción del nivel/i);
     await userEvent.type(descInput, 'Nivel 1');
 
     // Submit
@@ -626,7 +645,7 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     await userEvent.selectOptions(typeSelect, 'multiple_choice');
 
     // Set statement
-    const statementInput = screen.getByPlaceholderText('Enunciado de la pregunta');
+    const statementInput = screen.getByPlaceholderText(/enunciado/i);
     await userEvent.type(statementInput, '¿Cuál es la capital?');
 
     // Set max score
@@ -687,10 +706,10 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     const select = screen.getByLabelText('Clase');
     await userEvent.selectOptions(select, 'c1|Matemáticas');
 
-    const criterionNameInput = screen.getByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    const criterionNameInput = screen.getByPlaceholderText(/Nombre del criterio/i);
     await userEvent.type(criterionNameInput, 'Criterio 1');
 
-    const descInput = screen.getByPlaceholderText('Descripción del nivel');
+    const descInput = screen.getByPlaceholderText(/Descripción del nivel/i);
     await userEvent.type(descInput, 'Nivel 1');
 
     const submitBtn = screen.getByText('Crear evaluación');
@@ -771,15 +790,15 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
     await userEvent.selectOptions(select, 'c1|Matemáticas');
 
     // Set statement
-    const statementInput = screen.getByPlaceholderText('Enunciado de la pregunta');
+    const statementInput = screen.getByPlaceholderText(/enunciado/i);
     await userEvent.type(statementInput, 'Describe el proceso');
 
     // Set criterion name (the written question comes with 1 default criterion)
-    const nameInputs = screen.getAllByPlaceholderText('Nombre del criterio (ej: Ortografía)');
+    const nameInputs = screen.getAllByPlaceholderText(/Nombre del criterio/i);
     await userEvent.type(nameInputs[0], 'Claridad');
 
     // Set level description
-    const descInputs = screen.getAllByPlaceholderText('Descripción del nivel');
+    const descInputs = screen.getAllByPlaceholderText(/Descripción del nivel/i);
     await userEvent.type(descInputs[0], 'Excelente');
 
     // Submit
@@ -809,4 +828,16 @@ describe('NuevaEvaluacionPage (Tiza)', () => {
       );
     });
   });
+
+  // ─── Previsualización ──────────────────────────────────
+
+  it('abre el modal de previsualización al hacer clic en Previsualizar', async () => {
+    await renderNuevaEvaluacionPage();
+
+    const previewBtns = screen.getAllByText('Previsualizar');
+    await userEvent.click(previewBtns[0]);
+
+    expect(screen.getByText('Vista previa de evaluación')).toBeInTheDocument();
+  });
 });
+

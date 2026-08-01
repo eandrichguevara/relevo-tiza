@@ -248,8 +248,8 @@ class CriterionLevel(BaseModel):
     
     Ejemplo: "5 puntos — Presenta máximo 2 faltas ortográficas"
     """
-    points: float = Field(..., ge=0, description="Puntaje de este nivel (ej: 5.0)")
-    description: str = Field(..., min_length=1, description="Descripción del nivel de desempeño")
+    points: float = Field(0.0, ge=0, description="Puntaje de este nivel (ej: 5.0)")
+    description: str = Field("", description="Descripción del nivel de desempeño")
 
 
 class CriterionItem(BaseModel):
@@ -263,8 +263,8 @@ class CriterionItem(BaseModel):
         {points: 1, description: "No más de 6 faltas ortográficas"},
       ]
     """
-    name: str = Field(..., min_length=1, description="Nombre del criterio (ej: 'Ortografía', 'Claridad')")
-    levels: List[CriterionLevel] = Field(..., min_length=1, description="Niveles de desempeño (al menos 1)")
+    name: str = Field("", description="Nombre del criterio (ej: 'Ortografía', 'Claridad')")
+    levels: List[CriterionLevel] = Field(default_factory=list, description="Niveles de desempeño")
 
 
 class ItemTypeEnum(str, Enum):
@@ -549,7 +549,14 @@ class TeacherClassResponse(BaseModel):
 class SuggestNextQuestionRequest(BaseModel):
     subject: Optional[str] = None
     grade: Optional[str] = None
-    topic: Optional[str] = None
+    evaluation_title: Optional[str] = Field(
+        None,
+        description="Título administrativo de la evaluación (NO es contenido curricular)",
+    )
+    topic: Optional[str] = Field(
+        None,
+        description="Tema o unidad curricular específico a evaluar (ej: 'Álgebra', 'La Célula')",
+    )
     question_type: Optional[QuestionTypeEnum] = QuestionTypeEnum.written
     existing_questions: Optional[List[str]] = Field(default_factory=list)
 
@@ -574,11 +581,26 @@ class SuggestDistractorsResponse(BaseModel):
 
 class RefineQuestionRequest(BaseModel):
     statement: str
-    action: str = Field(..., description="Acción: 'improve', 'simplify', 'harder'")
+    action: str = Field("autocomplete", description="Acción: 'autocomplete', 'improve', 'simplify', 'harder'")
+    field_type: Optional[str] = Field("statement", description="Tipo de campo a autocompletar")
+    criteria: Optional[List[CriterionItem]] = Field(
+        None,
+        description="Criterios actuales de la pregunta (para adaptarlos al nuevo enunciado)",
+    )
+    evaluation_title: Optional[str] = None
+    subject: Optional[str] = None
+    grade: Optional[str] = None
+    section_context: Optional[str] = None
+    question_statement: Optional[str] = None
+    criterion_name: Optional[str] = None
+    question_type: Optional[str] = None
+    existing_alternatives: Optional[List[str]] = None
+    current_level_points: Optional[float] = None
 
 
 class RefineQuestionResponse(BaseModel):
     refined_statement: str
+    criteria: Optional[List[CriterionItem]] = None
 
 
 class SuggestRubricRequest(BaseModel):

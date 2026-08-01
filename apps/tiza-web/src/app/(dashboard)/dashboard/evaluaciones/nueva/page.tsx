@@ -1,10 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Input, Button, Spinner } from '@tiza/ui';
-import { Plus, Trash2, FileText, Image as ImageIcon, HelpCircle, ArrowUp, ArrowDown } from 'lucide-react';
-import { useCreateEvaluation, useMyClasses, type TeacherClass } from '@/hooks/useApi';
+import { Plus, Trash2, FileText, Image as ImageIcon, HelpCircle, ArrowUp, ArrowDown, Sparkles, Wand2, Eye, Undo2, Redo2 } from 'lucide-react';
+import { EvaluationPreviewModal } from '@/components/EvaluationPreviewModal';
+import {
+  useCreateEvaluation,
+  useMyClasses,
+  useSuggestDistractors,
+  useRefineQuestion,
+  useSuggestRubric,
+  type TeacherClass,
+} from '@/hooks/useApi';
+import { useAutosave } from '@/hooks/useAutosave';
 
 interface CriterionLevel {
   points: number;
@@ -47,6 +56,367 @@ export default function NuevaEvaluacionPage() {
   const { data: myClasses, isLoading: classesLoading } = useMyClasses();
   const [title, setTitle] = useState('');
   const [selectedClass, setSelectedClass] = useState<TeacherClass | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const suggestDistractors = useSuggestDistractors();
+  const refineQuestion = useRefineQuestion();
+  const suggestRubric = useSuggestRubric();
+  const [loadingAiKey, setLoadingAiKey] = useState<string | null>(null);
+  // Sugerencia IA pendiente de aceptar por cada campo del formulario
+  const [aiSuggestion, setAiSuggestion] = useState<{ key: string; statement: string } | null>(null);
+  // ─── Historial para Deshacer/Rehacer (Ctrl+Z / Ctrl+Y) ───────────────
+  const historyStack = useRef<{ title: string; items: EvaluationItem[] }[]>([]);
+  const historyIndex = useRef<number>(-1);
+  const isUndoingRedoing = useRef<boolean>(false);
+  const typingDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const updateCanUndoRedo = useCallback(() => {
+    setCanUndo(historyIndex.current > 0);
+    setCanRedo(historyIndex.current < historyStack.current.length - 1);
+  }, []);
+
+  const pushHistory = useCallback((newTitle: string, newItems: EvaluationItem[], forceImmediate = false) => {
+    if (isUndoingRedoing.current) return;
+
+    const doPush = () => {
+      const currentStack = historyStack.current.slice(0, historyIndex.current + 1);
+      const lastState = currentStack[currentStack.length - 1];
+
+      if (lastState && lastState.title === newTitle && JSON.stringify(lastState.items) === JSON.stringify(newItems)) {
+        return;
+      }
+
+      const nextStack = [...currentStack, { title: newTitle, items: JSON.parse(JSON.stringify(newItems)) }];
+      if (nextStack.length > 50) nextStack.shift();
+
+      historyStack.current = nextStack;
+      historyIndex.current = nextStack.length - 1;
+      updateCanUndoRedo();
+    };
+
+    if (forceImmediate) {
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      doPush();
+    } else {
+      if (typingDebounceRef.current) clearTimeout(typingDebounceRef.current);
+      typingDebounceRef.current = setTimeout(doPush, 400);
+    }
+  }, [updateCanUndoRedo]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex.current > 0) {
+      isUndoingRedoing.current = true;
+      historyIndex.current -= 1;
+      const snapshot = historyStack.current[historyIndex.current];
+      setTitle(snapshot.title);
+      setItems(JSON.parse(JSON.stringify(snapshot.items)));
+      setAiSuggestion(null);
+      updateCanUndoRedo();
+      setTimeout(() => {
+        isUndoingRedoing.current = false;
+      }, 50);
+    }
+  }, [updateCanUndoRedo]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex.current < historyStack.current.length - 1) {
+      isUndoingRedoing.current = true;
+      historyIndex.current += 1;
+      const snapshot = historyStack.current[historyIndex.current];
+      setTitle(snapshot.title);
+      setItems(JSON.parse(JSON.stringify(snapshot.items)));
+      setAiSuggestion(null);
+      updateCanUndoRedo();
+      setTimeout(() => {
+        isUndoingRedoing.current = false;
+      }, 50);
+    }
+  }, [updateCanUndoRedo]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const ctrlKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (ctrlKey && e.key.toLowerCase() === 'z') {
+        if (e.shiftKey) {
+          e.preventDefault();
+          handleRedo();
+        } else {
+          e.preventDefault();
+          handleUndo();
+        }
+      } else if (ctrlKey && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [handleUndo, handleRedo]);
+
+  const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  // Contexto de la sección acotada (entre el divisor anterior y el divisor siguiente)
+  const getSectionContext = (itemIndex: number) => {
+    let startIdx = 0;
+    for (let i = itemIndex - 1; i >= 0; i--) {
+      if (items[i].item_type === 'divider' || items[i].item_type === 'info_section') {
+        startIdx = i;
+        break;
+      }
+    }
+
+    let endIdx = items.length;
+    for (let i = itemIndex + 1; i < items.length; i++) {
+      if (items[i].item_type === 'divider' || items[i].item_type === 'info_section') {
+        endIdx = i;
+        break;
+      }
+    }
+
+    const sectionItems = items.slice(startIdx, endIdx);
+    const parts: string[] = [];
+
+    sectionItems.forEach((it, idx) => {
+      const realIndex = startIdx + idx;
+      if (it.item_type === 'divider' || it.item_type === 'info_section') {
+        const title = it.section_title || it.section_content;
+        if (title) parts.push(`Encabezado: ${title}`);
+      } else if (it.item_type === 'question' && realIndex !== itemIndex && it.statement) {
+        parts.push(`P${it.question_number}: ${it.statement}`);
+      }
+    });
+
+    return parts.join(' | ');
+  };
+
+  // Disparador genérico de autocompletado Copilot para cualquier campo
+  const triggerAutocomplete = (
+    key: string,
+    val: string,
+    fieldType: string,
+    opts?: {
+      itemIndex?: number;
+      questionStatement?: string;
+      criterionName?: string;
+      questionType?: string;
+      existingAlternatives?: string[];
+      criteria?: any[];
+      currentLevelPoints?: number;
+    }
+  ) => {
+    if (aiSuggestion?.key === key) setAiSuggestion(null);
+    clearTimeout(debounceTimers.current[key]);
+
+    if (val.trim().length >= 5) {
+      debounceTimers.current[key] = setTimeout(async () => {
+        setLoadingAiKey(key);
+        try {
+          const secContext = opts?.itemIndex !== undefined ? getSectionContext(opts.itemIndex) : undefined;
+          const res = await refineQuestion.mutateAsync({
+            statement: val,
+            action: 'autocomplete',
+            field_type: fieldType,
+            evaluation_title: title,
+            subject: selectedClass?.subject,
+            grade: selectedClass?.grade,
+            section_context: secContext,
+            question_statement: opts?.questionStatement,
+            criterion_name: opts?.criterionName,
+            question_type: opts?.questionType,
+            existing_alternatives: opts?.existingAlternatives,
+            criteria: opts?.criteria,
+            current_level_points: opts?.currentLevelPoints,
+          });
+          if (res.refined_statement && res.refined_statement.trim() !== val.trim()) {
+            setAiSuggestion({ key, statement: res.refined_statement });
+          }
+        } catch (err: any) {
+          console.error('[AI autocomplete] error:', err?.translatedMessage || err?.detail || err?.message || err);
+        } finally {
+          setLoadingAiKey(null);
+        }
+      }, 300);
+    }
+  };
+
+  const autoResizeTextarea = (el: HTMLTextAreaElement | null, suggestionText?: string) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    const currentVal = el.value || '';
+    if (suggestionText && suggestionText.length > currentVal.length) {
+      el.value = suggestionText;
+      const sugH = el.scrollHeight;
+      el.value = currentVal;
+      el.style.height = `${Math.max(38, sugH)}px`;
+    } else {
+      el.style.height = `${Math.max(38, el.scrollHeight)}px`;
+    }
+  };
+
+  const handleAutocompleteKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, key: string, onAccept: (newVal: string) => void) => {
+    if (e.key === 'Tab' && aiSuggestion?.key === key) {
+      e.preventDefault();
+      // Guardar el estado actual en el historial antes de aplicar el autocompletado
+      pushHistory(title, items, true);
+      const cleanAccepted = aiSuggestion.statement.replace(/ {2,}/g, ' ');
+      onAccept(cleanAccepted);
+      clearTimeout(debounceTimers.current[key]);
+      setAiSuggestion(null);
+
+      const target = e.currentTarget;
+      if (target && target.tagName === 'TEXTAREA') {
+        setTimeout(() => {
+          autoResizeTextarea(target as HTMLTextAreaElement);
+        }, 0);
+      }
+    }
+    if (e.key === 'Escape' && aiSuggestion?.key === key) {
+      setAiSuggestion(null);
+    }
+  };
+
+  const getPlaceholder = (key: string, defaultPlaceholder: string) => {
+    return aiSuggestion?.key === key ? '' : defaultPlaceholder;
+  };
+
+  // Renderizador del texto fantasma alineado estilo Copilot
+  const renderGhostOverlay = (key: string, currentValue: string, paddingClass = "px-3 py-1.5") => {
+    if (aiSuggestion?.key !== key || !aiSuggestion.statement) return null;
+    const currentVal = currentValue || '';
+    const sug = aiSuggestion.statement;
+
+    let content = null;
+    if (sug.toLowerCase().startsWith(currentVal.toLowerCase())) {
+      content = (
+        <>
+          <span className="opacity-0">{currentVal}</span>
+          <span className="text-gray-400 select-none font-normal">{sug.slice(currentVal.length)}</span>
+        </>
+      );
+    } else {
+      content = (
+        <>
+          <span className="opacity-0">{currentVal}</span>
+          <span className="text-purple-400/80 select-none font-normal"> — {sug}</span>
+        </>
+      );
+    }
+
+    return (
+      <div
+        className={`absolute inset-0 pointer-events-none text-sm leading-normal font-sans whitespace-pre-wrap break-words overflow-hidden z-0 ${paddingClass}`}
+        aria-hidden="true"
+      >
+        {content}
+      </div>
+    );
+  };
+
+  const renderCopilotBadge = (key: string) => {
+    if (aiSuggestion?.key !== key) return null;
+    return (
+      <div className="absolute right-2 bottom-1.5 z-20 flex items-center gap-1 text-[10px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 shadow-xs pointer-events-none animate-in fade-in duration-150">
+        <Sparkles size={10} className="text-purple-600" />
+        <span><kbd className="px-1 bg-white rounded border border-purple-300 font-mono font-bold text-purple-800">Tab</kbd></span>
+      </div>
+    );
+  };
+
+
+
+  const handleSuggestDistractors = async (item: EvaluationItem) => {
+    if (!item.statement?.trim()) {
+      alert('Escribe el enunciado de la pregunta antes de generar alternativas.');
+      return;
+    }
+    const correctAlt = (item.alternatives || []).find((a) => a.is_correct) || item.alternatives?.[0];
+    const correctText = correctAlt?.text || 'Opción correcta';
+
+    setLoadingAiKey(`${item.id}-distractors`);
+    try {
+      const res = await suggestDistractors.mutateAsync({
+        statement: item.statement,
+        correct_answer: correctText,
+        count: 3,
+      });
+
+      if (res.distractors && res.distractors.length > 0) {
+        const labels = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const existingAlts = item.alternatives || [];
+        const newAlts: AlternativeItem[] = [...existingAlts];
+
+        res.distractors.forEach((dText) => {
+          if (newAlts.length < 6) {
+            const nextLabel = labels[newAlts.length] || `Option ${newAlts.length + 1}`;
+            newAlts.push({ label: nextLabel, text: dText, is_correct: false });
+          }
+        });
+
+        updateItem(item.id, { alternatives: newAlts });
+      }
+    } catch (err: any) {
+      const msg = err?.detail || err?.translatedMessage || err?.message || 'Error desconocido';
+      alert('Error al generar alternativas con IA: ' + msg);
+    } finally {
+      setLoadingAiKey(null);
+    }
+  };
+
+  const handleRefineQuestion = async (item: EvaluationItem, action: 'improve' | 'simplify' | 'harder') => {
+    if (!item.statement?.trim()) {
+      alert('Escribe el enunciado de la pregunta antes de refinar.');
+      return;
+    }
+
+    setLoadingAiKey(`${item.id}-${action}`);
+    try {
+      const res = await refineQuestion.mutateAsync({
+        statement: item.statement,
+        action,
+        criteria: item.criteria as any,
+      });
+      if (res.refined_statement) {
+        updateItem(item.id, {
+          statement: res.refined_statement,
+          ...(res.criteria ? { criteria: res.criteria } : {}),
+        });
+      }
+    } catch (err: any) {
+      const msg = err?.detail || err?.translatedMessage || err?.message || 'Error desconocido';
+      alert('Error al refinar pregunta con IA: ' + msg);
+    } finally {
+      setLoadingAiKey(null);
+    }
+  };
+
+  const handleSuggestRubric = async (item: EvaluationItem) => {
+    if (!item.statement?.trim()) {
+      alert('Escribe el enunciado de la pregunta antes de generar la rúbrica.');
+      return;
+    }
+
+    setLoadingAiKey(`${item.id}-rubric`);
+    try {
+      const res = await suggestRubric.mutateAsync({
+        statement: item.statement,
+        max_score: 3.0,
+      });
+      if (res.criteria && res.criteria.length > 0) {
+        updateItem(item.id, { criteria: res.criteria });
+      }
+    } catch (err: any) {
+      const msg = err?.detail || err?.translatedMessage || err?.message || 'Error desconocido';
+      alert('Error al generar rúbrica con IA: ' + msg);
+    } finally {
+      setLoadingAiKey(null);
+    }
+  };
 
   const createDefaultWrittenQuestion = (id: string, qNum?: number): EvaluationItem => ({
     id,
@@ -73,9 +443,72 @@ export default function NuevaEvaluacionPage() {
   });
 
   const [items, setItems] = useState<EvaluationItem[]>([
-    createDefaultInfoSection('item-1'),
-    createDefaultWrittenQuestion('item-2', 1),
+    { ...createDefaultInfoSection('item-1'), section_title: 'Instrucciones' },
+    { ...createDefaultDivider('item-2'), section_title: 'Sección I' },
+    createDefaultWrittenQuestion('item-3', 1),
   ]);
+
+  // ─── Autoguardado (localStorage) ──────────────────────────────────────
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState<{
+    title?: string;
+    selectedClass?: TeacherClass | null;
+    items?: EvaluationItem[];
+  } | null>(null);
+
+  const autosave = useAutosave({
+    key: 'tiza:draft:nueva-eval',
+    data: { title, selectedClass, items },
+    debounceMs: 2000,
+  });
+
+  // Check draft on mount
+  useEffect(() => {
+    if (autosave.hasDraft) {
+      const draft = autosave.loadDraft();
+      if (draft && (draft.title || (draft.items && draft.items.length > 0))) {
+        setPendingDraft(draft);
+        setShowDraftBanner(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleApplyDraft = () => {
+    if (pendingDraft) {
+      if (pendingDraft.title !== undefined) setTitle(pendingDraft.title);
+      if (pendingDraft.selectedClass !== undefined) setSelectedClass(pendingDraft.selectedClass);
+      if (pendingDraft.items && pendingDraft.items.length > 0) setItems(pendingDraft.items);
+    }
+    setShowDraftBanner(false);
+  };
+
+  const handleDiscardDraft = () => {
+    autosave.clearDraft();
+    setShowDraftBanner(false);
+    setPendingDraft(null);
+  };
+
+  // Warn user before leaving page if there are edits
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (title.trim() || items.some((it) => it.statement?.trim() || it.section_title?.trim())) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [title, items]);
+
+  useEffect(() => {
+    if (historyStack.current.length === 0 && items.length > 0) {
+      historyStack.current = [{ title, items: JSON.parse(JSON.stringify(items)) }];
+      historyIndex.current = 0;
+      updateCanUndoRedo();
+    } else {
+      pushHistory(title, items, false);
+    }
+  }, [title, items, pushHistory, updateCanUndoRedo]);
 
   // Recalcular el número consecutivo de cada pregunta según su posición en la lista de items
   const recomputeQuestionNumbers = (list: EvaluationItem[]): EvaluationItem[] => {
@@ -431,6 +864,7 @@ export default function NuevaEvaluacionPage() {
         course_id: selectedClass.course_id,
         rubric,
       });
+      autosave.clearDraft();
       router.push('/dashboard/evaluaciones');
     } catch (err: any) {
       alert('Error: ' + err.message);
@@ -439,18 +873,119 @@ export default function NuevaEvaluacionPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-brand-secondary mb-6">Nueva evaluación</h1>
+      {/* Banner de restauración de borrador */}
+      {showDraftBanner && (
+        <div className="mb-6 p-4 rounded-xl bg-purple-50 border border-purple-200 flex flex-wrap items-center justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">📝</span>
+            <div>
+              <p className="text-sm font-semibold text-purple-950">
+                Se encontró un borrador guardado automáticamente
+              </p>
+              <p className="text-xs text-purple-700">
+                {autosave.lastSavedAt
+                  ? `Guardado el ${autosave.lastSavedAt.toLocaleDateString()} a las ${autosave.lastSavedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                  : '¿Deseas restaurar tu trabajo previo?'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              brand="tiza"
+              onClick={handleDiscardDraft}
+              className="text-xs text-purple-700 border-purple-300 hover:bg-purple-100"
+            >
+              Descartar borrador
+            </Button>
+            <Button
+              type="button"
+              brand="tiza"
+              onClick={handleApplyDraft}
+              className="text-xs"
+            >
+              Restaurar borrador
+            </Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-brand-secondary">Nueva evaluación</h1>
+          {autosave.savingStatus === 'saving' && (
+            <span className="text-xs text-gray-400 font-medium animate-pulse flex items-center gap-1">
+              💾 Guardando borrador...
+            </span>
+          )}
+          {autosave.savingStatus === 'saved' && (
+            <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+              ✓ Borrador guardado
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            brand="tiza"
+            onClick={handleUndo}
+            disabled={!canUndo}
+            title="Deshacer (Ctrl+Z)"
+            className="flex items-center gap-1 text-xs font-semibold"
+          >
+            <Undo2 size={15} /> Deshacer
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            brand="tiza"
+            onClick={handleRedo}
+            disabled={!canRedo}
+            title="Rehacer (Ctrl+Y)"
+            className="flex items-center gap-1 text-xs font-semibold"
+          >
+            <Redo2 size={15} /> Rehacer
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            brand="tiza"
+            onClick={() => setIsPreviewOpen(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold"
+          >
+            <Eye size={15} /> Previsualizar
+          </Button>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Input
-              label="Título de la evaluación"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej: Evaluación 1 — Comprensión lectora"
-              required
-            />
+            <div className="relative">
+              <label htmlFor="eval-title" className="block text-sm font-medium text-gray-700 mb-1">Título de la evaluación</label>
+              <div className="relative">
+                {renderGhostOverlay('eval-title', title, "px-3 py-2")}
+                <textarea
+                  id="eval-title"
+                  ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === 'eval-title' ? aiSuggestion.statement : undefined)}
+                  value={title}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTitle(val);
+                    triggerAutocomplete('eval-title', val, 'evaluation_title');
+                    autoResizeTextarea(e.target, aiSuggestion?.key === 'eval-title' ? aiSuggestion.statement : undefined);
+                  }}
+                  onKeyDown={(e) => handleAutocompleteKeyDown(e, 'eval-title', (newVal) => setTitle(newVal))}
+                  placeholder={getPlaceholder('eval-title', 'Ej: Evaluación 1 — Comprensión lectora')}
+                  required
+                  rows={1}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm bg-transparent relative z-10 focus:outline-none focus:ring-2 focus:ring-brand-primary overflow-hidden resize-none"
+                />
+                {renderCopilotBadge('eval-title')}
+              </div>
+            </div>
             <div>
               <label htmlFor="class" className="block text-sm font-medium text-gray-700 mb-1">
                 Clase {classesLoading && <Spinner size="sm" />}
@@ -495,13 +1030,13 @@ export default function NuevaEvaluacionPage() {
             {items.map((item, index) => (
               <div
                 key={item.id}
-                className={`p-4 rounded-lg border transition-all ${
+                className={`relative p-4 rounded-lg border transition-all ${
                   item.item_type === 'divider'
                     ? 'bg-amber-50/80 border-amber-300 border-l-4 border-l-amber-500 shadow-sm'
                     : item.item_type === 'info_section'
                     ? 'bg-blue-50/70 border-blue-200 border-l-4 border-l-blue-400 shadow-sm'
                     : 'bg-emerald-50/60 border-emerald-200 border-l-4 border-l-emerald-500 shadow-sm'
-                }`}
+                } `}
               >
                 {/* Header de la tarjeta de item */}
                 <div className="flex items-center justify-between mb-3 border-b pb-2">
@@ -560,14 +1095,25 @@ export default function NuevaEvaluacionPage() {
                     <label className="block text-xs font-medium text-amber-900">
                       Nombre / Título de la Sección
                     </label>
-                    <input
-                      type="text"
-                      value={item.section_title || ''}
-                      onChange={(e) => updateItem(item.id, { section_title: e.target.value })}
-                      placeholder="Ej: Sección I: Comprensión de Lectura"
-                      className="w-full rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      required
-                    />
+                    <div className="relative">
+                      {renderGhostOverlay(`${item.id}-divider_title`, item.section_title || '', "px-3 py-1.5")}
+                      <textarea
+                        ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-divider_title` ? aiSuggestion.statement : undefined)}
+                        value={item.section_title || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          updateItem(item.id, { section_title: val });
+                          triggerAutocomplete(`${item.id}-divider_title`, val, 'divider_title', { itemIndex: index });
+                          autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-divider_title` ? aiSuggestion.statement : undefined);
+                        }}
+                        onKeyDown={(e) => handleAutocompleteKeyDown(e, `${item.id}-divider_title`, (newVal) => updateItem(item.id, { section_title: newVal }))}
+                        placeholder={getPlaceholder(`${item.id}-divider_title`, 'Ej: Sección I: Comprensión de Lectura')}
+                        rows={1}
+                        className="w-full rounded-lg border border-amber-300 bg-transparent relative z-10 px-3 py-1.5 text-sm font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 overflow-hidden resize-none"
+                        required
+                      />
+                      {renderCopilotBadge(`${item.id}-divider_title`)}
+                    </div>
                   </div>
                 ) : item.item_type === 'info_section' ? (
                   /* Render de Sección Informativa */
@@ -576,25 +1122,47 @@ export default function NuevaEvaluacionPage() {
                       <label className="block text-xs font-medium text-blue-900 mb-1">
                         Título del Bloque Informativo (Opcional)
                       </label>
-                      <input
-                        type="text"
-                        value={item.section_title || ''}
-                        onChange={(e) => updateItem(item.id, { section_title: e.target.value })}
-                        placeholder="Ej: Texto de Lectura N° 1 o Instrucciones Generales"
-                        className="w-full rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm font-bold text-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                      />
+                      <div className="relative">
+                        {renderGhostOverlay(`${item.id}-info_title`, item.section_title || '', "px-3 py-1.5")}
+                        <textarea
+                          ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-info_title` ? aiSuggestion.statement : undefined)}
+                          value={item.section_title || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateItem(item.id, { section_title: val });
+                            triggerAutocomplete(`${item.id}-info_title`, val, 'info_title', { itemIndex: index });
+                            autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-info_title` ? aiSuggestion.statement : undefined);
+                          }}
+                          onKeyDown={(e) => handleAutocompleteKeyDown(e, `${item.id}-info_title`, (newVal) => updateItem(item.id, { section_title: newVal }))}
+                          placeholder={getPlaceholder(`${item.id}-info_title`, 'Ej: Texto de Lectura N° 1 o Instrucciones Generales')}
+                          rows={1}
+                          className="w-full rounded-lg border border-blue-300 bg-transparent relative z-10 px-3 py-1.5 text-sm font-bold text-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary overflow-hidden resize-none"
+                        />
+                        {renderCopilotBadge(`${item.id}-info_title`)}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-blue-900 mb-1">
                         Texto / Descripción / Instrucciones
                       </label>
-                      <textarea
-                        value={item.section_content || ''}
-                        onChange={(e) => updateItem(item.id, { section_content: e.target.value })}
-                        placeholder="Escribe el texto de lectura, recomendaciones o instrucciones para los estudiantes..."
-                        rows={3}
-                        className="w-full rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-y"
-                      />
+                      <div className="relative">
+                        {renderGhostOverlay(`${item.id}-info_content`, item.section_content || '', "px-3 py-1.5")}
+                        <textarea
+                          ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-info_content` ? aiSuggestion.statement : undefined)}
+                          value={item.section_content || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            updateItem(item.id, { section_content: val });
+                            triggerAutocomplete(`${item.id}-info_content`, val, 'info_content', { itemIndex: index });
+                            autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-info_content` ? aiSuggestion.statement : undefined);
+                          }}
+                          onKeyDown={(e) => handleAutocompleteKeyDown(e, `${item.id}-info_content`, (newVal) => updateItem(item.id, { section_content: newVal }))}
+                          placeholder={getPlaceholder(`${item.id}-info_content`, 'Escribe el texto de lectura, recomendaciones o instrucciones para los estudiantes...')}
+                          rows={2}
+                          className="w-full rounded-lg border border-blue-200 bg-transparent relative z-10 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary overflow-hidden resize-none"
+                        />
+                        {renderCopilotBadge(`${item.id}-info_content`)}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-blue-900 mb-1">
@@ -632,13 +1200,26 @@ export default function NuevaEvaluacionPage() {
                 ) : (
                   /* Render de Pregunta */
                   <div className="space-y-3">
-                    <textarea
-                      value={item.statement || ''}
-                      onChange={(e) => updateItem(item.id, { statement: e.target.value })}
-                      placeholder="Enunciado de la pregunta"
-                      rows={2}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary resize-y"
-                    />
+                    <label className="text-xs font-semibold text-gray-700">Enunciado de la pregunta</label>
+                    <div className="relative">
+                      {renderGhostOverlay(`${item.id}-statement`, item.statement || '', "px-3 py-1.5")}
+                      <textarea
+                        ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-statement` ? aiSuggestion.statement : undefined)}
+                        value={item.statement || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          updateItem(item.id, { statement: val });
+                          triggerAutocomplete(`${item.id}-statement`, val, 'statement', { itemIndex: index, questionType: item.type });
+                          autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-statement` ? aiSuggestion.statement : undefined);
+                        }}
+                        onKeyDown={(e) => handleAutocompleteKeyDown(e, `${item.id}-statement`, (newVal) => updateItem(item.id, { statement: newVal }))}
+                        placeholder={getPlaceholder(`${item.id}-statement`, 'Escribe el enunciado...')}
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm leading-normal font-sans bg-transparent relative z-10 focus:outline-none focus:ring-2 focus:ring-brand-primary overflow-hidden resize-none"
+                      />
+
+                      {renderCopilotBadge(`${item.id}-statement`)}
+                    </div>
 
                     <div className="flex gap-3 items-start flex-wrap">
                       <div>
@@ -709,17 +1290,52 @@ export default function NuevaEvaluacionPage() {
                     {/* Alternativas */}
                     {item.type === 'multiple_choice' && (
                       <div className="space-y-2 pt-2 border-t">
-                        <label className="text-xs font-semibold text-gray-700">Alternativas</label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-semibold text-gray-700">Alternativas</label>
+                          {loadingAiKey === `${item.id}-distractors` && <Spinner size="sm" />}
+                        </div>
                         {(item.alternatives || []).map((alt, ai) => (
                           <div key={ai} className="flex items-center gap-2">
                             <span className="w-6 text-sm font-bold text-gray-500">{alt.label}</span>
-                            <input
-                              type="text"
-                              value={alt.text}
-                              onChange={(e) => updateAlternativeText(item.id, ai, e.target.value)}
-                              placeholder={`Alternativa ${alt.label}`}
-                              className="flex-1 rounded-lg border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                            />
+                            <div className="relative flex-1">
+                              {renderGhostOverlay(`${item.id}-alt-${ai}`, alt.text || '', "px-3 py-1")}
+                              <textarea
+                                ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-alt-${ai}` ? aiSuggestion.statement : undefined)}
+                                value={alt.text}
+                                onChange={(e) => {
+                                  const val = e.target.value;
+                                  updateAlternativeText(item.id, ai, val);
+                                  const fType = alt.is_correct ? 'alternative_correct' : 'alternative_distractor';
+                                  const otherAlts = (item.alternatives || [])
+                                    .filter((_, idx) => idx !== ai)
+                                    .map((a) => a.text)
+                                    .filter((t) => t && t.trim().length > 0);
+                                  triggerAutocomplete(`${item.id}-alt-${ai}`, val, fType, {
+                                    itemIndex: index,
+                                    questionStatement: item.statement,
+                                    questionType: item.type,
+                                    existingAlternatives: otherAlts,
+                                  });
+                                  autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-alt-${ai}` ? aiSuggestion.statement : undefined);
+                                }}
+                                onKeyDown={(e) => {
+                                  handleAutocompleteKeyDown(e, `${item.id}-alt-${ai}`, (newVal) => updateAlternativeText(item.id, ai, newVal));
+                                  const isLast = ai === (item.alternatives || []).length - 1;
+                                  if (e.key === 'Tab' && isLast && !alt.text.trim() && (item.alternatives || []).length < 6) {
+                                    e.preventDefault();
+                                    handleSuggestDistractors(item);
+                                  }
+                                }}
+                                placeholder={getPlaceholder(`${item.id}-alt-${ai}`, `Alternativa ${alt.label}...`)}
+                                rows={1}
+                                className={`w-full rounded-lg border px-3 py-1 text-sm bg-transparent relative z-10 focus:outline-none focus:ring-2 overflow-hidden resize-none ${
+                                  alt.is_correct
+                                    ? 'border-emerald-300 focus:ring-emerald-500 font-medium'
+                                    : 'border-gray-300 focus:ring-brand-primary'
+                                }`}
+                              />
+                              {renderCopilotBadge(`${item.id}-alt-${ai}`)}
+                            </div>
                             <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
                               <input
                                 type="checkbox"
@@ -760,6 +1376,7 @@ export default function NuevaEvaluacionPage() {
                           <label className="text-xs font-semibold text-gray-700">
                             Criterios de evaluación
                           </label>
+                          {loadingAiKey === `${item.id}-rubric` && <Spinner size="sm" />}
                         </div>
 
                         {(item.criteria || []).map((criterion, cIdx) => (
@@ -771,15 +1388,34 @@ export default function NuevaEvaluacionPage() {
                               <span className="text-xs font-bold text-gray-400">
                                 C{cIdx + 1}
                               </span>
-                              <input
-                                type="text"
-                                value={criterion.name}
-                                onChange={(e) =>
-                                  updateCriterionName(item.id, cIdx, e.target.value)
-                                }
-                                placeholder="Nombre del criterio (ej: Ortografía)"
-                                className="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                              />
+                              <div className="relative flex-1">
+                                {renderGhostOverlay(`${item.id}-crit_name-${cIdx}`, criterion.name || '', "px-3 py-1.5")}
+                                <textarea
+                                  ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-crit_name-${cIdx}` ? aiSuggestion.statement : undefined)}
+                                  value={criterion.name}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    updateCriterionName(item.id, cIdx, val);
+                                    triggerAutocomplete(`${item.id}-crit_name-${cIdx}`, val, 'criterion_name', {
+                                      itemIndex: index,
+                                      questionStatement: item.statement,
+                                      criteria: item.criteria,
+                                    });
+                                    autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-crit_name-${cIdx}` ? aiSuggestion.statement : undefined);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    handleAutocompleteKeyDown(e, `${item.id}-crit_name-${cIdx}`, (newVal) => updateCriterionName(item.id, cIdx, newVal));
+                                    if (e.key === 'Tab' && !criterion.name.trim() && item.statement?.trim()) {
+                                      e.preventDefault();
+                                      handleSuggestRubric(item);
+                                    }
+                                  }}
+                                  placeholder={getPlaceholder(`${item.id}-crit_name-${cIdx}`, 'Nombre del criterio (ej: Ortografía)...')}
+                                  rows={1}
+                                  className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium bg-transparent relative z-10 focus:outline-none focus:ring-2 focus:ring-brand-primary overflow-hidden resize-none"
+                                />
+                                {renderCopilotBadge(`${item.id}-crit_name-${cIdx}`)}
+                              </div>
                               {(item.criteria || []).length > 1 && (
                                 <button
                                   type="button"
@@ -816,21 +1452,30 @@ export default function NuevaEvaluacionPage() {
                                     <span className="text-xs text-gray-400 shrink-0">
                                       pts —
                                     </span>
-                                    <input
-                                      type="text"
-                                      value={level.description}
-                                      onChange={(e) =>
-                                        updateCriterionLevel(
-                                          item.id,
-                                          cIdx,
-                                          lIdx,
-                                          'description',
-                                          e.target.value
-                                        )
-                                      }
-                                      placeholder="Descripción del nivel"
-                                      className="flex-1 rounded-lg border border-gray-300 px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary"
-                                    />
+                                    <div className="relative flex-1">
+                                      {renderGhostOverlay(`${item.id}-level_desc-${cIdx}-${lIdx}`, level.description || '', "px-3 py-1")}
+                                      <textarea
+                                        ref={(el) => autoResizeTextarea(el, aiSuggestion?.key === `${item.id}-level_desc-${cIdx}-${lIdx}` ? aiSuggestion.statement : undefined)}
+                                        value={level.description}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          updateCriterionLevel(item.id, cIdx, lIdx, 'description', val);
+                                          triggerAutocomplete(`${item.id}-level_desc-${cIdx}-${lIdx}`, val, 'level_description', {
+                                            itemIndex: index,
+                                            questionStatement: item.statement,
+                                            criterionName: criterion.name,
+                                            criteria: item.criteria,
+                                            currentLevelPoints: level.points,
+                                          });
+                                          autoResizeTextarea(e.target, aiSuggestion?.key === `${item.id}-level_desc-${cIdx}-${lIdx}` ? aiSuggestion.statement : undefined);
+                                        }}
+                                        onKeyDown={(e) => handleAutocompleteKeyDown(e, `${item.id}-level_desc-${cIdx}-${lIdx}`, (newVal) => updateCriterionLevel(item.id, cIdx, lIdx, 'description', newVal))}
+                                        placeholder={getPlaceholder(`${item.id}-level_desc-${cIdx}-${lIdx}`, 'Descripción del nivel...')}
+                                        rows={1}
+                                        className="w-full rounded-lg border border-gray-300 px-3 py-1 text-sm bg-transparent relative z-10 focus:outline-none focus:ring-2 focus:ring-brand-primary overflow-hidden resize-none"
+                                      />
+                                      {renderCopilotBadge(`${item.id}-level_desc-${cIdx}-${lIdx}`)}
+                                    </div>
                                   </div>
                                   {criterion.levels.length > 1 && (
                                     <button
@@ -883,6 +1528,7 @@ export default function NuevaEvaluacionPage() {
             >
               <Plus size={14} /> Agregar Pregunta
             </Button>
+
             <Button
               type="button"
               variant="outline"
@@ -904,15 +1550,56 @@ export default function NuevaEvaluacionPage() {
           </div>
         </Card>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center flex-wrap">
           <Button type="button" variant="ghost" brand="tiza" onClick={() => router.back()}>
             Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            brand="tiza"
+            onClick={handleUndo}
+            disabled={!canUndo}
+            title="Deshacer (Ctrl+Z)"
+            className="flex items-center gap-1.5"
+          >
+            <Undo2 size={16} /> Deshacer
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            brand="tiza"
+            onClick={handleRedo}
+            disabled={!canRedo}
+            title="Rehacer (Ctrl+Y)"
+            className="flex items-center gap-1.5"
+          >
+            <Redo2 size={16} /> Rehacer
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            brand="tiza"
+            onClick={() => setIsPreviewOpen(true)}
+            className="flex items-center gap-1.5"
+          >
+            <Eye size={16} /> Previsualizar
           </Button>
           <Button type="submit" brand="tiza" loading={createEval.isPending}>
             Crear evaluación
           </Button>
         </div>
       </form>
+
+      <EvaluationPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        title={title}
+        subject={selectedClass?.subject}
+        grade={selectedClass?.grade}
+        items={items}
+      />
     </div>
   );
 }
+

@@ -61,24 +61,6 @@ export function useDeleteEvaluation() {
 
 // ─── AI Evaluation Suggestions ───────────
 
-export function useSuggestNextQuestion() {
-  const { accessToken } = useAuth();
-  return useMutation({
-    mutationFn: (data: {
-      subject?: string;
-      grade?: string;
-      topic?: string;
-      question_type?: 'written' | 'multiple_choice';
-      existing_questions?: string[];
-    }) =>
-      apiFetch<any>('/api/evaluations/ai-suggestions/next-question', {
-        method: 'POST',
-        token: accessToken,
-        body: JSON.stringify(data),
-      }),
-  });
-}
-
 export function useSuggestDistractors() {
   const { accessToken } = useAuth();
   return useMutation({
@@ -94,11 +76,26 @@ export function useSuggestDistractors() {
 export function useRefineQuestion() {
   const { accessToken } = useAuth();
   return useMutation({
-    mutationFn: (data: { statement: string; action: 'improve' | 'simplify' | 'harder' }) =>
-      apiFetch<{ refined_statement: string }>('/api/evaluations/ai-suggestions/refine', {
+    mutationFn: (data: {
+      statement: string;
+      action: string;
+      criteria?: Array<{ name: string; levels: Array<{ points: number; description: string }> }>;
+      evaluation_title?: string;
+      subject?: string;
+      grade?: string;
+      section_context?: string;
+      field_type?: string;
+      question_statement?: string;
+      criterion_name?: string;
+      question_type?: string;
+      existing_alternatives?: string[];
+      current_level_points?: number;
+    }) =>
+      apiFetch<{ refined_statement: string; criteria?: any[] }>('/api/evaluations/ai-suggestions/refine', {
         method: 'POST',
         token: accessToken,
         body: JSON.stringify(data),
+        timeout: 60_000,
       }),
   });
 }
@@ -111,6 +108,7 @@ export function useSuggestRubric() {
         method: 'POST',
         token: accessToken,
         body: JSON.stringify(data),
+        timeout: 60_000,
       }),
   });
 }

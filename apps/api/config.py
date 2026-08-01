@@ -32,7 +32,8 @@ class Settings(BaseSettings):
 
     # ─── AI / LLM ──────────────────────────────────────────────────
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"          # corrección OCR
+    GEMINI_FAST_MODEL: str = "gemini-flash-lite-latest"     # sugerencias inline rápidas (Flash Lite)
     CONFIDENCE_THRESHOLD: float = 0.65
 
     # ─── Auth ──────────────────────────────────────────────────────

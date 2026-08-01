@@ -493,6 +493,7 @@ async def suggest_next_question(
         result = await gemini_service.suggest_next_question(
             subject=body.subject,
             grade=body.grade,
+            evaluation_title=body.evaluation_title,
             topic=body.topic,
             question_type=body.question_type.value if body.question_type else "written",
             existing_questions=body.existing_questions,
@@ -530,17 +531,28 @@ async def refine_question(
     body: RefineQuestionRequest,
     current_user: User = Depends(verify_tenant_access),
 ):
-    """Mejorar, simplificar o ajustar dificultad del enunciado de una pregunta."""
+    """Mejorar, simplificar o ajustar dificultad del enunciado y criterios de una pregunta."""
     try:
-        refined = await gemini_service.refine_question(
+        result = await gemini_service.refine_question(
             statement=body.statement,
             action=body.action,
+            criteria=[c.model_dump() for c in body.criteria] if body.criteria else None,
+            evaluation_title=body.evaluation_title,
+            subject=body.subject,
+            grade=body.grade,
+            section_context=body.section_context,
+            field_type=body.field_type,
+            question_statement=body.question_statement,
+            criterion_name=body.criterion_name,
+            question_type=body.question_type,
+            existing_alternatives=body.existing_alternatives,
+            current_level_points=body.current_level_points,
         )
-        return {"refined_statement": refined}
+        return result
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error al refinar enunciado con IA: {str(e)}",
+            detail=f"Error al refinar pregunta con IA: {str(e)}",
         )
 
 

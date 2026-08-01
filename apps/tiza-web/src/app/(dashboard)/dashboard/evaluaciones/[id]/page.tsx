@@ -6,6 +6,7 @@ import { Card, Button, Badge, Spinner, EmptyState } from '@tiza/ui';
 import { useAuth } from '@/hooks/useAuth';
 import { Upload, FileText, Download, AlertTriangle, CheckCircle, Eye } from 'lucide-react';
 import { useEvaluation, useResults, useProcessEvaluation, useGenerateReport } from '@/hooks/useApi';
+import { EvaluationPreviewModal } from '@/components/EvaluationPreviewModal';
 import Link from 'next/link';
 
 export default function EvaluationDetailPage() {
@@ -18,6 +19,7 @@ export default function EvaluationDetailPage() {
   const generateReport = useGenerateReport();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -123,11 +125,11 @@ export default function EvaluationDetailPage() {
         </Card>
         <Card>
           <h3 className="font-semibold mb-3">Estructura y Rúbrica</h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mb-4">
             {Array.isArray(evaluation.rubric)
               ? (() => {
                   const questionsCount = evaluation.rubric.filter(
-                    (it: any) => it.item_type !== 'info_section'
+                    (it: any) => it.item_type !== 'info_section' && it.item_type !== 'divider'
                   ).length;
                   const sectionsCount = evaluation.rubric.filter(
                     (it: any) => it.item_type === 'info_section'
@@ -136,6 +138,14 @@ export default function EvaluationDetailPage() {
                 })()
               : 'Sin rúbrica'}
           </p>
+          <Button
+            brand="tiza"
+            variant="outline"
+            onClick={() => setIsPreviewOpen(true)}
+            className="w-full flex items-center justify-center gap-1"
+          >
+            <Eye size={16} /> Previsualizar evaluación
+          </Button>
         </Card>
       </div>
 
@@ -188,6 +198,16 @@ export default function EvaluationDetailPage() {
           </div>
         )}
       </Card>
+
+      <EvaluationPreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        title={evaluation.title}
+        subject={evaluation.subject}
+        grade={evaluation.grade}
+        items={Array.isArray(evaluation.rubric) ? evaluation.rubric : []}
+      />
     </div>
   );
 }
+
